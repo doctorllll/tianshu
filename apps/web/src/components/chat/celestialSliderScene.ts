@@ -1,6 +1,6 @@
 /** Tianshu's reasoning-effort scene: each level is a body on the way from stardust to a galaxy. */
 
-import type { Rgb } from "./celestialParticles";
+import { GALAXY_SQUASH, GALAXY_TILT, type Rgb } from "./celestialParticles";
 
 interface Occluder {
   readonly x: number;
@@ -10,7 +10,8 @@ interface Occluder {
 
 /**
  * `size` is the sprite's drawn size in CSS px; `occlude` is the dark disc (as fractions of the
- * sprite) laid under it so stars do not shine through the night side.
+ * sprite) laid under it so stars do not shine through the night side. `free` bodies are too big
+ * for the track and spill out of it; `power` (0–1) is how hard their sparks and shocks hit.
  */
 export const CELESTIAL_STAGES = [
   {
@@ -19,6 +20,8 @@ export const CELESTIAL_STAGES = [
     accent: "#8fd3ff",
     size: 64,
     occlude: null,
+    free: false,
+    power: 0.15,
   },
   {
     id: "asteroid",
@@ -26,6 +29,8 @@ export const CELESTIAL_STAGES = [
     accent: "#b9c4d6",
     size: 56,
     occlude: { x: 0.5, y: 0.46, r: 0.22 },
+    free: false,
+    power: 0.25,
   },
   {
     id: "planet",
@@ -33,27 +38,35 @@ export const CELESTIAL_STAGES = [
     accent: "#5cc2ff",
     size: 56,
     occlude: { x: 0.475, y: 0.485, r: 0.325 },
+    free: false,
+    power: 0.4,
   },
   {
     id: "star",
     line: "Star · burning bright",
     accent: "#ffb547",
-    size: 54,
+    size: 66,
     occlude: { x: 0.5, y: 0.5, r: 0.34 },
+    free: true,
+    power: 0.62,
   },
   {
     id: "blackhole",
     line: "Black hole · deep collapse",
     accent: "#ff7a3a",
-    size: 76,
-    occlude: { x: 0.5, y: 0.5, r: 0.125 },
+    size: 150,
+    occlude: { x: 0.5, y: 0.5, r: 0.14 },
+    free: true,
+    power: 0.88,
   },
   {
     id: "galaxy",
     line: "Galaxy · everything turns on the pivot",
     accent: "#b68cff",
-    size: 68,
+    size: 150,
     occlude: null,
+    free: true,
+    power: 1,
   },
 ] as const satisfies ReadonlyArray<{
   id: string;
@@ -61,6 +74,8 @@ export const CELESTIAL_STAGES = [
   accent: string;
   size: number;
   occlude: Occluder | null;
+  free: boolean;
+  power: number;
 }>;
 
 export type CelestialStage = (typeof CELESTIAL_STAGES)[number];
@@ -107,6 +122,38 @@ export function celestialStageAt(
   const { from, to, mix } = celestialBlendAt(ratio, stages);
   return mix < 0.5 ? from : to;
 }
+
+/** How hard the body at `ratio` hits, 0 to 1, blended between levels. */
+export function celestialPowerAt(ratio: number, stages: ReadonlyArray<CelestialStage>): number {
+  const { from, to, mix } = celestialBlendAt(ratio, stages);
+  return from.power + (to.power - from.power) * mix;
+}
+
+export interface CelestialLayer {
+  readonly stage: CelestialStage;
+  /** Drawn size in CSS px. */
+  readonly size: number;
+  readonly weight: number;
+}
+
+/** The bodies at the knob: between levels the old one shrinks away as the next one grows in. */
+export function celestialLayersAt(
+  ratio: number,
+  stages: ReadonlyArray<CelestialStage>,
+  grip: number,
+): ReadonlyArray<CelestialLayer> {
+  const { from, to, mix } = celestialBlendAt(ratio, stages);
+  const lift = 1 + grip * 0.06;
+  if (from === to || mix <= 0) return [{ stage: from, size: from.size * lift, weight: 1 }];
+  const ease = mix * mix * (3 - 2 * mix);
+  return [
+    { stage: from, size: from.size * lift * (1 - ease * 0.3), weight: 1 - ease },
+    { stage: to, size: to.size * lift * (0.7 + ease * 0.3), weight: ease },
+  ];
+}
+
+/** The galaxy turns in its own tilted plane, slowly, against the way its arms wind. */
+const GALAXY_SPIN = -0.14;
 
 function hexToRgb(hex: string): [number, number, number] {
   const value = Number.parseInt(hex.slice(1), 16);
@@ -411,8 +458,8 @@ const DEBRIS = orbiters(0xa57e01d, 16, (random) => ({
   phase: random(),
 }));
 
-const DISK = orbiters(0xb1ac4, 80, (random) => {
-  const r = 0.17 + Math.pow(random(), 0.8) * 0.3;
+const DISK = orbiters(0xb1ac4, 160, (random) => {
+  const r = 0.17 + Math.pow(random(), 0.8) * 0.45;
   return {
     a: random() * Math.PI * 2,
     r,
@@ -547,9 +594,10 @@ function drawBodyMotion(
     }
     case "star": {
       if (layer === "back") {
-        const breathe = 0.26 + 0.08 * Math.sin(t * 2.1) + 0.04 * Math.sin(t * 5.3);
-        const corona = ctx.createRadialGradient(x, y, size * 0.3, x, y, size * 0.75);
+        const breathe = 0.3 + 0.1 * Math.sin(t * 2.1) + 0.05 * Math.sin(t * 5.3);
+        const corona = ctx.createRadialGradient(x, y, size * 0.3, x, y, size * 0.95);
         corona.addColorStop(0, `rgba(255,170,70,${(breathe * weight).toFixed(3)})`);
+        corona.addColorStop(0.45, `rgba(255,130,50,${(breathe * 0.35 * weight).toFixed(3)})`);
         corona.addColorStop(1, "rgba(255,120,40,0)");
         ctx.fillStyle = corona;
         ctx.fillRect(x - size, y - size, size * 2, size * 2);
@@ -564,7 +612,7 @@ function drawBodyMotion(
       ctx.fillRect(x - size * 1.5, y - 0.6, size * 3, 1.2);
       for (const spark of EJECTA) {
         const phase = frac(t * spark.w + spark.phase);
-        const reach = size * (0.36 + phase * 0.45);
+        const reach = size * (0.36 + phase * 0.6);
         const px = x + Math.cos(spark.a) * reach;
         const py = y + Math.sin(spark.a) * reach;
         dot(ctx, px, py, spark.s, `rgba(255,190,110,${((1 - phase) * 0.8 * weight).toFixed(3)})`);
@@ -573,6 +621,39 @@ function drawBodyMotion(
     }
     case "blackhole": {
       if (layer === "back") {
+        // Relativistic jets out of both poles, flickering, with knots running up them.
+        const jet = size * (0.52 + 0.06 * Math.sin(t * 7.3) + 0.04 * Math.sin(t * 12.1));
+        for (const dir of [-1, 1]) {
+          const beam = ctx.createLinearGradient(x, y, x, y + dir * jet);
+          beam.addColorStop(0, `rgba(210,230,255,${(0.6 * weight).toFixed(3)})`);
+          beam.addColorStop(0.35, `rgba(170,200,255,${(0.3 * weight).toFixed(3)})`);
+          beam.addColorStop(1, "rgba(140,170,255,0)");
+          ctx.fillStyle = beam;
+          ctx.beginPath();
+          ctx.moveTo(x - 1.4, y);
+          ctx.lineTo(x - size * 0.035, y + dir * jet);
+          ctx.lineTo(x + size * 0.035, y + dir * jet);
+          ctx.lineTo(x + 1.4, y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = beam;
+          ctx.lineWidth = 0.9;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x, y + dir * jet * 0.9);
+          ctx.stroke();
+          for (let k = 0; k < 3; k++) {
+            const phase = frac(t * 1.5 + k / 3 + (dir > 0 ? 0.17 : 0));
+            const fade = (1 - phase) * Math.min(1, phase * 6) * 0.85 * weight;
+            dot(
+              ctx,
+              x,
+              y + dir * jet * phase,
+              1.4 * (1 - phase * 0.5),
+              `rgba(225,238,255,${fade.toFixed(3)})`,
+            );
+          }
+        }
         ctx.globalCompositeOperation = "source-over";
         const pull = ctx.createRadialGradient(x, y, size * 0.1, x, y, size * 0.55);
         pull.addColorStop(0, `rgba(0,0,0,${(0.7 * weight).toFixed(3)})`);
@@ -581,21 +662,23 @@ function drawBodyMotion(
         ctx.fillRect(x - size, y - size, size * 2, size * 2);
         ctx.globalCompositeOperation = "lighter";
       }
+      const grit = Math.sqrt(size / 76);
       for (const grain of DISK) {
         const angle = grain.a + t * grain.w;
         const p = onEllipse(angle, grain.r * size, grain.r * size * 0.085, 0);
         if (p.front !== (layer === "front")) continue;
-        // The side turning toward us burns brighter.
+        // The side turning toward us burns brighter; the outer disc thins out.
         const doppler = 0.55 + 0.45 * -Math.cos(angle);
-        const hot = 1 - (grain.r - 0.17) / 0.3;
+        const hot = Math.max(0, 1 - (grain.r - 0.17) / 0.3);
+        const thin = grain.r > 0.45 ? 1 - ((grain.r - 0.45) / 0.17) * 0.75 : 1;
         const g = Math.round(150 + hot * 80);
         const b = Math.round(70 + hot * 90);
         dot(
           ctx,
           x + p.x,
           y + p.y,
-          grain.s,
-          `rgba(255,${g},${b},${(0.75 * doppler * weight).toFixed(3)})`,
+          grain.s * grit,
+          `rgba(255,${g},${b},${(0.75 * doppler * thin * weight).toFixed(3)})`,
         );
       }
       if (layer === "front") {
@@ -608,19 +691,40 @@ function drawBodyMotion(
           const fade = Math.sin(phase * Math.PI) * 0.7 * weight;
           dot(ctx, px, py, 0.7, `rgba(255,220,170,${fade.toFixed(3)})`);
         }
-        const shimmer = 0.22 + 0.14 * Math.sin(t * 2.6);
+        const shimmer = 0.26 + 0.16 * Math.sin(t * 2.6);
         ctx.strokeStyle = `rgba(255,228,190,${(shimmer * weight).toFixed(3)})`;
-        ctx.lineWidth = 0.8;
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(x, y, size * 0.135, 0, Math.PI * 2);
+        ctx.arc(x, y, size * 0.155, 0, Math.PI * 2);
         ctx.stroke();
       }
       break;
     }
     case "galaxy": {
-      if (layer === "back") break;
+      const spin = t * GALAXY_SPIN;
+      if (layer === "back") {
+        // A faint halo of old stars around the whole disc.
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(GALAXY_TILT);
+        ctx.scale(1, GALAXY_SQUASH);
+        const halo = ctx.createRadialGradient(0, 0, size * 0.2, 0, 0, size * 0.78);
+        const breathe = 0.16 + 0.04 * Math.sin(t * 0.9);
+        halo.addColorStop(0, `rgba(150,128,255,${(breathe * weight).toFixed(3)})`);
+        halo.addColorStop(0.5, `rgba(90,110,255,${(breathe * 0.4 * weight).toFixed(3)})`);
+        halo.addColorStop(1, "rgba(90,110,255,0)");
+        ctx.fillStyle = halo;
+        ctx.fillRect(-size, -size, size * 2, size * 2);
+        ctx.restore();
+        break;
+      }
       for (const star of ARMS) {
-        const p = onEllipse(star.a + t * star.w, star.r * size, star.r * size * 0.62, -0.55);
+        const p = onEllipse(
+          star.a + spin - t * star.w * 0.15,
+          star.r * size,
+          star.r * size * GALAXY_SQUASH,
+          GALAXY_TILT,
+        );
         const twinkle = 0.45 + 0.55 * Math.sin(t * (1 + star.phase * 3) + star.phase * 9);
         const fill =
           star.r < 0.11
@@ -644,19 +748,48 @@ function drawBodyMotion(
   ctx.restore();
 }
 
+/** A pocket of deep space the big bodies carry with them, so they read on any panel behind. */
+function drawVoid(
+  ctx: CanvasRenderingContext2D,
+  stage: CelestialStage,
+  x: number,
+  y: number,
+  size: number,
+  weight: number,
+) {
+  if (stage.id !== "blackhole" && stage.id !== "galaxy") return;
+  ctx.save();
+  ctx.translate(x, y);
+  if (stage.id === "galaxy") {
+    ctx.rotate(GALAXY_TILT);
+    ctx.scale(1, GALAXY_SQUASH * 1.2);
+  } else {
+    ctx.scale(1, 0.62);
+  }
+  const r = size * 0.6;
+  const space = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+  space.addColorStop(0, `rgba(3,4,12,${(0.82 * weight).toFixed(3)})`);
+  space.addColorStop(0.6, `rgba(3,4,12,${(0.5 * weight).toFixed(3)})`);
+  space.addColorStop(1, "rgba(3,4,12,0)");
+  ctx.fillStyle = space;
+  ctx.fillRect(-r, -r, r * 2, r * 2);
+  ctx.restore();
+}
+
 function drawOne(
   ctx: CanvasRenderingContext2D,
   stage: CelestialStage,
   x: number,
   y: number,
-  scale: number,
+  size: number,
   weight: number,
   t: number,
 ) {
   if (weight <= 0.002) return;
-  const size = stage.size * scale;
   const tint = hexToRgb(stage.accent);
   const image = celestialSprites().get(stage.id);
+
+  drawVoid(ctx, stage, x, y, size, weight);
 
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
@@ -686,14 +819,28 @@ function drawOne(
   if (image && image.complete && image.naturalWidth > 0) {
     ctx.save();
     ctx.globalAlpha *= weight;
-    ctx.drawImage(image, x - size / 2, y - size / 2, size, size);
+    if (stage.id === "galaxy") {
+      // Turn the disc within its own tilted plane: unproject, rotate, project back.
+      ctx.translate(x, y);
+      ctx.rotate(GALAXY_TILT);
+      ctx.scale(1, GALAXY_SQUASH);
+      ctx.rotate(t * GALAXY_SPIN);
+      ctx.scale(1, 1 / GALAXY_SQUASH);
+      ctx.rotate(-GALAXY_TILT);
+      ctx.drawImage(image, -size / 2, -size / 2, size, size);
+    } else {
+      ctx.drawImage(image, x - size / 2, y - size / 2, size, size);
+    }
     ctx.restore();
   }
 
   drawBodyMotion(ctx, stage.id, x, y, size, t, weight, "front");
 }
 
-/** The body at the knob; between levels the old one shrinks away as the next one grows in. */
+/**
+ * The body at the knob. `free` picks which bodies to draw: the ones that stay in the track (drawn
+ * clipped to it) or the big ones that spill out of it.
+ */
 export function drawCelestialBody(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -702,16 +849,12 @@ export function drawCelestialBody(
   t: number,
   stages: ReadonlyArray<CelestialStage>,
   grip: number,
+  free: boolean,
 ) {
-  const { from, to, mix } = celestialBlendAt(ratio, stages);
-  const lift = 1 + grip * 0.06;
-  if (from === to) {
-    drawOne(ctx, from, x, y, lift, 1, t);
-    return;
+  for (const layer of celestialLayersAt(ratio, stages, grip)) {
+    if (layer.stage.free !== free) continue;
+    drawOne(ctx, layer.stage, x, y, layer.size, layer.weight, t);
   }
-  const ease = mix * mix * (3 - 2 * mix);
-  drawOne(ctx, from, x, y, lift * (1 - ease * 0.3), 1 - ease, t);
-  drawOne(ctx, to, x, y, lift * (0.7 + ease * 0.3), ease, t);
 }
 
 /** A thin targeting ring around the body, so the knob reads as something to grab. */
@@ -747,28 +890,65 @@ export function drawCelestialReticle(
   ctx.restore();
 }
 
-/** The ring of light that runs out from the knob when the level goes up. */
+/**
+ * The ring of light that runs out from the knob when the level goes up; the higher the level, the
+ * wider and rounder it gets, with a second ring and a lens flare across the panel at the top.
+ */
 export function drawCelestialShock(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   shock: number,
   tint: Rgb,
+  power = 0,
 ) {
   if (shock <= 0.01) return;
   const spread = 1 - shock;
-  const radius = 18 + spread * (2 - spread) * 70;
+  const reach = 70 + power * 150;
+  const flat = 0.36 + power * 0.3;
+  const radius = 18 + spread * (2 - spread) * reach;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-  ctx.strokeStyle = rgba(tint, shock * shock * 0.7);
-  ctx.lineWidth = 0.5 + shock * 0.9;
+  ctx.strokeStyle = rgba(tint, shock * shock * 0.75);
+  ctx.lineWidth = 0.5 + shock * (0.9 + power * 1.8);
   ctx.beginPath();
-  ctx.ellipse(x, y, radius, radius * 0.36, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, y, radius, radius * flat, 0, 0, Math.PI * 2);
   ctx.stroke();
-  const flash = ctx.createRadialGradient(x, y, 0, x, y, 40);
-  flash.addColorStop(0, rgba(tint, shock * shock * 0.4));
+
+  if (power > 0.5) {
+    const lag = clamp01(spread * 1.3 - 0.18);
+    if (lag > 0 && lag < 1) {
+      const inner = 14 + lag * (2 - lag) * reach * 0.7;
+      ctx.strokeStyle = `rgba(255,255,255,${(Math.pow(1 - lag, 2) * 0.55).toFixed(3)})`;
+      ctx.lineWidth = 0.6 + (1 - lag) * 1.2;
+      ctx.beginPath();
+      ctx.ellipse(x, y, inner, inner * flat, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    // An anamorphic streak through the knob.
+    const strength = Math.pow(shock, 1.5);
+    const half = 60 + power * 240 * Math.sqrt(spread + 0.05);
+    const core = ctx.createLinearGradient(x - half, 0, x + half, 0);
+    core.addColorStop(0, "rgba(255,255,255,0)");
+    core.addColorStop(0.5, `rgba(255,255,255,${(strength * 0.85).toFixed(3)})`);
+    core.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = core;
+    const thick = 0.6 + power;
+    ctx.fillRect(x - half, y - thick, half * 2, thick * 2);
+    const wash = ctx.createLinearGradient(x - half * 1.2, 0, x + half * 1.2, 0);
+    wash.addColorStop(0, rgba(tint, 0));
+    wash.addColorStop(0.5, rgba(tint, strength * 0.35));
+    wash.addColorStop(1, rgba(tint, 0));
+    ctx.fillStyle = wash;
+    const band = 4 + power * 4;
+    ctx.fillRect(x - half * 1.2, y - band, half * 2.4, band * 2);
+  }
+
+  const bloom = 40 + power * 70;
+  const flash = ctx.createRadialGradient(x, y, 0, x, y, bloom);
+  flash.addColorStop(0, rgba(tint, shock * shock * (0.4 + power * 0.3)));
   flash.addColorStop(1, rgba(tint, 0));
   ctx.fillStyle = flash;
-  ctx.fillRect(x - 40, y - 40, 80, 80);
+  ctx.fillRect(x - bloom, y - bloom, bloom * 2, bloom * 2);
   ctx.restore();
 }

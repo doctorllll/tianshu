@@ -1,11 +1,15 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useUiText } from "~/i18n/useUiText";
 import { observeResize } from "~/lib/observeResize";
 import { cn } from "~/lib/utils";
 import "./composerV9.css";
 import { CelestialParticles } from "./celestialParticles";
 import {
+  type CelestialStage,
   celestialAccentAt,
+  celestialLayersAt,
+  celestialPowerAt,
   celestialRgbAt,
   celestialSprites,
   celestialStageAt,
@@ -28,13 +32,31 @@ export interface CosmicEffortOption {
 const TRACK_H = 50;
 const PAD = 40;
 const SNAP = 0.032;
-// Idle open-popover repaint cadence (~24fps keeps fluid motion silky while staying light on GPU).
+// The bodies and sparks live on a page-level canvas this much bigger than the track on each side,
+// so the big ones can spill out of the track and over the panel; its edges fade out over FEATHER.
+const OVER_X = 130;
+const OVER_Y = 110;
+const FEATHER = 34;
+// Idle open-popover repaint cadence (~24fps keeps fluid motion silky while staying light on GPU);
+// the bodies that spill out of the track keep emitting, so they repaint faster.
 const IDLE_FRAME_MS = 1000 / 24;
+const IDLE_FRAME_FREE_MS = 1000 / 50;
+// Over the popover (z 100), never in the way of the pointer; shown once it is placed.
+const OVERLAY_STYLE = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  zIndex: 101,
+  display: "block",
+  pointerEvents: "none",
+  transformOrigin: "0 0",
+  visibility: "hidden",
+} as const;
 // Auto-sleep the canvas loop after 2s of settled idle (pointer away) to drop idle cost to zero.
 const IDLE_SLEEP_MS = 2000;
 
 let sharedAudioCtx: AudioContext | null = null;
-function playSubtleCosmicChime(ratio: number) {
+function playSubtleCosmicChime(ratio: number, boom: boolean) {
   if (typeof window === "undefined") return;
   try {
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
@@ -63,6 +85,21 @@ function playSubtleCosmicChime(ratio: number) {
     osc2.start(now);
     osc.stop(now + 0.08);
     osc2.stop(now + 0.08);
+    if (boom) {
+      // A low thump under the chime when the body grows into a black hole or a galaxy.
+      const sub = sharedAudioCtx.createOscillator();
+      const subGain = sharedAudioCtx.createGain();
+      sub.type = "sine";
+      sub.frequency.setValueAtTime(86, now);
+      sub.frequency.exponentialRampToValueAtTime(38, now + 0.32);
+      subGain.gain.setValueAtTime(0.0001, now);
+      subGain.gain.exponentialRampToValueAtTime(0.09, now + 0.012);
+      subGain.gain.exponentialRampToValueAtTime(0.0006, now + 0.36);
+      sub.connect(subGain);
+      subGain.connect(sharedAudioCtx.destination);
+      sub.start(now);
+      sub.stop(now + 0.38);
+    }
   } catch {
     // Ignore audio context restrictions in headless/restricted environments.
   }
@@ -74,21 +111,34 @@ interface ShiftJuice {
   recoil: number;
   shock: number;
   kick: number;
+  /** How hard the level just reached hits, 0–1, and whether its shock may leave the track. */
+  shockPower: number;
+  shockFree: boolean;
 }
 
-function applyShiftJuice(st: ShiftJuice, nextIdx: number, prevIdx: number): void {
+/** The hit when the level changes; the higher the level reached, the harder it lands. */
+function applyShiftJuice(
+  st: ShiftJuice,
+  nextIdx: number,
+  prevIdx: number,
+  stage: CelestialStage | undefined,
+): void {
   const up = nextIdx > prevIdx;
-  st.hitstop = up ? 0.028 : 0;
-  st.shake = up ? 0.8 : 0.2;
-  st.recoil = up ? -5 : 2.2;
+  const power = stage?.power ?? 0.3;
+  st.hitstop = up ? 0.028 + power * 0.07 : 0;
+  st.shake = up ? 0.8 + power * 2.6 : 0.2 + power * 0.4;
+  st.recoil = up ? -(5 + power * 6) : 2.2;
   st.shock = up ? 1 : 0;
   st.kick = up ? 1 : -1;
+  st.shockPower = power;
+  st.shockFree = Boolean(stage?.free);
 }
 
 /**
  * Tianshu's reasoning-effort slider: the knob is a body that grows from an asteroid to a galaxy,
- * over a deep sky with the Big Dipper, shedding sparks as it moves. Level radios come in as
- * `children` and render under the track for keyboard and screen readers.
+ * over a deep sky with the Big Dipper, shedding sparks as it moves. The small bodies stay in the
+ * track; from the star up they spill out of it over the panel, on a canvas laid over the page.
+ * Level radios come in as `children` and render under the track for keyboard and screen readers.
  */
 export function CosmicEffortSlider(props: {
   readonly label: string;
@@ -103,6 +153,7 @@ export function CosmicEffortSlider(props: {
   const wellRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayRef = useRef<HTMLCanvasElement>(null);
   const particlesRef = useRef<CelestialParticles | null>(null);
 
   const foundIndex = options.findIndex((o) => o.id === value);
@@ -127,6 +178,8 @@ export function CosmicEffortSlider(props: {
     recoil: 0,
     shock: 0,
     kick: 0,
+    shockPower: 0,
+    shockFree: false,
     prevKx: Number.NaN,
     lastIdlePaintMs: 0,
     lastActivityMs: 0,
@@ -141,13 +194,13 @@ export function CosmicEffortSlider(props: {
     const st = stateRef.current;
     if (!st.dragging) {
       if (st.lastIdx !== selectedIndex) {
-        applyShiftJuice(st, selectedIndex, st.lastIdx);
+        applyShiftJuice(st, selectedIndex, st.lastIdx, celestialStagesFor(count)[selectedIndex]);
         st.lastIdx = selectedIndex;
       }
       st.target = targetRatio;
       wakeLoopRef.current?.();
     }
-  }, [selectedIndex, targetRatio]);
+  }, [selectedIndex, targetRatio, count]);
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- owns imperative Canvas 2D render loop & resize/visibility listeners
   useEffect(() => {
@@ -156,6 +209,34 @@ export function CosmicEffortSlider(props: {
     if (!canvas || !wrap) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    const overlay = overlayRef.current;
+    const octx = overlay?.getContext("2d") ?? null;
+    let placed = "";
+    let popup: HTMLElement | null = null;
+
+    // Keep the page-level canvas over the track: same place, same open/close scale and fade.
+    const placeOverlay = (layoutW: number, ow: number, oh: number) => {
+      if (!overlay) return;
+      const rect = wrap.getBoundingClientRect();
+      const scale = layoutW > 0 ? rect.width / layoutW : 1;
+      popup ??= wrap.closest<HTMLElement>('[data-slot="popover-popup"]');
+      const opacity = popup ? getComputedStyle(popup).opacity : "1";
+      const left = (rect.left - OVER_X * scale).toFixed(2);
+      const top = (rect.top - OVER_Y * scale).toFixed(2);
+      const next = `${left} ${top} ${scale.toFixed(4)} ${opacity} ${ow} ${oh}`;
+      if (next === placed) return;
+      placed = next;
+      overlay.style.width = `${ow}px`;
+      overlay.style.height = `${oh}px`;
+      overlay.style.transform = `translate3d(${left}px,${top}px,0) scale(${scale.toFixed(4)})`;
+      overlay.style.opacity = opacity;
+      overlay.style.visibility = "visible";
+    };
+    const hideOverlay = () => {
+      if (!overlay || placed === "hidden") return;
+      placed = "hidden";
+      overlay.style.visibility = "hidden";
+    };
 
     if (!particlesRef.current) particlesRef.current = new CelestialParticles();
     const particles = particlesRef.current;
@@ -179,6 +260,7 @@ export function CosmicEffortSlider(props: {
       const layoutW = wrap.clientWidth;
       if (layoutW < 2) {
         raf = 0;
+        hideOverlay();
         return;
       }
 
@@ -209,16 +291,27 @@ export function CosmicEffortSlider(props: {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const cw = Math.round(cssW * dpr);
       const ch = Math.round(cssH * dpr);
-      const needsResize = canvas.width !== cw || canvas.height !== ch;
+      const ow = cssW + OVER_X * 2;
+      const oh = cssH + OVER_Y * 2;
+      const ocw = Math.round(ow * dpr);
+      const och = Math.round(oh * dpr);
+      const needsResize =
+        canvas.width !== cw ||
+        canvas.height !== ch ||
+        (overlay !== null && (overlay.width !== ocw || overlay.height !== och));
+      placeOverlay(layoutW, ow, oh);
 
       const busy = st.dragging || st.kick !== 0 || particles.busy || st.shock > 0.01;
+      const idleFrameMs = celestialStageAt(st.val, sceneStages).free
+        ? IDLE_FRAME_FREE_MS
+        : IDLE_FRAME_MS;
       if (
         !reducedMotion &&
         !busy &&
         !needsResize &&
         st.hasPainted &&
         Math.abs(st.target - st.val) <= 0.001 &&
-        now - st.lastIdlePaintMs < IDLE_FRAME_MS
+        now - st.lastIdlePaintMs < idleFrameMs
       ) {
         raf = window.requestAnimationFrame(drawFrame);
         return;
@@ -231,6 +324,10 @@ export function CosmicEffortSlider(props: {
       if (needsResize) {
         canvas.width = cw;
         canvas.height = ch;
+        if (overlay) {
+          overlay.width = ocw;
+          overlay.height = och;
+        }
       }
 
       if (reducedMotion) {
@@ -252,7 +349,8 @@ export function CosmicEffortSlider(props: {
         st.shake = Math.max(0, st.shake - dt * 6.4);
         st.recoil *= Math.pow(0.0008, dt);
         if (Math.abs(st.recoil) < 0.05) st.recoil = 0;
-        st.shock = Math.max(0, st.shock - dt * 3.2);
+        // The top levels' shock rolls out longer.
+        st.shock = Math.max(0, st.shock - dt * (3.2 - st.shockPower * 1.6));
         particles.step(dt);
       }
 
@@ -270,13 +368,34 @@ export function CosmicEffortSlider(props: {
       const kx = PAD + st.val * (cssW - PAD * 2) + st.recoil;
       const ky = cssH / 2;
       const tint = celestialRgbAt(st.val, sceneStages);
+      const power = celestialPowerAt(st.val, sceneStages);
+      const free = celestialStageAt(st.val, sceneStages).free;
+      const layers = celestialLayersAt(st.val, sceneStages, st.grip);
 
+      particles.setAnchor(kx, ky);
       if (!reducedMotion) {
-        if (st.kick === 1) particles.burst(kx, ky, tint, 1);
-        if (st.kick === -1) particles.implode(kx, ky, tint);
+        // A level change goes off where the new body lands, in its colour.
+        if (st.kick !== 0) {
+          const landX = PAD + st.target * (cssW - PAD * 2);
+          const landTint = celestialRgbAt(st.target, sceneStages);
+          if (st.kick === 1) {
+            particles.burst(landX, ky, landTint, st.shockPower, st.shockFree);
+            if (st.shockFree && st.shockPower >= 0.6) {
+              particles.nova(landX, ky, landTint, st.shockPower);
+            }
+          } else {
+            particles.implode(landX, ky, landTint, st.shockPower, st.shockFree);
+          }
+        }
         const moved = Number.isNaN(st.prevKx) ? 0 : kx - st.prevKx;
-        if (st.dragging && Math.abs(moved) > 0.35) particles.trail(kx, ky, moved, tint);
+        if (st.dragging && Math.abs(moved) > 0.35) {
+          particles.trail(kx, ky, moved, tint, power, free);
+        }
         particles.drift(cssW, cssH, dt, 2 + st.val * 6, tint);
+        for (const layer of layers) {
+          particles.emit(layer.stage.id, kx, ky, layer.size, dt, layer.weight);
+        }
+        particles.release(layers.filter((layer) => layer.weight > 0.02).map((l) => l.stage.id));
       }
       st.kick = 0;
       st.prevKx = kx;
@@ -285,6 +404,7 @@ export function CosmicEffortSlider(props: {
         count <= 1 ? cssW / 2 : PAD + (i / (count - 1)) * (cssW - PAD * 2),
       );
 
+      // The track itself holds only the sky.
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, cssW, cssH);
       ctx.save();
@@ -301,11 +421,61 @@ export function CosmicEffortSlider(props: {
         selected: st.lastIdx,
         kx,
       });
-      drawCelestialBody(ctx, kx, ky, st.val, st.t, sceneStages, st.grip);
-      particles.draw(ctx);
-      drawCelestialReticle(ctx, kx, ky, st.t, tint, st.grip);
-      if (!reducedMotion) drawCelestialShock(ctx, kx, ky, st.shock, tint);
       ctx.restore();
+
+      // Bodies and sparks go on the page-level canvas, in track coordinates.
+      const bodyCtx = octx ?? ctx;
+      if (octx) {
+        octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        octx.clearRect(0, 0, ow, oh);
+        octx.translate(OVER_X, OVER_Y);
+      }
+      bodyCtx.save();
+      bodyCtx.beginPath();
+      bodyCtx.roundRect(0, 0, cssW, cssH, cssH / 2);
+      bodyCtx.clip();
+      drawCelestialBody(bodyCtx, kx, ky, st.val, st.t, sceneStages, st.grip, false);
+      particles.draw(bodyCtx, false);
+      if (!reducedMotion && !st.shockFree) {
+        drawCelestialShock(bodyCtx, kx, ky, st.shock, tint, st.shockPower);
+      }
+      if (!octx) {
+        // No page-level canvas: everything stays in the track.
+        drawCelestialBody(bodyCtx, kx, ky, st.val, st.t, sceneStages, st.grip, true);
+        particles.draw(bodyCtx, true);
+      }
+      bodyCtx.restore();
+      if (octx) {
+        drawCelestialBody(octx, kx, ky, st.val, st.t, sceneStages, st.grip, true);
+        particles.draw(octx, true);
+        if (!reducedMotion && st.shockFree) {
+          drawCelestialShock(octx, kx, ky, st.shock, tint, st.shockPower);
+        }
+      }
+      drawCelestialReticle(bodyCtx, kx, ky, st.t, tint, st.grip);
+      if (!octx && !reducedMotion && st.shockFree) {
+        drawCelestialShock(bodyCtx, kx, ky, st.shock, tint, st.shockPower);
+      }
+      if (octx) {
+        // Fade the canvas's own edges so nothing that leaves the track ends on a hard line.
+        octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        octx.globalCompositeOperation = "destination-in";
+        const across = octx.createLinearGradient(0, 0, ow, 0);
+        across.addColorStop(0, "rgba(0,0,0,0)");
+        across.addColorStop(FEATHER / ow, "rgba(0,0,0,1)");
+        across.addColorStop(1 - FEATHER / ow, "rgba(0,0,0,1)");
+        across.addColorStop(1, "rgba(0,0,0,0)");
+        octx.fillStyle = across;
+        octx.fillRect(0, 0, ow, oh);
+        const down = octx.createLinearGradient(0, 0, 0, oh);
+        down.addColorStop(0, "rgba(0,0,0,0)");
+        down.addColorStop(FEATHER / oh, "rgba(0,0,0,1)");
+        down.addColorStop(1 - FEATHER / oh, "rgba(0,0,0,1)");
+        down.addColorStop(1, "rgba(0,0,0,0)");
+        octx.fillStyle = down;
+        octx.fillRect(0, 0, ow, oh);
+        octx.globalCompositeOperation = "source-over";
+      }
 
       st.hasPainted = true;
       canvas.dataset.renderState = reducedMotion ? "sleeping" : "active";
@@ -334,6 +504,9 @@ export function CosmicEffortSlider(props: {
     if (typeof document !== "undefined") {
       document.addEventListener("visibilitychange", onVisibilityChange);
     }
+    // The page-level canvas has to follow the track when anything scrolls or the window resizes.
+    window.addEventListener("scroll", wake, { capture: true, passive: true });
+    window.addEventListener("resize", wake);
 
     return () => {
       forgetCelestialWake(wake);
@@ -344,6 +517,8 @@ export function CosmicEffortSlider(props: {
       if (typeof document !== "undefined") {
         document.removeEventListener("visibilitychange", onVisibilityChange);
       }
+      window.removeEventListener("scroll", wake, { capture: true });
+      window.removeEventListener("resize", wake);
     };
   }, [count]);
 
@@ -368,7 +543,10 @@ export function CosmicEffortSlider(props: {
     const opt = options[idx];
     if (!opt || disabled) return;
     if (opt.id !== value) {
-      if (withSound) playSubtleCosmicChime(count <= 1 ? 0 : idx / (count - 1));
+      if (withSound) {
+        const boom = idx > selectedIndex && (stages[idx]?.power ?? 0) >= 0.8;
+        playSubtleCosmicChime(count <= 1 ? 0 : idx / (count - 1), boom);
+      }
       onChange(opt.id);
     }
   };
@@ -439,7 +617,7 @@ export function CosmicEffortSlider(props: {
             setDragStory(celestialStageAt(ratio, stages).line);
             wakeLoopRef.current?.();
             if (idx !== stateRef.current.lastIdx) {
-              applyShiftJuice(stateRef.current, idx, stateRef.current.lastIdx);
+              applyShiftJuice(stateRef.current, idx, stateRef.current.lastIdx, stages[idx]);
               stateRef.current.lastIdx = idx;
               commitIndex(idx, true);
             }
@@ -451,7 +629,7 @@ export function CosmicEffortSlider(props: {
             const nextStory = celestialStageAt(ratio, stages).line;
             setDragStory((prev) => (prev === nextStory ? prev : nextStory));
             if (idx !== stateRef.current.lastIdx) {
-              applyShiftJuice(stateRef.current, idx, stateRef.current.lastIdx);
+              applyShiftJuice(stateRef.current, idx, stateRef.current.lastIdx, stages[idx]);
               stateRef.current.lastIdx = idx;
               commitIndex(idx, true);
             }
@@ -483,6 +661,18 @@ export function CosmicEffortSlider(props: {
         </div>
       </div>
       {props.children}
+      {typeof document === "undefined"
+        ? null
+        : createPortal(
+            <canvas
+              ref={overlayRef}
+              aria-hidden="true"
+              data-cosmic-overlay
+              // Inline, so it never takes a click even where the stylesheet has not loaded.
+              style={OVERLAY_STYLE}
+            />,
+            document.body,
+          )}
     </div>
   );
 }
