@@ -963,12 +963,58 @@ function isCompactCommand(message: ProviderAdapter.ProviderAdapterV2TurnMessage)
   return /^\/compact(?:\s|$)/.test(message.text.trim()) && message.attachments.length === 0;
 }
 
+const STEERING_EXTENSION_METHOD = "_session/steering";
+
+const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null;
+
+/**
+ * The cross-adapter steering extension (`_session/steering`, the convention of codex-acp and
+ * claude-agent-acp): the agent advertises it as `InitializeResponse._meta.steering.supported`.
+ */
+export function acpAdvertisesSteeringExtension(initializeResult: unknown): boolean {
+  if (!isRecord(initializeResult)) return false;
+  const meta = initializeResult._meta;
+  const steering = isRecord(meta) ? meta.steering : undefined;
+  return isRecord(steering) && steering.supported === true;
+}
+
+/** Sends a steer into the running turn; the agent reads it at its next step, between tool calls. */
+export const sendSteeringExtension = (
+  runtime: Pick<AcpSessionRuntime.AcpSessionRuntime["Service"], "request">,
+  sessionId: string,
+  text: string,
+): Effect.Effect<undefined, EffectAcpErrors.AcpError> =>
+  runtime
+    .request(STEERING_EXTENSION_METHOD, {
+      sessionId,
+      prompt: [{ type: "text", text }],
+      _meta: { steering: { priority: "now" } },
+    })
+    .pipe(
+      Effect.flatMap((reply) => {
+        const outcome = isRecord(reply) ? reply.outcome : undefined;
+        // `queued` and `startedNewTurn` still leave the text with the agent; only an idle session
+        // (`promptRequired`) or an unknown reply leaves it to the orchestrator's follow-up.
+        return outcome === "injected" || outcome === "queued" || outcome === "startedNewTurn"
+          ? Effect.undefined
+          : Effect.fail(
+              new EffectAcpErrors.AcpRequestError({
+                code: -32000,
+                errorMessage: `The agent did not take the steering message (${String(outcome)}).`,
+                method: STEERING_EXTENSION_METHOD,
+              }),
+            );
+      }),
+    );
+
 function negotiatedCapabilities(
   base: OrchestrationV2ProviderCapabilities,
   started: AcpSessionRuntime.AcpSessionRuntimeStartResult,
   modelOptionArrivesLate: boolean,
   forksFromTurn: boolean,
   steersWithPrompt: boolean,
+  steersWithExtension = false,
 ): OrchestrationV2ProviderCapabilities {
   const agent = started.initializeResult.agentCapabilities ?? {};
   const session = agent.sessionCapabilities;
@@ -991,7 +1037,12 @@ function negotiatedCapabilities(
     },
     turns: {
       ...base.turns,
-      supportsActiveSteering: base.turns.supportsActiveSteering || steersWithPrompt,
+      supportsActiveSteering:
+        base.turns.supportsActiveSteering || steersWithPrompt || steersWithExtension,
+      // The extension carries text only; a steer with attachments restarts the turn instead.
+      ...(steersWithExtension && !base.turns.supportsActiveSteering && !steersWithPrompt
+        ? { activeSteeringAcceptsAttachments: false }
+        : {}),
     },
     tools: {
       ...base.tools,
@@ -8039,12 +8090,17 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
         rememberTerminalEnvironment(started.sessionId, yield* readMcpContext(input.threadId));
         yield* runtime.drainEvents;
         const steersWithPrompt = flavor.steersWithPrompt?.(started.initializeResult) === true;
+        const steersWithExtension =
+          flavor.steering === undefined &&
+          !steersWithPrompt &&
+          acpAdvertisesSteeringExtension(started.initializeResult);
         const capabilities = negotiatedCapabilities(
           yield* readCapabilities,
           started,
           flavor.modelOptionArrivesLate === true,
           flavor.forkFromTurn?.supported(started.initializeResult) === true,
           steersWithPrompt,
+          steersWithExtension,
         );
         const canLoadSession = started.initializeResult.agentCapabilities?.loadSession === true;
         const canResumeSession =
@@ -10075,12 +10131,26 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           steerTurn: Effect.fn("AcpAdapterV2.steerTurn")(
             function* (turnInput) {
               if (steersWithPrompt) return yield* steerWithPrompt(turnInput);
-              const steering = flavor.steering;
+              const steering =
+                flavor.steering ??
+                (steersWithExtension
+                  ? {
+                      send: (
+                        steeringRuntime: Pick<
+                          AcpSessionRuntime.AcpSessionRuntime["Service"],
+                          "request"
+                        >,
+                        sessionId: string,
+                        text: string,
+                      ) => sendSteeringExtension(steeringRuntime, sessionId, text),
+                    }
+                  : undefined);
               // A text-only steer leaves attachments to the orchestrator's restart.
               if (
                 steering === undefined ||
                 (turnInput.message.attachments.length > 0 &&
-                  flavor.capabilities.turns.activeSteeringAcceptsAttachments === false)
+                  (steersWithExtension ||
+                    flavor.capabilities.turns.activeSteeringAcceptsAttachments === false))
               ) {
                 return yield* new ProviderAdapter.ProviderAdapterSteerRunUnsupportedError({
                   driver,

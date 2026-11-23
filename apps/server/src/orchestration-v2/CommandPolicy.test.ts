@@ -120,6 +120,31 @@ it("resolves automatic message delivery from authoritative provider capabilities
   );
 });
 
+it("queues a steer for a provider that can only steer by restarting the turn", () => {
+  const restartOnly = dispatchProjection(
+    capabilities((current) => ({
+      ...current,
+      turns: {
+        ...current.turns,
+        supportsActiveSteering: false,
+        supportsSteeringByInterruptRestart: true,
+      },
+    })),
+  );
+  assert.deepEqual(
+    CommandPolicy.resolveMessageDispatchIntent(restartOnly, { type: "start_immediately" }, "steer"),
+    { type: "queue_after_active" },
+  );
+  assert.deepEqual(
+    CommandPolicy.resolveMessageDispatchIntent(
+      restartOnly,
+      { type: "start_immediately" },
+      "restart",
+    ),
+    { type: "restart_active", targetRunId: activeRunId },
+  );
+});
+
 it.each(["preparing", "starting"] as const)(
   "queues an automatic message while the handoff run is %s",
   (status) => {

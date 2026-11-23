@@ -134,12 +134,13 @@ export function resolveMessageDispatchIntent(
   if (targetMessage !== undefined && isNativeMaintenanceCommand(targetMessage)) {
     return { type: "queue_after_active" };
   }
-  // A provider that can neither steer nor restart its turn takes the message after the turn.
+  // A provider that cannot steer natively takes the message after the turn. Steering by
+  // interrupt and restart would throw away the work under way; restart is asked for explicitly.
   const turns =
     target === undefined || !isActiveRun(target)
       ? undefined
       : providerTurnCapabilities(projection, target);
-  return turns !== undefined && !turns.supportsActiveSteering && providerSwitchWaitsForTurn(turns)
+  return turns !== undefined && !turns.supportsActiveSteering
     ? { type: "queue_after_active" }
     : mode;
 }

@@ -2092,7 +2092,7 @@ const restartCompletionWake = Effect.fn("restartCompletionWake")(function* (
     yield* completeTask(siblingTaskId);
   }
 
-  // The provider cannot steer natively, so the steer restarts the wake run.
+  // The provider cannot steer natively, so a steer would wait for the turn; the user restarts it.
   const steeredRunning = yield* watchTurnRunning(wakeOrdinal + 1);
   yield* orchestrator.dispatch({
     type: "message.dispatch",
@@ -2104,7 +2104,7 @@ const restartCompletionWake = Effect.fn("restartCompletionWake")(function* (
     modelSelection: runSelection,
     ...(intentNamesTarget
       ? { dispatchMode: { type: "start_immediately" as const }, deliveryIntent: "restart" as const }
-      : { dispatchMode: { type: "steer_active" as const, targetRunId: wake.runId } }),
+      : { dispatchMode: { type: "restart_active" as const, targetRunId: wake.runId } }),
     createdBy: "user",
     creationSource: "web",
   });
