@@ -298,6 +298,8 @@ export interface ProviderOrchestratorReplayVariant {
   readonly runtimePolicyOverride?: RuntimePolicyV2Override;
   readonly runContinuationWorker?: boolean;
   readonly expectedAbsentWorkspacePaths?: ReadonlyArray<string>;
+  /** Replaces the fixture's input when this provider's recording followed different steps. */
+  readonly buildInput?: () => OrchestratorFixtureInput;
   readonly assertOutput: (
     result: OrchestratorV2ScenarioResult,
     transcript: ProviderReplayTranscript,
