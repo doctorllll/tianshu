@@ -14,6 +14,7 @@ import {
 import * as ProviderLatestVersions from "@t3tools/provider-core/server/ProviderLatestVersions";
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import { makeManagedServerProvider } from "@t3tools/provider-core/server/managedProvider";
+import * as Digest from "effect/crypto/Digest";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
@@ -27,7 +28,21 @@ import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import * as Sink from "effect/Sink";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
-import { makeClaudeMaintenanceResolution } from "./ClaudeMaintenance.ts";
+import {
+  makeClaudeMaintenanceResolution,
+  NATIVE_VERSIONS_INSTALL_SCRIPT,
+} from "./ClaudeMaintenance.ts";
+
+// Runs the newest runnable build in the native versions directory, like a launcher that
+// points another config directory at the same installs.
+const VERSIONS_LAUNCHER = `#!/bin/bash
+export CLAUDE_CONFIG_DIR="$HOME/.claude-other"
+dir="$HOME/.local/share/claude/versions"
+for v in $(ls "$dir" 2>/dev/null | grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+$' | sort -t. -k1,1nr -k2,2nr -k3,3nr); do
+  [[ -f "$dir/$v" && -x "$dir/$v" ]] && exec "$dir/$v" "$@"
+done
+exit 127
+`;
 
 const snapshot: ServerProvider = {
   instanceId: ProviderInstanceId.make("claude"),
@@ -44,7 +59,7 @@ const snapshot: ServerProvider = {
 };
 
 const fixture = Effect.fn("ClaudeMaintenance.test.fixture")(function* (
-  install: "native" | "xdgNative" | "npm" | "wrapper" = "native",
+  install: "native" | "xdgNative" | "npm" | "wrapper" | "versionsLauncher" = "native",
   platform: NodeJS.Platform = "linux",
   programFiles?: string,
 ) {
@@ -57,7 +72,7 @@ const fixture = Effect.fn("ClaudeMaintenance.test.fixture")(function* (
       : path.join(directory, ".local/bin", platform === "win32" ? "claude.exe" : "claude");
   // Unix native installs link the launcher to a versioned binary; Windows places a real .exe.
   const realBinaryPath =
-    install === "native" && platform !== "win32"
+    (install === "native" && platform !== "win32") || install === "versionsLauncher"
       ? path.join(directory, ".local/share/claude/versions/2.1.314")
       : install === "xdgNative"
         ? path.join(directory, "xdg/data/claude/versions/2.1.314")
@@ -67,7 +82,12 @@ const fixture = Effect.fn("ClaudeMaintenance.test.fixture")(function* (
   yield* fs.chmod(realBinaryPath, 0o755);
   if (realBinaryPath !== binaryPath) {
     yield* fs.makeDirectory(path.dirname(binaryPath), { recursive: true });
-    yield* fs.symlink(realBinaryPath, binaryPath);
+    if (install === "versionsLauncher") {
+      yield* fs.writeFileString(binaryPath, VERSIONS_LAUNCHER);
+      yield* fs.chmod(binaryPath, 0o755);
+    } else {
+      yield* fs.symlink(realBinaryPath, binaryPath);
+    }
   }
   const configDirectory = path.join(directory, "config");
   yield* fs.makeDirectory(configDirectory);
@@ -150,6 +170,7 @@ const fixture = Effect.fn("ClaudeMaintenance.test.fixture")(function* (
       Effect.provideService(HostProcess.Platform, platform),
       Effect.provideService(HostProcess.Environment, {
         PATH: "",
+        HOME: directory,
         CLAUDE_CONFIG_DIR: configDirectory,
         ...(programFiles ? { PROGRAMFILES: programFiles } : {}),
       }),
@@ -343,6 +364,11 @@ it.layer(NodeServices.layer)("ClaudeMaintenance", (it) => {
   it.effect.each([
     { name: "a wrapper script", install: "wrapper", lockKey: undefined },
     {
+      name: "a launcher that runs the newest build in the versions directory",
+      install: "versionsLauncher",
+      lockKey: "claudeAgent-native",
+    },
+    {
       name: "a native install under XDG_DATA_HOME",
       install: "xdgNative",
       lockKey: "claudeAgent-native",
@@ -358,6 +384,128 @@ it.layer(NodeServices.layer)("ClaudeMaintenance", (it) => {
       );
       expect((yield* resolve()).update?.lockKey).toBe(row.lockKey);
     }),
+  );
+
+  it.effect("updates a versions-directory launcher by installing beside it, on its channel", () =>
+    Effect.gen(function* () {
+      const f = yield* fixture("versionsLauncher", "darwin");
+      yield* f.fs.writeFileString(f.settingsPath, '{"autoUpdatesChannel":"stable"}');
+      const requests: string[] = [];
+      const client = HttpClient.make((request) => {
+        requests.push(request.url);
+        return Effect.succeed(HttpClientResponse.fromWeb(request, new Response("2.1.320")));
+      });
+      const resolve = yield* f.makeResolution.pipe(
+        Effect.provideService(HttpClient.HttpClient, client),
+      );
+      const capabilities = yield* resolve();
+      expect(capabilities.update).toMatchObject({
+        executable: "/bin/sh",
+        args: [
+          "-c",
+          NATIVE_VERSIONS_INSTALL_SCRIPT,
+          "claude-install",
+          `${f.directory}/.local/share/claude/versions`,
+          "stable",
+        ],
+        lockKey: "claudeAgent-native",
+      });
+      const versions = yield* ProviderLatestVersions.make();
+      const enriched = yield* enrichProviderSnapshotWithVersionAdvisory(
+        snapshot,
+        capabilities,
+      ).pipe(
+        Effect.provideService(HttpClient.HttpClient, client),
+        Effect.provideService(ProviderLatestVersions.ProviderLatestVersions, versions),
+      );
+      expect(enriched.versionAdvisory).toMatchObject({
+        status: "behind_latest",
+        latestVersion: "2.1.320",
+        canUpdate: true,
+      });
+      expect(requests).toEqual([expect.stringMatching(/claude-code-releases\/stable$/)]);
+    }),
+  );
+
+  it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32")(
+    "the install script verifies the build and adds it without touching the launcher",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+        const digest = yield* Digest.Digest;
+        const home = yield* fs.makeTempDirectoryScoped();
+        const releases = path.join(home, "releases");
+        const versionsDirectory = path.join(home, ".local/share/claude/versions");
+        const launcher = path.join(home, ".local/bin/claude-other");
+        yield* fs.makeDirectory(versionsDirectory, { recursive: true });
+        yield* fs.makeDirectory(path.dirname(launcher), { recursive: true });
+        yield* fs.writeFileString(path.join(versionsDirectory, "2.1.314"), "");
+        yield* fs.writeFileString(launcher, VERSIONS_LAUNCHER);
+        yield* fs.chmod(launcher, 0o755);
+        const platforms = ["darwin", "linux"].flatMap((os) =>
+          ["arm64", "x64"].flatMap((arch) => [`${os}-${arch}`, `${os}-${arch}-musl`]),
+        );
+        const publish = Effect.fn("publish")(function* (
+          channel: string,
+          version: string,
+          tampered = false,
+        ) {
+          const binary = `#!/bin/sh\necho "${version} (Claude Code)"\n`;
+          const checksum = tampered
+            ? "0".repeat(64)
+            : yield* digest.digestHex(Digest.sha256, new TextEncoder().encode(binary));
+          const entries = Object.fromEntries(
+            platforms.map((platform) => [
+              platform,
+              { binary: "claude", checksum, size: binary.length },
+            ]),
+          );
+          for (const platform of platforms) {
+            yield* fs.makeDirectory(path.join(releases, version, platform), { recursive: true });
+            yield* fs.writeFileString(path.join(releases, version, platform, "claude"), binary);
+          }
+          yield* fs.writeFileString(
+            path.join(releases, version, "manifest.json"),
+            JSON.stringify({ version, platforms: entries }, null, 2),
+          );
+          yield* fs.writeFileString(path.join(releases, channel), `${version}\n`);
+        });
+        const run = (command: string, args: ReadonlyArray<string>) =>
+          Effect.gen(function* () {
+            const child = yield* spawner.spawn(
+              ChildProcess.make(command, args, { env: { HOME: home }, extendEnv: true }),
+            );
+            const [stdout, exitCode] = yield* Effect.all(
+              [child.stdout.pipe(Stream.decodeText(), Stream.mkString), child.exitCode],
+              { concurrency: "unbounded" },
+            );
+            return { stdout, exitCode: Number(exitCode) };
+          });
+        const install = (channel: string) =>
+          run("/bin/sh", [
+            "-c",
+            NATIVE_VERSIONS_INSTALL_SCRIPT,
+            "claude-install",
+            versionsDirectory,
+            channel,
+            `file://${releases}`,
+          ]);
+
+        yield* publish("latest", "2.1.330");
+        expect((yield* install("latest")).exitCode).toBe(0);
+        expect((yield* run(launcher, ["--version"])).stdout.trim()).toBe("2.1.330 (Claude Code)");
+        expect((yield* install("latest")).stdout).toContain("already installed");
+        expect(yield* fs.readFileString(launcher)).toBe(VERSIONS_LAUNCHER);
+
+        yield* publish("stable", "2.1.331", true);
+        expect((yield* install("stable")).exitCode).not.toBe(0);
+        expect((yield* fs.readDirectory(versionsDirectory)).toSorted()).toEqual([
+          "2.1.314",
+          "2.1.330",
+        ]);
+      }).pipe(Effect.scoped, Effect.provide(Digest.layerWebCrypto)),
   );
 
   it.effect("automatic refresh rereads the native channel while preserving both caches", () =>
