@@ -71,6 +71,28 @@ export type ResolvedProviderInstanceEnvironment = ReadonlyArray<
   Omit<ProviderInstanceEnvironmentVariable, "value"> & { readonly value: string }
 >;
 
+/**
+ * A native app or service the agent only works with while it runs (Antigravity's app, fastctx-web).
+ * Clients ask about it when the agent is picked and can start it in the background.
+ */
+export const ProviderNativeHostConfig = Schema.Struct({
+  label: TrimmedNonEmptyString,
+  /** Running when this URL answers at all, whatever the status. */
+  probeUrl: Schema.optionalKey(TrimmedNonEmptyString),
+  /** Running when a process with exactly this name exists. */
+  processName: Schema.optionalKey(TrimmedNonEmptyString),
+  /** argv that starts it without bringing a window forward. */
+  start: Schema.optionalKey(Schema.Array(Schema.String)),
+});
+export type ProviderNativeHostConfig = typeof ProviderNativeHostConfig.Type;
+
+export const ProviderNativeHostStatus = Schema.Struct({
+  label: TrimmedNonEmptyString,
+  running: Schema.Boolean,
+  canStart: Schema.Boolean,
+});
+export type ProviderNativeHostStatus = typeof ProviderNativeHostStatus.Type;
+
 /** Drivers decode their own config; unknown-driver envelopes round-trip verbatim across versions. */
 export const ProviderInstanceConfig = Schema.Struct({
   driver: ProviderDriverKind,
@@ -80,6 +102,7 @@ export const ProviderInstanceConfig = Schema.Struct({
   environment: Schema.optionalKey(ProviderInstanceEnvironment),
   enabled: Schema.optionalKey(Schema.Boolean),
   config: Schema.optionalKey(Schema.Unknown),
+  nativeHost: Schema.optionalKey(ProviderNativeHostConfig),
 });
 export type ProviderInstanceConfig = typeof ProviderInstanceConfig.Type;
 

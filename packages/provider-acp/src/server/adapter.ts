@@ -417,6 +417,13 @@ export interface AcpAdapterV2Flavor {
   readonly mcpOverHttp?: boolean;
   /** The agent has no tool search of its own, so T3 lists optional tools on demand. */
   readonly deferMcpTools?: boolean;
+  /**
+   * MCP servers from the agent's own configuration, read per session. Some agents (ZCode) keep
+   * their configured servers only when session/new carries none, so these ride along with T3's.
+   */
+  readonly nativeMcpServers?: Effect.Effect<ReadonlyArray<EffectAcpSchema.McpServer>>;
+  /** The agent titles a session from its first prompt, so T3's notes follow the user's words. */
+  readonly promptInstructionsLast?: boolean;
   readonly normalizeSessionUpdate?: (
     notification: EffectAcpSchema.SessionNotification,
   ) => EffectAcpSchema.SessionNotification;
@@ -1045,7 +1052,9 @@ function acpMcpContext(
   mcpOverHttp: boolean | undefined,
   deferMcpTools: boolean | undefined,
   callLauncher: string | undefined,
+  nativeServers: ReadonlyArray<EffectAcpSchema.McpServer> = [],
 ): AcpMcpContext {
+  // Without T3's server the agent keeps its own configuration, so nothing rides along.
   if (session === undefined) {
     return { servers: [], acpServers: [], httpServers: [] };
   }
@@ -1062,8 +1071,9 @@ function acpMcpContext(
           { name: "T3_ACP_MCP_AUTHORIZATION", value: session.authorizationHeader },
         ],
       },
+      ...nativeServers,
     ],
-    acpServers: [{ type: "acp", name: "t3-code", serverId: "t3-code" }],
+    acpServers: [{ type: "acp", name: "t3-code", serverId: "t3-code" }, ...nativeServers],
     httpServers:
       mcpOverHttp === true
         ? [
@@ -1078,6 +1088,7 @@ function acpMcpContext(
                   : []),
               ],
             },
+            ...nativeServers,
           ]
         : [],
     endpoint: session.endpoint,
@@ -2035,8 +2046,19 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
       : mcpSessions
           .read(threadId)
           .pipe(
-            Effect.map((session) =>
-              acpMcpContext(session, self, flavor.mcpOverHttp, flavor.deferMcpTools, callLauncher),
+            Effect.flatMap((session) =>
+              (flavor.nativeMcpServers ?? Effect.succeed([])).pipe(
+                Effect.map((nativeServers) =>
+                  acpMcpContext(
+                    session,
+                    self,
+                    flavor.mcpOverHttp,
+                    flavor.deferMcpTools,
+                    callLauncher,
+                    nativeServers,
+                  ),
+                ),
+              ),
             ),
           );
   const driver = flavor.driver;
@@ -8982,6 +9004,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           const text = t3AcpPromptWithInstructions({
             prompt: messageText,
             state: instructionState,
+            ...(flavor.promptInstructionsLast === true ? { instructionsLast: true } : {}),
             ...(previousInstructionState === undefined || compactionMarker !== undefined
               ? {}
               : { previousState: previousInstructionState }),

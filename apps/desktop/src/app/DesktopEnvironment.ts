@@ -85,7 +85,8 @@ export class DesktopEnvironment extends Context.Service<
   }
 >()("@t3tools/desktop/app/DesktopEnvironment") {}
 
-const APP_BASE_NAME = "T3 Code";
+// ASCII: app.setName feeds the User-Agent and the keychain item name.
+const APP_BASE_NAME = "Tianshu";
 
 function resolveDesktopAppStageLabel(input: {
   readonly isDevelopment: boolean;
@@ -98,7 +99,7 @@ function resolveDesktopAppStageLabel(input: {
   return isNightlyDesktopVersion(input.appVersion) ? "Nightly" : "Beta";
 }
 
-export const STARDUST_DISPLAY_NAME = "T3 Stardust";
+export const STARDUST_DISPLAY_NAME = "天枢";
 
 export function resolveDesktopAppBranding(input: {
   readonly isDevelopment: boolean;

@@ -36,7 +36,13 @@ import { ComposerControl, type ComposerControlSize } from "./ComposerControl";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { useComposerMenuState } from "./useComposerMenuState";
 import type { RuntimeModeOption } from "./ComposerFooterControls";
-import { CosmicEffortSlider, cosmicColorAtRatio } from "./CosmicEffortSlider";
+import { CosmicEffortSlider } from "./CosmicEffortSlider";
+import {
+  celestialAccentAt,
+  celestialSpriteUrl,
+  celestialStageAt,
+  celestialStagesFor,
+} from "./celestialSliderScene";
 import {
   composerFloatingLayerProps,
   takeOpenTarget,
@@ -94,26 +100,35 @@ function columnControls(
   return { effort, others: controls.filter((control) => control !== effort) };
 }
 
-/** A small glowing dot coloured like the effort slider at this level (V9 model chip). */
-function CosmicLevelDot(props: { ratio: number }) {
-  const color = cosmicColorAtRatio(props.ratio);
+interface CosmicLevel {
+  readonly ratio: number;
+  readonly count: number;
+}
+
+/** The body the effort slider holds at this level, small, beside the model name. */
+function CosmicLevelDot(props: { level: CosmicLevel }) {
+  const stages = celestialStagesFor(props.level.count);
+  const stage = celestialStageAt(props.level.ratio, stages);
+  const color = celestialAccentAt(props.level.ratio, stages, 0.55);
   return (
     <span
       aria-hidden="true"
-      data-cosmic-level-dot
-      style={{ background: color, boxShadow: `0 0 6px ${color}` }}
-    />
+      data-cosmic-level-dot={stage.id}
+      style={{ boxShadow: `0 0 0 0.5px rgba(255,255,255,0.14), 0 0 5px ${color}` }}
+    >
+      <img alt="" src={celestialSpriteUrl(stage.id)} />
+    </span>
   );
 }
 
 /** Translated tier label for the effort tier pill inside the model trigger. */
-function CosmicTierPill(props: { ratio: number | null; word: string }) {
+function CosmicTierPill(props: { level: CosmicLevel | null; word: string }) {
   const uiText = useUiText();
   const label = uiText(props.word);
   return (
     <Tooltip>
       <TooltipTrigger render={<span data-v9-cosmic-tier-pill />}>
-        {props.ratio !== null ? <CosmicLevelDot ratio={props.ratio} /> : null}
+        {props.level !== null ? <CosmicLevelDot level={props.level} /> : null}
         <span data-composer-control-label className="max-w-20 truncate">
           {label}
         </span>
@@ -178,8 +193,8 @@ export function describeComposerEffort(
               modelSelection,
               traits.reportedModelSelection,
             ) ?? (reasoning.id === "thinking" ? reasoning.label : null));
-  // Where the picker's cosmic slider sits for this level, so the chip's dot matches its colour.
-  const sliderRatio = (() => {
+  // Where the picker's slider sits for this level, so the chip shows the same body.
+  const sliderLevel = ((): CosmicLevel | null => {
     if (reasoning?.type !== "select" || ultrathink) return null;
     const choices = selectableProviderOptionChoices(reasoning);
     if (choices.length < 2) return null;
@@ -189,7 +204,7 @@ export function describeComposerEffort(
       traits.reportedModelSelection,
     );
     const index = choices.findIndex((choice) => choice.id === current);
-    return index < 0 ? null : index / (choices.length - 1);
+    return index < 0 ? null : { ratio: index / (choices.length - 1), count: choices.length };
   })();
   const fast = display.speedLabel === "Fast" || display.speedLabel === "Ultrafast";
   // Agent options such as modes live in the picker; the trigger adds only the context window.
@@ -200,7 +215,7 @@ export function describeComposerEffort(
       modelSelection,
       traits.reportedModelSelection,
     );
-  if (!word && !glyph && sliderRatio === null && !fast && !display.ultracode && !contextWindow)
+  if (!word && !glyph && sliderLevel === null && !fast && !display.ultracode && !contextWindow)
     return { suffix: null, detail: display.label };
   return {
     detail: display.label,
@@ -212,14 +227,14 @@ export function describeComposerEffort(
         )}
       >
         {word ? (
-          <CosmicTierPill ratio={sliderRatio} word={word} />
+          <CosmicTierPill level={sliderLevel} word={word} />
         ) : glyph ? (
           <>
-            {sliderRatio !== null ? <CosmicLevelDot ratio={sliderRatio} /> : null}
+            {sliderLevel !== null ? <CosmicLevelDot level={sliderLevel} /> : null}
             <EffortGlyph count={glyph.count} filled={glyph.filled} size={size} />
           </>
-        ) : sliderRatio !== null ? (
-          <CosmicLevelDot ratio={sliderRatio} />
+        ) : sliderLevel !== null ? (
+          <CosmicLevelDot level={sliderLevel} />
         ) : null}
         {fast ? <FastBolt ultra={display.speedLabel === "Ultrafast"} /> : null}
         {display.ultracode ? (

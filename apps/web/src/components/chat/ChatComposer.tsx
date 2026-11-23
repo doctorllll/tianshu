@@ -223,6 +223,7 @@ import {
   composerSuggestionOptionId,
 } from "./ComposerCommandMenu";
 import { ComposerAttachButton } from "./ComposerAttachButton";
+import { SubSessionButton } from "./SubSessionButton";
 import {
   ComposerAttachmentFileList,
   ComposerAttachmentMediaRow,
@@ -3532,6 +3533,23 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       disabled={!activeThreadId || isRevertingCheckpoint}
     />
   ) : null;
+  // The request goes after what is already typed; the user reviews it and sends it.
+  const insertSubSessionRequest = (text: string) => {
+    const snapshot = readComposerSnapshot();
+    const before = snapshot.value.trimEnd();
+    applyPromptReplacement(0, snapshot.value.length, before ? `${before}\n\n${text}` : text, {
+      expectedText: snapshot.value,
+      focusEditorAfterReplace: true,
+    });
+  };
+  const subSessionButton =
+    showComposerAttachAction && activeThreadId ? (
+      <SubSessionButton
+        providers={providerStatuses}
+        disabled={isRevertingCheckpoint}
+        onInsert={insertSubSessionRequest}
+      />
+    ) : null;
   return (
     <form
       ref={composerFormRef}
@@ -3960,8 +3978,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 )}
               >
                 {composerAttachButton && !dictationTakesFooter ? (
-                  <div data-composer-attach-slot="true" className="shrink-0">
+                  <div
+                    data-composer-attach-slot="true"
+                    className="flex shrink-0 items-center gap-1"
+                  >
                     {composerAttachButton}
+                    {subSessionButton}
                   </div>
                 ) : null}
                 {!dictationTakesFooter ? (

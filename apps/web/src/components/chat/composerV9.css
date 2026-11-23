@@ -677,12 +677,31 @@ html:root [data-chat-provider-model-picker="true"][data-v9-unified-model-btn="tr
   color: var(--v9-fg-2);
 }
 
-[data-v9-cosmic-tier-pill] [data-cosmic-level-dot] {
-  width: 6.5px;
-  height: 6.5px;
-  border-radius: 50%;
+/* The level's body in a small dark porthole, so night sides read on light toolbars too. */
+[data-cosmic-level-dot] {
+  position: relative;
+  width: 15px;
+  height: 15px;
   flex-shrink: 0;
   display: inline-block;
+  overflow: hidden;
+  border-radius: 999px;
+  background: radial-gradient(circle at 50% 45%, #0c1226 0%, #03050b 75%);
+}
+
+[data-cosmic-level-dot] > img {
+  position: absolute;
+  inset: -40%;
+  width: 180%;
+  height: 180%;
+  max-width: none;
+}
+
+[data-cosmic-level-dot="blackhole"] > img,
+[data-cosmic-level-dot="galaxy"] > img {
+  inset: -20%;
+  width: 140%;
+  height: 140%;
 }
 
 /* Thin-Line Permission Footer Pill (V9 .perm-footer-pill) */

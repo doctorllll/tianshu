@@ -28,24 +28,30 @@ export function quotaPins(
   if (preferences.pinsEdited === true && preferences.pins !== null)
     return [...new Set(preferences.pins)].slice(0, 4);
   const drivers = new Set<string>();
-  const priority = ["codex", "claudeAgent", "antigravity"];
+  // Tianshu leads with the agents sold by subscription. ACP agents share one driver, so each
+  // instance counts on its own.
+  const priority = ["zcode", "fastctx", "antigravity", "grok", "codex", "claudeAgent"];
+  const rank = (account: QuotaAccount) => {
+    const ranks = [account.driver, ...account.instances.map((i) => i.instanceId)]
+      .map((id) => priority.indexOf(id))
+      .filter((index) => index >= 0);
+    return ranks.length ? Math.min(...ranks) : 10;
+  };
+  const group = (account: QuotaAccount) =>
+    account.driver === "acpRegistry" ? account.id : account.driver;
   return [...accounts]
-    .sort(
-      (a, b) =>
-        (priority.indexOf(a.driver) < 0 ? 10 : priority.indexOf(a.driver)) -
-        (priority.indexOf(b.driver) < 0 ? 10 : priority.indexOf(b.driver)),
-    )
+    .sort((a, b) => rank(a) - rank(b))
     .filter((a) => {
       if (
         !a.limits?.windows.length ||
         a.limits.unavailable?.reason === "unsupported" ||
-        drivers.has(a.driver)
+        drivers.has(group(a))
       )
         return false;
-      drivers.add(a.driver);
+      drivers.add(group(a));
       return true;
     })
-    .slice(0, 3)
+    .slice(0, 4)
     .map((a) => a.id);
 }
 /** The login the open thread's provider instance signs in with, when it has a quota to show. */
@@ -94,7 +100,10 @@ export function quotaWindow(
   const wanted = preferences.windows[account.id];
   if (wanted) return account.limits?.windows.find((w) => `${w.kind}:${w.id}` === wanted) ?? null;
   return (
-    account.limits?.windows.find((w) => w.kind === "weekly") ?? account.limits?.windows[0] ?? null
+    account.limits?.windows.find((w) => w.primary === true) ??
+    account.limits?.windows.find((w) => w.kind === "weekly") ??
+    account.limits?.windows[0] ??
+    null
   );
 }
 export function quotaState(

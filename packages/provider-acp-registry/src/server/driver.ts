@@ -65,6 +65,8 @@ import * as AcpRegistrySupport from "./AcpRegistrySupport.ts";
 import * as AcpRegistryRuntimeCoordinator from "./AcpRegistryRuntimeCoordinator.ts";
 import * as AcpRegistryAuth from "./auth.ts";
 import * as AcpRegistryAuthenticationState from "./authenticationState.ts";
+import { acpPlanUsageReader } from "./planUsage.ts";
+import { isZcodeAcpCommand, presentZcodeModels, readZcodeModelPreferences } from "./zcodeAcp.ts";
 
 const DRIVER_KIND = ProviderDriverKind.make("acpRegistry");
 const decodeSettings = Schema.decodeSync(AcpRegistrySettings);
@@ -690,6 +692,23 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
     // Refreshes rebuild the snapshot from the probe, so per-model options
     // learned from earlier sessions are kept here.
     const learnedModels = yield* Ref.make<ReadonlyArray<ServerProviderModel>>([]);
+    // ZCode's dropdown is shown the way ZCode's own picker shows it.
+    const zcodeHome =
+      effectiveConfig.source === "local" &&
+      isZcodeAcpCommand(effectiveConfig.commandPath, effectiveConfig.commandArgs)
+        ? { home: processEnvironment.ZCODE_HOME }
+        : undefined;
+    const presentModels = (provider: ServerProvider) =>
+      zcodeHome === undefined || provider.models.length === 0
+        ? Effect.succeed(provider)
+        : readZcodeModelPreferences(zcodeHome.home).pipe(
+            Effect.provideService(FileSystem.FileSystem, fileSystem),
+            Effect.provideService(Path.Path, path),
+            Effect.map((preferences): ServerProvider => ({
+              ...provider,
+              models: presentZcodeModels(provider.models, preferences),
+            })),
+          );
     const applyLiveConfiguration = (
       provider: ServerProvider,
       configuration: AcpRegistryLiveConfiguration,
@@ -702,11 +721,15 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
           learned.length > 0 ? learned : provider.models,
         );
         return [next, next.models === provider.models ? learned : next.models];
-      });
+      }).pipe(Effect.flatMap(presentModels));
     const clearLearnedModels = Ref.set(learnedModels, []);
+    // Enrichment republishes its own probe, so the plan name read with the quota is kept here.
+    const planLabelRef = yield* Ref.make<string | undefined>(undefined);
     const withLiveRuntimeState = Effect.fn("AcpRegistryDriver.withLiveRuntimeState")(function* (
-      input: ServerProvider,
+      probed: ServerProvider,
     ) {
+      const planLabel = yield* Ref.get(planLabelRef);
+      const input = planLabel ? { ...probed, auth: { ...probed.auth, label: planLabel } } : probed;
       if (input.auth.status === "unauthenticated") yield* confirmedAuthentication.set(false);
       const provider =
         input.enabled &&
@@ -715,7 +738,7 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
         (yield* confirmedAuthentication.get)
           ? { ...input, auth: { ...input.auth, status: "authenticated" as const } }
           : input;
-      return yield* Option.isNone(runtimeCoordinator)
+      const live = yield* Option.isNone(runtimeCoordinator)
         ? Effect.succeed(provider)
         : Effect.all({
             commands: runtimeCoordinator.value.getAvailableCommands(instanceId),
@@ -735,7 +758,23 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
               );
             }),
           );
+      return yield* presentModels(live);
     });
+    // Subscription agents (ZCode's Coding Plan, fastctx's logins) report their plan quota.
+    const planUsage = acpPlanUsageReader(effectiveConfig, processEnvironment);
+    const withPlanUsage = (provider: ServerProvider) =>
+      planUsage === undefined || !provider.enabled || !provider.installed
+        ? Effect.succeed(provider)
+        : planUsage.pipe(
+            Effect.provideService(FileSystem.FileSystem, fileSystem),
+            Effect.provideService(Path.Path, path),
+            Effect.tap(({ planLabel }) => Ref.set(planLabelRef, planLabel)),
+            Effect.map(({ usageLimits, planLabel }): ServerProvider => ({
+              ...provider,
+              usageLimits,
+              ...(planLabel ? { auth: { ...provider.auth, label: planLabel } } : {}),
+            })),
+          );
     // A local executable's version comes only from probing it, so readiness checks reuse the last report.
     const reportedLocalVersion = yield* Ref.make<string | null>(null);
     const checkProvider = checkAcpRegistryProviderReadiness(readinessInput).pipe(
@@ -750,6 +789,7 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
         ),
       ),
       Effect.flatMap(withLiveRuntimeState),
+      Effect.flatMap(withPlanUsage),
     );
     const enrichProvider = checkAcpRegistryProviderStatus(
       {

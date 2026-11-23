@@ -32,23 +32,24 @@ function Harness() {
   );
 }
 
-it("renders the single V18 Starship scene and updates flight stage with level", async () => {
+it("renders the celestial scene and names the body for each level", async () => {
   await using screen = await render(<Harness />, { router: false }); // no routes involved
   const root = document.querySelector("[data-cosmic-effort-slider]")!;
-  expect(root.getAttribute("data-cosmic-scene")).toBe("starship");
-  expect(document.querySelector("[data-cosmic-variant-pills]")).toBeNull();
+  expect(root.getAttribute("data-cosmic-scene")).toBe("celestial");
   await expect.element(screen.getByText("Reasoning effort · Medium")).toBeInTheDocument();
-  await expect.element(screen.getByText("Max-Q · breaking clouds")).toBeInTheDocument();
+  await expect.element(screen.getByText("Star · burning bright")).toBeInTheDocument();
   await expect.element(screen.getByText("3 levels")).toBeInTheDocument();
 
-  // Level radios passed as children drive both the heading and the Starship flight beat.
+  // Three levels run asteroid, star, galaxy.
   await userEvent.click(screen.getByRole("radio", { name: "Low" }));
   await expect.element(screen.getByText("Reasoning effort · Low")).toBeInTheDocument();
-  await expect.element(screen.getByText("Pad standby · cryo mist")).toBeInTheDocument();
+  await expect.element(screen.getByText("Asteroid · quick and light")).toBeInTheDocument();
 
   await userEvent.click(screen.getByRole("radio", { name: "High" }));
   await expect.element(screen.getByText("Reasoning effort · High")).toBeInTheDocument();
-  await expect.element(screen.getByText("Deep-space warp · full mission")).toBeInTheDocument();
+  await expect
+    .element(screen.getByText("Galaxy · everything turns on the pivot"))
+    .toBeInTheDocument();
 });
 
 it("keeps only the level radios in the Thinking radiogroup", async () => {

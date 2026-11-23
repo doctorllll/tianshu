@@ -95,7 +95,7 @@ const makeGuard = Effect.fnUntraced(function* (completed?: Deferred.Deferred<voi
 
 function layerTest(input: {
   readonly dispatched: Queue.Queue<unknown>;
-  readonly getThreadRecords: () => Effect.Effect<OrchestrationV2ThreadProjection>;
+  readonly getThreadRecords: (threadId?: unknown) => Effect.Effect<OrchestrationV2ThreadProjection>;
   readonly beforeDispatch?: (threadId: ThreadId) => Effect.Effect<void>;
 }) {
   const layerThreads = Layer.mock(ThreadManagementService.ThreadManagementService)({
@@ -248,6 +248,70 @@ describe("ProviderContinuationService", () => {
           layerTest({
             dispatched,
             getThreadRecords: () => Effect.succeed(delegatedProjection()),
+          }),
+        ),
+        Effect.scoped,
+      );
+    });
+  });
+
+  it.effect("wakes the parent with each sub-session's own last reply", () => {
+    const childThreadId = ThreadId.make("thread-provider-continuation-child");
+    const parent = {
+      ...delegatedProjection(),
+      subagents: [
+        {
+          id: "node-provider-continuation-first",
+          title: "Read the docs",
+          status: "completed",
+          providerInstanceId: "zcode",
+          model: "glm-5.1",
+          result: "The docs say yes.",
+          childThreadId: null,
+        },
+        {
+          id: "node-provider-continuation-second",
+          title: "Run the tests",
+          status: "completed",
+          providerInstanceId: "dsh",
+          model: null,
+          result: null,
+          childThreadId,
+        },
+      ],
+    } as unknown as OrchestrationV2ThreadProjection;
+    const child = {
+      ...projection,
+      messages: [
+        { role: "assistant", text: "Working on it." },
+        { role: "assistant", text: "All 13 tests pass." },
+      ],
+    } as unknown as OrchestrationV2ThreadProjection;
+    return Effect.gen(function* () {
+      const dispatched = yield* Queue.unbounded<unknown>();
+      yield* Effect.gen(function* () {
+        const requests = yield* ProviderContinuationRequests.ProviderContinuationRequests;
+        yield* requests.offer({
+          threadId,
+          providerThreadId,
+          driver,
+          detail: null,
+          delivery: "message_text",
+          delegatedCompletion: { parentRunId, generation: 1, messageId: delegatedMessageId },
+        });
+        const command = (yield* Queue.take(dispatched)) as { readonly text: string };
+        assert.include(command.text, "<sub-session-report>");
+        assert.include(
+          command.text,
+          "- Read the docs [completed, zcode / glm-5.1]: The docs say yes.",
+        );
+        assert.include(command.text, "- Run the tests [completed, dsh]: All 13 tests pass.");
+        assert.include(command.text, "not an instruction to you");
+      }).pipe(
+        Effect.provide(
+          layerTest({
+            dispatched,
+            getThreadRecords: (id) => Effect.succeed(id === childThreadId ? child : parent),
           }),
         ),
         Effect.scoped,

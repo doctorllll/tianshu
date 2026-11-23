@@ -285,7 +285,7 @@ it("never keeps a finished sub-agent in Needs you, even after its result was ope
         navigate={vi.fn()}
       />,
     );
-    expect(screen.container.textContent).not.toMatch(/子任务|Child audit|Done 4/);
+    expect(screen.container.textContent).not.toMatch(/子会话|Child audit|Done 4/);
   } finally {
     useResumeCardStore.setState(previous, true);
   }

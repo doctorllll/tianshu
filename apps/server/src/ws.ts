@@ -187,6 +187,7 @@ import * as ProjectStore from "./orchestration-v2/ProjectStore.ts";
 import * as ThreadSearch from "./orchestration-v2/ThreadSearch.ts";
 import * as OrchestrationEventStore from "./persistence/OrchestrationEventStore.ts";
 import { userFacingDispatchErrorMessage } from "./orchestration-v2/UserFacingErrors.ts";
+import * as NativeHost from "./provider/NativeHost.ts";
 import * as ProviderRegistry from "./provider/ProviderRegistry.ts";
 import * as SecretCheck from "./secrets/SecretCheck.ts";
 import * as AcpRegistrySessions from "./provider/AcpRegistrySessions.ts";
@@ -2718,6 +2719,18 @@ export const layerWsRpc = (
         [WS_METHODS.providerInstallCancel]: (input) => providerInstallation.cancel(input),
         [WS_METHODS.providerInstallSubscribe]: (input) => providerInstallation.subscribe(input),
         [WS_METHODS.providerInstallRemove]: (input) => providerInstallation.remove(input),
+        [WS_METHODS.providerNativeHostStatus]: (input) =>
+          NativeHost.nativeHostStatus(input.instanceId).pipe(
+            Effect.provideService(ServerSettings.ServerSettingsService, serverSettings),
+          ),
+        [WS_METHODS.providerNativeHostStart]: (input) =>
+          NativeHost.startNativeHost(input.instanceId).pipe(
+            Effect.provideService(ServerSettings.ServerSettingsService, serverSettings),
+            // The agent's own check failed while the app was down; let it see the app now.
+            Effect.tap((status) =>
+              status?.running ? providerRegistry.refreshInstance(input.instanceId) : Effect.void,
+            ),
+          ),
         [WS_METHODS.serverUpdateServer]: (input) => serverSelfUpdate.update(input),
         [WS_METHODS.serverGetNpmRelease]: (input) => npmRelease.get(input),
         [WS_METHODS.serverUpdateServerWithProgress]: (input) =>

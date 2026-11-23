@@ -12,7 +12,7 @@ import { InspectorTabBar } from "./InspectorTabBar";
 const LABELS = {
   artifacts: "产物 3",
   history: "续聊",
-  subtasks: "子任务",
+  subtasks: "子会话",
   project: "项目",
 } as const;
 
@@ -77,9 +77,9 @@ it("opens the run tab without removing existing inspector entries", async () => 
   );
   const run = [
     ...screen.container.querySelectorAll<HTMLButtonElement>("[aria-label=检查器] button"),
-  ].find((button) => button.textContent === "子任务")!;
+  ].find((button) => button.textContent === "子会话")!;
   run.dispatchEvent(new KeyboardEvent("keydown", { key: "r", altKey: true, bubbles: true }));
-  await expect.poll(() => pressed(screen.container)).toEqual(["子任务"]);
+  await expect.poll(() => pressed(screen.container)).toEqual(["子会话"]);
   expect(screen.container.querySelector("[data-testid=body]")!.textContent).toBe("subtasks");
   expect(screen.container.querySelectorAll("[aria-label=检查器] button")).toHaveLength(4);
   localStorage.removeItem(INSPECTOR_TAB_STORAGE_KEY);
@@ -95,7 +95,7 @@ it("keeps the shared spring slider node when switching tabs", async () => {
   const style = getComputedStyle(slider);
   expect(style.transitionDuration).toBe("0.42s");
   expect(style.transitionTimingFunction).toBe("cubic-bezier(0.3, 1.35, 0.45, 1)");
-  await screen.getByRole("button", { name: "子任务", exact: true }).click();
+  await screen.getByRole("button", { name: "子会话", exact: true }).click();
   expect(screen.container.querySelector("[data-inspector-tab-slider]")).toBe(slider);
   expect(
     screen.container

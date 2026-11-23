@@ -6,6 +6,7 @@ import type {
   ThreadId,
 } from "@t3tools/contracts";
 import type { Dispatch, SetStateAction } from "react";
+import { NativeHostBanner } from "./NativeHostBanner";
 import {
   dismissProviderStatusBannerForSession,
   ProviderStatusBanner,
@@ -18,6 +19,8 @@ import { dismissThreadErrorBannerForSession, ThreadErrorBanner } from "./ThreadE
  */
 export function ChatBannerLane(props: {
   environmentId: EnvironmentId;
+  /** The selected agent, shown or not; its native app is checked even while it reports ready. */
+  activeProvider: ServerProvider | null;
   providerStatus: ServerProvider | null;
   providerStatusDismissalKey: string | null;
   onOpenProviderSetup: (instanceId: ProviderInstanceId) => void;
@@ -43,6 +46,13 @@ export function ChatBannerLane(props: {
   } = props;
   return (
     <div className="chat-banner-lane pointer-events-none absolute top-0 z-30 flex flex-col">
+      <NativeHostBanner
+        environmentId={props.environmentId}
+        instanceId={props.activeProvider?.instanceId ?? null}
+        agentName={
+          props.activeProvider?.displayName?.trim() || (props.activeProvider?.instanceId ?? "")
+        }
+      />
       <ProviderStatusBanner
         environmentId={props.environmentId}
         status={providerStatus}

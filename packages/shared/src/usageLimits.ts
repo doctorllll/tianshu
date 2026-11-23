@@ -1259,11 +1259,16 @@ export function quotaAccounts(presentations: Presentations): readonly QuotaAccou
               source.accounts.some((a) => a.usageLimits.unavailable?.reason === "probeFailed")),
         ),
     );
-    const alias =
-      account.displayName && !account.displayName.includes("@")
+    const acp = account.driver === "acpRegistry";
+    // Each ACP instance is its own agent: its name leads, and its plan is the alias.
+    const alias = acp
+      ? (account.plan ?? "")
+      : account.displayName && !account.displayName.includes("@")
         ? account.displayName
         : (account.plan ?? "");
-    const label = LABELS[account.driver] ?? String(account.driver);
+    const label =
+      LABELS[account.driver] ??
+      (acp && account.displayName ? account.displayName : String(account.driver));
     return {
       id: preferenceId(account.key),
       driver: account.driver,
@@ -1294,11 +1299,14 @@ export function quotaAccounts(presentations: Presentations): readonly QuotaAccou
                 provider.auth.workspaceId)),
       );
       if (exists) continue;
+      const acp = provider.driver === "acpRegistry";
       const alias =
-        provider.displayName && !provider.displayName.includes("@")
+        !acp && provider.displayName && !provider.displayName.includes("@")
           ? provider.displayName
           : (provider.auth.label ?? "");
-      const label = LABELS[provider.driver] ?? (alias || String(provider.driver));
+      const label =
+        LABELS[provider.driver] ??
+        ((acp ? provider.displayName?.trim() : alias) || String(provider.driver));
       accounts.push({
         id: preferenceId(`${environmentId}:${provider.instanceId}`),
         driver: provider.driver,
@@ -1313,16 +1321,19 @@ export function quotaAccounts(presentations: Presentations): readonly QuotaAccou
       });
     }
   }
+  // ACP instances share one driver but are different agents; only real repeats are numbered.
+  const group = (a: (typeof accounts)[number]) => (a.driver === "acpRegistry" ? a.id : a.driver);
   const siblings = new Map<string, number>();
-  for (const a of accounts) siblings.set(a.driver, (siblings.get(a.driver) ?? 0) + 1);
+  for (const a of accounts) siblings.set(group(a), (siblings.get(group(a)) ?? 0) + 1);
   const counts = new Map<string, number>();
   return accounts.map((a) => {
-    const index = (counts.get(a.driver) ?? 0) + 1;
-    counts.set(a.driver, index);
+    const index = (counts.get(group(a)) ?? 0) + 1;
+    counts.set(group(a), index);
+    const numbered = (siblings.get(group(a)) ?? 0) > 1;
     return {
       ...a,
-      alias: `${index}${a.alias ? ` · ${a.alias}` : ""}`,
-      title: (siblings.get(a.driver) ?? 0) > 1 ? a.name || `${a.label} ${index}` : a.label,
+      alias: numbered ? `${index}${a.alias ? ` · ${a.alias}` : ""}` : a.alias,
+      title: numbered ? a.name || `${a.label} ${index}` : a.label,
     };
   });
 }

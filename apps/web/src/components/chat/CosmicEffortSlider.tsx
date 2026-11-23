@@ -3,17 +3,19 @@ import { useUiText } from "~/i18n/useUiText";
 import { observeResize } from "~/lib/observeResize";
 import { cn } from "~/lib/utils";
 import "./composerV9.css";
+import { CelestialParticles } from "./celestialParticles";
 import {
-  type StarshipParticle,
-  type StarshipStoryBeat,
-  createStarshipParticles,
-  drawStarshipScene,
-  prewarmStarshipParticles,
-  sampleStarshipAccent,
-  sampleStarshipFlash,
-  starshipStoryAtRatio,
-  stepStarshipParticles,
-} from "./cosmicSliderScenes";
+  celestialAccentAt,
+  celestialRgbAt,
+  celestialSprites,
+  celestialStageAt,
+  celestialStagesFor,
+  drawCelestialBody,
+  drawCelestialReticle,
+  drawCelestialShock,
+  drawCelestialSky,
+  forgetCelestialWake,
+} from "./celestialSliderScene";
 
 export interface CosmicEffortOption {
   readonly id: string;
@@ -22,21 +24,14 @@ export interface CosmicEffortOption {
   readonly isDefault?: boolean | undefined;
 }
 
-// V18 Starship Launch Stack geometry: 50px canvas (+ 3px bevel = 56px track), 50x44 glass lens.
+// 50px canvas (+ 3px bevel = 56px track); the body sits on the knob with nothing around it.
 const TRACK_H = 50;
-const PAD = 28;
-const LENS_W = 50;
-const LENS_H = 44;
+const PAD = 40;
 const SNAP = 0.032;
 // Idle open-popover repaint cadence (~24fps keeps fluid motion silky while staying light on GPU).
 const IDLE_FRAME_MS = 1000 / 24;
-// Auto-sleep the canvas loop after 2s of settled idle to drop idle GPU/CPU cost to zero.
+// Auto-sleep the canvas loop after 2s of settled idle (pointer away) to drop idle cost to zero.
 const IDLE_SLEEP_MS = 2000;
-
-/** Accent colour for the effort level, shared by the slider dot and composer model chip. */
-export function cosmicColorAtRatio(ratio: number): string {
-  return sampleStarshipAccent(ratio);
-}
 
 let sharedAudioCtx: AudioContext | null = null;
 function playSubtleCosmicChime(ratio: number) {
@@ -73,40 +68,27 @@ function playSubtleCosmicChime(ratio: number) {
   }
 }
 
-function applyShiftJuice(
-  st: {
-    hitstop: number;
-    flash: number;
-    shake: number;
-    recoil: number;
-    chroma: number;
-    shock: number;
-  },
-  nextIdx: number,
-  prevIdx: number,
-): void {
+interface ShiftJuice {
+  hitstop: number;
+  shake: number;
+  recoil: number;
+  shock: number;
+  kick: number;
+}
+
+function applyShiftJuice(st: ShiftJuice, nextIdx: number, prevIdx: number): void {
   const up = nextIdx > prevIdx;
-  if (up) {
-    st.hitstop = 0.028;
-    st.flash = 0.36;
-    st.shake = 0.95;
-    st.recoil = -5.5;
-    st.chroma = 1;
-    st.shock = 1;
-  } else {
-    st.hitstop = 0;
-    st.flash = 0.1;
-    st.shake = 0.22;
-    st.recoil = 2.2;
-    st.chroma = 0.3;
-    st.shock = 0;
-  }
+  st.hitstop = up ? 0.028 : 0;
+  st.shake = up ? 0.8 : 0.2;
+  st.recoil = up ? -5 : 2.2;
+  st.shock = up ? 1 : 0;
+  st.kick = up ? 1 : -1;
 }
 
 /**
- * V18 "Starship Launch Stack" reasoning effort slider: one continuous cinematic Starship flight
- * from cold launchpad standby to deep-space warp with 180ms tactile upshift feedback. Level radios
- * are passed in as `children` and render under the track for keyboard and screen readers.
+ * Tianshu's reasoning-effort slider: the knob is a body that grows from an asteroid to a galaxy,
+ * over a deep sky with the Big Dipper, shedding sparks as it moves. Level radios come in as
+ * `children` and render under the track for keyboard and screen readers.
  */
 export function CosmicEffortSlider(props: {
   readonly label: string;
@@ -121,29 +103,31 @@ export function CosmicEffortSlider(props: {
   const wellRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const offCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const particlesRef = useRef<StarshipParticle[] | null>(null);
+  const particlesRef = useRef<CelestialParticles | null>(null);
 
   const foundIndex = options.findIndex((o) => o.id === value);
   const selectedIndex = Math.max(0, foundIndex);
   const count = Math.max(1, options.length);
   const targetRatio = count <= 1 ? 0 : selectedIndex / (count - 1);
+  const stages = celestialStagesFor(count);
 
   const [dragging, setDragging] = useState(false);
-  const [dragStory, setDragStory] = useState<StarshipStoryBeat | null>(null);
+  const [dragStory, setDragStory] = useState<string | null>(null);
 
   const stateRef = useRef({
     val: targetRatio,
     target: targetRatio,
     dragging: false,
+    hovering: false,
+    grip: 0,
     lastIdx: selectedIndex,
     t: 2.4,
     hitstop: 0,
-    flash: 0,
     shake: 0,
     recoil: 0,
-    chroma: 0,
     shock: 0,
+    kick: 0,
+    prevKx: Number.NaN,
     lastIdlePaintMs: 0,
     lastActivityMs: 0,
     hasPainted: false,
@@ -173,17 +157,9 @@ export function CosmicEffortSlider(props: {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    if (!offCanvasRef.current) offCanvasRef.current = document.createElement("canvas");
-    const off = offCanvasRef.current;
-    const octx = off.getContext("2d");
-    if (!octx) return;
-
-    if (!particlesRef.current) {
-      const pool = createStarshipParticles(68);
-      prewarmStarshipParticles(pool, stateRef.current.val);
-      particlesRef.current = pool;
-    }
+    if (!particlesRef.current) particlesRef.current = new CelestialParticles();
     const particles = particlesRef.current;
+    const sceneStages = celestialStagesFor(count);
 
     const reducedMotion =
       typeof window !== "undefined" &&
@@ -209,12 +185,14 @@ export function CosmicEffortSlider(props: {
       const st = stateRef.current;
       const activeMotion =
         st.dragging ||
+        st.hovering ||
         st.hitstop > 0 ||
-        st.flash > 0.01 ||
         st.shake > 0.02 ||
         Math.abs(st.recoil) > 0.08 ||
-        st.chroma > 0.01 ||
         st.shock > 0.01 ||
+        st.kick !== 0 ||
+        Math.abs(st.grip - (st.dragging ? 1 : 0)) > 0.01 ||
+        particles.busy ||
         Math.abs(st.target - st.val) > 0.001;
 
       if (activeMotion) {
@@ -233,11 +211,13 @@ export function CosmicEffortSlider(props: {
       const ch = Math.round(cssH * dpr);
       const needsResize = canvas.width !== cw || canvas.height !== ch;
 
+      const busy = st.dragging || st.kick !== 0 || particles.busy || st.shock > 0.01;
       if (
         !reducedMotion &&
-        !activeMotion &&
+        !busy &&
         !needsResize &&
         st.hasPainted &&
+        Math.abs(st.target - st.val) <= 0.001 &&
         now - st.lastIdlePaintMs < IDLE_FRAME_MS
       ) {
         raf = window.requestAnimationFrame(drawFrame);
@@ -251,37 +231,36 @@ export function CosmicEffortSlider(props: {
       if (needsResize) {
         canvas.width = cw;
         canvas.height = ch;
-        off.width = cw;
-        off.height = ch;
       }
 
       if (reducedMotion) {
         st.val = st.target;
         st.hitstop = 0;
-        st.flash = 0;
         st.shake = 0;
         st.recoil = 0;
-        st.chroma = 0;
         st.shock = 0;
+        st.kick = 0;
+        st.grip = st.dragging ? 1 : 0;
+        particles.clear();
       } else if (st.hitstop > 0) {
         st.hitstop = Math.max(0, st.hitstop - dt);
       } else {
         st.t += dt;
         st.val += (st.target - st.val) * (st.dragging ? 0.45 : 0.24);
         if (Math.abs(st.target - st.val) < 0.0005) st.val = st.target;
-        st.flash = Math.max(0, st.flash - dt * 4.6);
+        st.grip += ((st.dragging ? 1 : 0) - st.grip) * Math.min(1, dt * 12);
         st.shake = Math.max(0, st.shake - dt * 6.4);
         st.recoil *= Math.pow(0.0008, dt);
         if (Math.abs(st.recoil) < 0.05) st.recoil = 0;
-        st.chroma = Math.max(0, st.chroma - dt * 7.2);
-        st.shock = Math.max(0, st.shock - dt * 4.5);
+        st.shock = Math.max(0, st.shock - dt * 3.2);
+        particles.step(dt);
       }
 
       const well = wellRef.current;
       if (well) {
         if (!reducedMotion && st.shake > 0.02) {
-          const dx = (Math.sin(now * 0.095) * 1.7 * st.shake).toFixed(2);
-          const dy = (Math.cos(now * 0.13) * 1.2 * st.shake).toFixed(2);
+          const dx = (Math.sin(now * 0.095) * 1.5 * st.shake).toFixed(2);
+          const dy = (Math.cos(now * 0.13) * 1 * st.shake).toFixed(2);
           well.style.transform = `translate3d(${dx}px,${dy}px,0)`;
         } else if (well.style.transform) {
           well.style.transform = "";
@@ -290,123 +269,42 @@ export function CosmicEffortSlider(props: {
 
       const kx = PAD + st.val * (cssW - PAD * 2) + st.recoil;
       const ky = cssH / 2;
+      const tint = celestialRgbAt(st.val, sceneStages);
 
-      octx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      octx.clearRect(0, 0, cssW, cssH);
-      const { nx, ny, angle } = drawStarshipScene(
-        octx,
-        cssW,
-        cssH,
-        st.val,
-        kx,
-        st.t,
-        particles,
-        st.shock,
+      if (!reducedMotion) {
+        if (st.kick === 1) particles.burst(kx, ky, tint, 1);
+        if (st.kick === -1) particles.implode(kx, ky, tint);
+        const moved = Number.isNaN(st.prevKx) ? 0 : kx - st.prevKx;
+        if (st.dragging && Math.abs(moved) > 0.35) particles.trail(kx, ky, moved, tint);
+        particles.drift(cssW, cssH, dt, 2 + st.val * 6, tint);
+      }
+      st.kick = 0;
+      st.prevKx = kx;
+
+      const detents = Array.from({ length: count }, (_, i) =>
+        count <= 1 ? cssW / 2 : PAD + (i / (count - 1)) * (cssW - PAD * 2),
       );
-      if (!reducedMotion && st.hitstop <= 0) {
-        stepStarshipParticles(particles, dt, st.val, nx, ny, angle, cssW);
-      }
 
-      // Detent dots along the lower rim, one per level.
-      for (let i = 0; i < count; i++) {
-        const dx = count <= 1 ? cssW / 2 : PAD + (i / (count - 1)) * (cssW - PAD * 2);
-        octx.fillStyle = i <= st.lastIdx ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.24)";
-        octx.beginPath();
-        octx.arc(dx, cssH - 4.2, i === st.lastIdx ? 1.8 : 1, 0, Math.PI * 2);
-        octx.fill();
-      }
-
-      // Single-frame upshift exposure flash.
-      if (!reducedMotion && st.flash > 0.01) {
-        octx.save();
-        octx.fillStyle = sampleStarshipFlash(st.val);
-        octx.globalAlpha = st.flash;
-        octx.fillRect(0, 0, cssW, cssH);
-        octx.restore();
-      }
-
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, cw, ch);
-      ctx.drawImage(off, 0, 0);
-
-      // Crystal-clear Liquid Glass capsule lens (thin rim highlight keeps the Starship sharp).
-      ctx.save();
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const kw = LENS_W + st.chroma * 3;
-      const kh = LENS_H - st.chroma * 1.4;
-      const kr = kh / 2;
-
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.42)";
-      ctx.shadowBlur = st.dragging ? 14 : 9;
-      ctx.shadowOffsetY = 2.5;
-      ctx.fillStyle = "rgba(0,0,0,0.18)";
-      ctx.beginPath();
-      ctx.roundRect(kx - kw / 2, ky - kh / 2, kw, kh, kr);
-      ctx.fill();
-      ctx.restore();
-
+      ctx.clearRect(0, 0, cssW, cssH);
       ctx.save();
       ctx.beginPath();
-      ctx.roundRect(kx - kw / 2, ky - kh / 2, kw, kh, kr);
+      ctx.roundRect(0, 0, cssW, cssH, cssH / 2);
       ctx.clip();
-      const mag = st.dragging ? 1.32 : 1.22;
-      const sw = (kw / mag) * dpr;
-      const sh = (kh / mag) * dpr;
-      const sx = Math.max(0, Math.min(cw - sw, kx * dpr - sw / 2));
-      const sy = Math.max(0, Math.min(ch - sh, ky * dpr - sh / 2));
-      ctx.drawImage(off, sx, sy, sw, sh, kx - kw / 2, ky - kh / 2, kw, kh);
-
-      const disp = 1.2 + st.chroma * 2.6;
-      ctx.globalCompositeOperation = "screen";
-      ctx.globalAlpha = 0.18 + st.chroma * 0.25;
-      ctx.drawImage(
-        off,
-        Math.max(0, sx - disp * dpr),
-        sy,
-        sw,
-        sh,
-        kx - kw / 2 - disp,
-        ky - kh / 2,
-        kw,
-        kh,
-      );
-      ctx.drawImage(
-        off,
-        Math.min(cw - sw, sx + disp * dpr),
-        sy,
-        sw,
-        sh,
-        kx - kw / 2 + disp,
-        ky - kh / 2,
-        kw,
-        kh,
-      );
-      ctx.globalCompositeOperation = "source-over";
-      ctx.globalAlpha = 1;
-
-      const gg = ctx.createLinearGradient(kx, ky - kh / 2, kx, ky + kh / 2);
-      gg.addColorStop(0, "rgba(255,255,255,0.34)");
-      gg.addColorStop(0.2, "rgba(255,255,255,0.02)");
-      gg.addColorStop(0.84, "rgba(255,255,255,0.01)");
-      gg.addColorStop(1, "rgba(255,255,255,0.22)");
-      ctx.fillStyle = gg;
-      ctx.fillRect(kx - kw / 2, ky - kh / 2, kw, kh);
-      ctx.fillStyle = "rgba(255,255,255,0.68)";
-      ctx.beginPath();
-      ctx.ellipse(kx - 2, ky - kh * 0.36, kw * 0.28, kh * 0.06, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-
-      const rg = ctx.createLinearGradient(kx, ky - kh / 2, kx, ky + kh / 2);
-      rg.addColorStop(0, "rgba(255,255,255,0.92)");
-      rg.addColorStop(0.5, "rgba(255,255,255,0.28)");
-      rg.addColorStop(1, sampleStarshipAccent(st.val));
-      ctx.strokeStyle = rg;
-      ctx.lineWidth = st.dragging || st.chroma > 0.2 ? 1.8 : 1.3;
-      ctx.beginPath();
-      ctx.roundRect(kx - kw / 2 + 0.65, ky - kh / 2 + 0.65, kw - 1.3, kh - 1.3, kr);
-      ctx.stroke();
+      drawCelestialSky(ctx, {
+        w: cssW,
+        h: cssH,
+        ratio: st.val,
+        t: st.t,
+        stages: sceneStages,
+        detents,
+        selected: st.lastIdx,
+        kx,
+      });
+      drawCelestialBody(ctx, kx, ky, st.val, st.t, sceneStages, st.grip);
+      particles.draw(ctx);
+      drawCelestialReticle(ctx, kx, ky, st.t, tint, st.grip);
+      if (!reducedMotion) drawCelestialShock(ctx, kx, ky, st.shock, tint);
       ctx.restore();
 
       st.hasPainted = true;
@@ -429,6 +327,8 @@ export function CosmicEffortSlider(props: {
     };
 
     wakeLoopRef.current = wake;
+    // Bodies arrive after the first frames; each one wakes a sleeping canvas to show it.
+    celestialSprites(wake);
     wake();
     const stopObserve = observeResize(wrap, wake);
     if (typeof document !== "undefined") {
@@ -436,6 +336,7 @@ export function CosmicEffortSlider(props: {
     }
 
     return () => {
+      forgetCelestialWake(wake);
       wakeLoopRef.current = null;
       if (raf) window.cancelAnimationFrame(raf);
       if (wellRef.current) wellRef.current.style.transform = "";
@@ -473,16 +374,22 @@ export function CosmicEffortSlider(props: {
   };
 
   const activeOpt = foundIndex >= 0 ? options[foundIndex] : undefined;
-  const activeColor = sampleStarshipAccent(targetRatio);
+  const activeColor = celestialAccentAt(targetRatio, stages);
   const levelLabel = activeOpt?.label ?? props.label;
-  const storyKey = dragStory ?? starshipStoryAtRatio(targetRatio);
+  const storyKey = dragStory ?? celestialStageAt(targetRatio, stages).line;
 
   return (
     <div
       data-cosmic-effort-slider
-      data-cosmic-scene="starship"
+      data-cosmic-scene="celestial"
       className={cn(disabled && "opacity-60")}
-      onPointerEnter={() => wakeLoopRef.current?.()}
+      onPointerEnter={() => {
+        stateRef.current.hovering = true;
+        wakeLoopRef.current?.();
+      }}
+      onPointerLeave={() => {
+        stateRef.current.hovering = false;
+      }}
       onFocus={() => wakeLoopRef.current?.()}
     >
       <div data-cosmic-embed-head>
@@ -529,7 +436,7 @@ export function CosmicEffortSlider(props: {
             const { ratio, idx } = pointerToIndex(event.clientX);
             stateRef.current.target = ratio;
             stateRef.current.val = ratio;
-            setDragStory(starshipStoryAtRatio(ratio));
+            setDragStory(celestialStageAt(ratio, stages).line);
             wakeLoopRef.current?.();
             if (idx !== stateRef.current.lastIdx) {
               applyShiftJuice(stateRef.current, idx, stateRef.current.lastIdx);
@@ -541,7 +448,7 @@ export function CosmicEffortSlider(props: {
             if (!stateRef.current.dragging || disabled) return;
             const { ratio, idx } = pointerToIndex(event.clientX);
             stateRef.current.target = ratio;
-            const nextStory = starshipStoryAtRatio(ratio);
+            const nextStory = celestialStageAt(ratio, stages).line;
             setDragStory((prev) => (prev === nextStory ? prev : nextStory));
             if (idx !== stateRef.current.lastIdx) {
               applyShiftJuice(stateRef.current, idx, stateRef.current.lastIdx);

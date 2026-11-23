@@ -17,6 +17,19 @@ describe("buildRuntimeInstructions", () => {
     assert.notInclude(instructions, "<pull_request_linking>");
   });
 
+  it("keeps lean notes to the harness and file links, without the PR block", () => {
+    const instructions = buildRuntimeInstructions({
+      harness: "acpRegistry",
+      model: "GLM-5.3",
+      lean: true,
+    });
+
+    assert.include(instructions, "<runtime_info>Harness: acpRegistry, as GLM-5.3.");
+    assert.include(instructions, "[http.ts:42](/abs/path/http.ts:42)");
+    assert.notInclude(instructions, "T3 Code");
+    assert.notInclude(instructions, "<pull_request_linking>");
+  });
+
   it("links PRs the agent creates, takes over, or pushes to, and no others", () => {
     const instructions = buildRuntimeInstructions({ harness: "Codex" });
 

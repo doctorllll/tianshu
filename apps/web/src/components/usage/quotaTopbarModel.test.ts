@@ -126,6 +126,27 @@ describe("quota topbar data", () => {
     expect(accounts).toHaveLength(2);
     expect(new Set(accounts.map((a) => a.id)).size).toBe(2);
   });
+  it("names each ACP instance by its own name, with its plan as the alias", () => {
+    const acp = (id: string, name: string, plan: string, email?: string) =>
+      provider({
+        instanceId: ProviderInstanceId.make(id),
+        driver: ProviderDriverKind.make("acpRegistry"),
+        displayName: name,
+        auth: { status: "unknown", label: plan, ...(email ? { email } : {}) },
+      });
+    const accounts = quotaAccounts(
+      present([
+        acp("zcode", "ZCode", "Coding Plan Pro"),
+        acp("fastctx", "fastctx", "Claude · machine"),
+        acp("antigravity", "Antigravity", "Google AI Pro", "someone@example.invalid"),
+      ]),
+    );
+    expect(accounts.map((a) => [a.title, a.alias])).toEqual([
+      ["ZCode", "Coding Plan Pro"],
+      ["fastctx", "Claude · machine"],
+      ["Antigravity", "Google AI Pro"],
+    ]);
+  });
   it("preserves selected windows and never silently substitutes a missing window", () => {
     const a = quotaAccounts(present([provider()]))[0]!;
     expect(quotaWindow(a, DEFAULT_QUOTA_PREFERENCES)?.kind).toBe("weekly");

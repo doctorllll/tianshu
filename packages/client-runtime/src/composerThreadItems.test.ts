@@ -180,3 +180,27 @@ describe("matchComposerEnvironmentItems", () => {
     ).toEqual(["cloud"]);
   });
 });
+
+it("offers the composer thread's own sub-sessions first, but not other threads' subagents", () => {
+  const childOf = (parent: string) => ({
+    rootThreadId: ThreadId.make(parent),
+    parentThreadId: ThreadId.make(parent),
+    relationshipToParent: "subagent" as const,
+  });
+  const items = matchComposerThreadItems({
+    shells: [
+      shell("listed", "Model docs", { updatedAt: "2026-10-22T00:00:00.000Z" }),
+      shell("mine", "Model review", { lineage: childOf("main") }),
+      shell("theirs", "Model audit", { lineage: childOf("other") }),
+    ],
+    environmentId,
+    linkedEnvironments: new Map(),
+    excludeThreadId: ThreadId.make("main"),
+    query: "model",
+    now: Date.parse("2026-10-23T00:00:00.000Z"),
+  });
+  expect(items.map((item) => [item.thread.threadId, item.description])).toEqual([
+    ["mine", "Sub-session"],
+    ["listed", "Thread"],
+  ]);
+});

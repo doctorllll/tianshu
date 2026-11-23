@@ -34,7 +34,6 @@ const task: BoardTask = {
   done_count: 0,
   total: 1,
 };
-const counts = { active: 1, user: 1, blocked: 0, agent: 0, stale: 0, done_week: 0, badge: 1 };
 describe("task board attention", () => {
   it("keeps folder boundary matching and the service longest-folder rule", () => {
     using _locale = testUiLocale("zh-CN");
@@ -100,35 +99,22 @@ describe("daily summary persistence", () => {
     ).toBe(true);
   });
 });
-describe("task board HTTP snapshot", () => {
-  it("preserves identity across generated timestamps and shares concurrent requests", async () => {
+describe("task board service", () => {
+  it("connects no external board: nothing is fetched or posted", async () => {
     using _locale = testUiLocale("zh-CN");
-    const { refreshTaskBoard, useTaskBoard } = await import("./taskBoard");
+    const { refreshTaskBoard, mutateTaskBoard, useTaskBoard } = await import("./taskBoard");
     useTaskBoard.setState({ data: null, error: null, cwd: null, dataCwd: null, loading: true });
-    using request = vi
-      .spyOn(globalThis, "fetch")
-      .mockImplementation(
-        async () =>
-          new Response(JSON.stringify({ tasks: [task], counts, generated_at: Math.random() })),
-      );
-    await Promise.all([refreshTaskBoard(), refreshTaskBoard()]);
-    expect(request).toHaveBeenCalledTimes(1);
-    const initial = useTaskBoard.getState();
+    using request = vi.spyOn(globalThis, "fetch");
     await refreshTaskBoard();
-    expect(useTaskBoard.getState()).toBe(initial);
-  });
-  it("refreshes after writes and leaves a clear failure when readback is unavailable", async () => {
-    using _locale = testUiLocale("zh-CN");
-    const { mutateTaskBoard, useTaskBoard } = await import("./taskBoard");
-    using request = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response("{}"))
-      .mockResolvedValueOnce(new Response("down", { status: 503 }));
+    expect(useTaskBoard.getState()).toMatchObject({
+      data: null,
+      error: "没有接入任务板。",
+      loading: false,
+    });
     await expect(
-      mutateTaskBoard("toggle", { folder: task.folder, step: "review" }),
-    ).rejects.toThrow("已提交");
-    expect(useTaskBoard.getState().error).toBe("看板服务没开");
-    expect(request.mock.calls[0]?.[1]?.credentials).toBe("omit");
+      mutateTaskBoard("review", { folder: task.folder, step: "review", decision: "approve" }),
+    ).rejects.toThrow("没有接入任务板。");
+    expect(request).not.toHaveBeenCalled();
   });
 });
 
@@ -215,39 +201,5 @@ describe("schema 2 task inbox", () => {
     });
     expect(boardEvidenceTarget("/work/a", "javascript:alert(1)")).toBeNull();
     expect(boardEvidenceTarget("/work/a", "data:text/html,test")).toBeNull();
-  });
-  it("requires a rejection reason before posting and reads back approve/reject results", async () => {
-    using _locale = testUiLocale("zh-CN");
-    const { mutateTaskBoard, useTaskBoard } = await import("./taskBoard");
-    useTaskBoard.setState({ data: null, error: null, cwd: null, dataCwd: null, loading: true });
-    using request = vi
-      .spyOn(globalThis, "fetch")
-      .mockImplementation(async () => new Response(JSON.stringify({ tasks: [task], counts })));
-    await expect(
-      mutateTaskBoard("review", {
-        folder: task.folder,
-        step: "review",
-        decision: "reject",
-        reason: "  ",
-      }),
-    ).rejects.toThrow("打回需要写一句原因");
-    expect(request).not.toHaveBeenCalled();
-    await mutateTaskBoard("review", {
-      folder: task.folder,
-      step: "review",
-      decision: "reject",
-      reason: "Fix title",
-    });
-    expect(request.mock.calls[0]?.[0]).toBe("http://127.0.0.1:8765/api/review");
-    expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).toEqual({
-      folder: task.folder,
-      step: "review",
-      decision: "reject",
-      reason: "Fix title",
-    });
-    expect(request.mock.calls[1]?.[0]).toBe("http://127.0.0.1:8765/api/tasks");
-    await mutateTaskBoard("review", { folder: task.folder, step: "review", decision: "approve" });
-    expect(JSON.parse(String(request.mock.calls[2]?.[1]?.body)).decision).toBe("approve");
-    expect(useTaskBoard.getState().error).toBeNull();
   });
 });

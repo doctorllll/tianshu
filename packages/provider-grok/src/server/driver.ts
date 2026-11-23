@@ -216,7 +216,7 @@ export const GrokDriver: ProviderDriver<GrokSettings, GrokDriverEnv, Path.Path> 
             snapshot.auth.status === "authenticated"
           ),
         (snapshot) =>
-          readGrokAccount(processEnv).pipe(
+          readGrokAccount(processEnv, snapshot.version).pipe(
             Effect.map(({ email, usageLimits }) => ({
               ...snapshot,
               auth: email ? { ...snapshot.auth, email } : snapshot.auth,

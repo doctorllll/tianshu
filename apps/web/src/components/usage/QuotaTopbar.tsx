@@ -58,6 +58,9 @@ function windowName(window: NonNullable<ReturnType<typeof quotaWindow>>, compact
     /^(session|5h|5 hours?|five hour)$/i.test(window.label)
   )
     return copy("{count}h", { count: window.windowDurationMins / 60 });
+  // Labels a driver names itself (fastctx's "My week") translate through the catalog.
+  const translated = copy(window.label);
+  if (translated !== window.label) return translated;
   return quotaWindowLabel(window.label, readUiLocale() === "zh-CN");
 }
 function NameTip({ account }: { readonly account: QuotaAccount }) {
@@ -536,7 +539,7 @@ export function QuotaTopbarView({
                             <span>
                               <NameTip account={account} />
                               <small>
-                                {copy("Account ")}
+                                {/^\d/.test(account.alias) ? copy("Account ") : null}
                                 {quotaPlanLabel(account.alias)}
                               </small>
                             </span>

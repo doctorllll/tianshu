@@ -22,14 +22,11 @@ import {
   MessageSquare,
   ExternalLink,
   Unplug,
-  Copy,
 } from "lucide-react";
 import {
   useTaskBoard,
   setTaskBoardCwd,
   mutateTaskBoard,
-  refreshTaskBoard,
-  TASK_BOARD_START_COMMAND,
   requestTaskBoardCurrent,
 } from "../taskBoard";
 import {
@@ -319,7 +316,6 @@ export function TaskBoardPanel({
   const [reason, setReason] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const openInEditor = useAtomCommand(shellEnvironment.openInEditor, { reportFailure: false });
@@ -747,33 +743,7 @@ export function TaskBoardPanel({
           <div className="mx-auto mb-3 grid size-11 place-items-center rounded-xl bg-accent">
             <Unplug className="size-5" />
           </div>
-          <h2 className="mb-1 text-sm font-semibold text-foreground">
-            {uiText("Task board service is offline")}
-          </h2>
-          <p>
-            {uiText("Task data is temporarily unavailable. Other T3 features are still available.")}
-          </p>
-          <code className="my-3 block break-all rounded-md bg-accent px-2 py-1.5 text-left text-3xs">
-            {TASK_BOARD_START_COMMAND}
-          </code>
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={() =>
-              void navigator.clipboard
-                .writeText(TASK_BOARD_START_COMMAND)
-                .then(() => setCopied(true))
-                .catch(() =>
-                  setMutationError(uiText("Couldn’t copy. Copy the command above manually.")),
-                )
-            }
-          >
-            <Copy />
-            {copied ? uiText("Copied") : uiText("Copy command")}
-          </Button>
-          <Button size="xs" variant="ghost" onClick={() => void refreshTaskBoard()}>
-            {uiText("Retry message")}
-          </Button>
+          <h2 className="mb-1 text-sm font-semibold text-foreground">{error}</h2>
           {mutationError ? (
             <p role="alert" className="mt-2 text-destructive">
               {mutationError}

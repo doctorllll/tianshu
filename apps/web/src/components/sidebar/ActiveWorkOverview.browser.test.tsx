@@ -48,7 +48,7 @@ describe("active work navigation", () => {
     );
     await screen.getByRole("button", { name: /Review 0/ }).click();
     expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ threadId: children[0]!.id }));
-    await screen.getByRole("button", { name: "收起Parent video的子任务" }).click();
+    await screen.getByRole("button", { name: "收起Parent video的子会话" }).click();
     await expect.element(screen.getByRole("button", { name: /Review 0/ })).not.toBeInTheDocument();
     await screen.getByRole("button", { name: /查看全部/ }).click();
     await page.getByRole("button", { name: /Review 6/ }).click();
@@ -56,7 +56,7 @@ describe("active work navigation", () => {
       expect.objectContaining({ threadId: children[6]!.id }),
     );
     await expect
-      .element(page.getByText("正在进行 · 1 个主任务，7 个子任务"))
+      .element(page.getByText("正在进行 · 1 个主任务，7 个子会话"))
       .not.toBeInTheDocument();
   });
   it("labels the running provider even if the next composer selection has changed", async () => {

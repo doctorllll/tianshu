@@ -388,7 +388,7 @@ export function UsageLimitsCompass({
             <div data-lv9="vessel-sheen" aria-hidden="true" />
             <div data-lv9="vessel-content">
               <div data-lv9="v-head compass-head-front">
-                <span data-lv9="badge violet">{text("Stardust compass")}</span>
+                <span data-lv9="badge violet">{text("Tianshu compass")}</span>
                 <span data-lv9="sp" />
                 <button
                   type="button"
@@ -495,7 +495,7 @@ export function UsageLimitsCompass({
                     { count: summary.total },
                   )}
                 </span>
-                <span data-lv9="compass-foot-status">{text("Stardust routing ready")}</span>
+                <span data-lv9="compass-foot-status">{text("Tianshu routing ready")}</span>
               </div>
             </div>
           </div>

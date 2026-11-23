@@ -160,6 +160,8 @@ const readGrokCredential = Effect.fn("readGrokCredential")(function* (
 
 export const readGrokAccount = Effect.fn("readGrokAccount")(function* (
   environment: NodeJS.ProcessEnv = process.env,
+  /** The installed CLI's version, sent the way `grok usage` sends it. */
+  clientVersion?: string | null,
 ) {
   const checkedAt = DateTime.formatIso(yield* DateTime.now);
   const probeFailed = makeUnavailableUsageLimits({
@@ -179,7 +181,14 @@ export const readGrokAccount = Effect.fn("readGrokAccount")(function* (
   const usageLimits = yield* Effect.gen(function* () {
     const client = yield* HttpClient.HttpClient;
     const response = yield* client.execute(
-      HttpClientRequest.get(GROK_USAGE_URL).pipe(HttpClientRequest.bearerToken(token)),
+      HttpClientRequest.get(GROK_USAGE_URL).pipe(
+        HttpClientRequest.bearerToken(token),
+        // The headers grok's own billing request carries (xai-grok-shell extensions/billing).
+        HttpClientRequest.setHeaders({
+          "x-grok-client-mode": "billing",
+          ...(clientVersion ? { "x-grok-client-version": clientVersion } : {}),
+        }),
+      ),
     );
     if (response.status === 403) {
       const { error } = yield* HttpClientResponse.schemaBodyJson(GrokErrorResponse)(response);

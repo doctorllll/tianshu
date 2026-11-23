@@ -113,7 +113,7 @@ export function StardustOrbitMeter({
           <div data-lv9="holo-face liquid-front" aria-hidden={flipped || undefined}>
             <div data-lv9="liquid-specular" aria-hidden="true" />
             <div data-lv9="holo-row">
-              <span data-lv9="badge ac">{text("Stardust orbit")}</span>
+              <span data-lv9="badge ac">{text("Tianshu orbit")}</span>
               <span>{text("Tap to flip")}</span>
             </div>
             <div data-lv9="orbit-stage">
@@ -264,10 +264,10 @@ export function StardustOrbitMeter({
       </div>
       <div data-lv9="v4-orbit-copy">
         <div data-lv9="v4-orbit-badges">
-          <span data-lv9="badge ac">{text("Stardust orbit")}</span>
+          <span data-lv9="badge ac">{text("Tianshu orbit")}</span>
           <span data-lv9="badge muted">{text("Liquid glass 3D flip card")}</span>
         </div>
-        <h2>{text("Stardust orbit energy meter")}</h2>
+        <h2>{text("Tianshu orbit energy meter")}</h2>
         <p>
           {text(
             "The ring is the average of each subscription's lowest remaining quota; nodes on the orbit are your subscriptions, ringed when 20% or less is left. Flip the card for which one to use next.",

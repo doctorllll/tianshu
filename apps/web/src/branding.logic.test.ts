@@ -48,18 +48,16 @@ describe("stable release hides the Nightly stage", () => {
       expect(resolveSidebarStageBackdropVariant(stage, mode)).toBeNull();
     }
     // The window title carries no "(Nightly)" either.
-    expect(formatAppDisplayName({ baseName: "T3 Stardust", stageLabel: stage })).toBe(
-      "T3 Stardust",
-    );
+    expect(formatAppDisplayName({ baseName: "Tianshu", stageLabel: stage })).toBe("Tianshu");
     expect(
       resolveServerBackedAppDisplayName({
-        baseName: "T3 Stardust",
-        fallbackDisplayName: "T3 Stardust",
+        baseName: "Tianshu",
+        fallbackDisplayName: "Tianshu",
         fallbackStageLabel: stage,
         primaryServerVersion: NIGHTLY_STAMP,
         releaseChannel: "stable",
       }),
-    ).toBe("T3 Stardust");
+    ).toBe("Tianshu");
   });
 
   it("still shows Dev on a stable flag, and Nightly artwork on a nightly build", () => {

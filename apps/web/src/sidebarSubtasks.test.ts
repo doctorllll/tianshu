@@ -143,7 +143,7 @@ describe("subtask inbox and archive lifecycle", () => {
     expect(nextAttentionThread(attention, null)?.id).toBe(answer.id);
     expect(attentionThreadLabel(permission, all, "待授权")).toEqual({
       title: "父会话",
-      detail: "子任务 · 待授权",
+      detail: "子会话 · 待授权",
     });
     expect(attentionThreadLabel(permission, [permission], "待授权").title).toBe(permission.title);
   });

@@ -1,5 +1,6 @@
 import { useUiText } from "~/i18n/useUiText";
 
+import { TianshuWordmark } from "../TianshuWordmark";
 import { useTaskBoard } from "~/taskBoard";
 import { useVisibleThreadShells } from "~/state/entities";
 import { recentProjectThreads, startThreadStatus } from "./stardustStartModel";
@@ -374,7 +375,7 @@ export function DraftHeroHeadline({
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col items-center" data-stardust-heading>
-      <img src="/stardust-icon.png" alt={uiText("T3 Stardust")} className="mb-3 size-14" />
+      <TianshuWordmark className="mb-4 h-20" />
       <h1 className="text-center text-2xl font-semibold tracking-tight">
         {hasResolvedProject && !isScratchDraft ? (
           <>

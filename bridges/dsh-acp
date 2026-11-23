@@ -1,0 +1,340 @@
+#!/usr/bin/env python3
+"""dsh-acp: DeepSeek Harness as an ACP agent (stdio JSON-RPC), for Tianshu and other ACP clients.
+
+Each turn runs DSH's own headless profile, `dsh --profile headless --json [--session-id X] -`,
+in the session's directory, and streams its run events back as ACP updates. Nothing of DSH is
+patched: sessions are DSH sessions in ~/.dsh/sessions. After a new session's first turn the
+bridge drops a marker in $DSH_HOME/adopt-queue/ so the dsh-session-adopt plugin lists it in the
+DSH desktop sidebar (on the App's next start when it is open), as dsh-dispatch.py does.
+
+A new session has a provisional id until its first turn; the mapping to DSH's session id is
+kept in ~/.local/state/dsh-acp/sessions.json so a client can resume by the id it was given.
+
+Environment: DSH_BIN (default: dsh on PATH), DSH_HOME (default ~/.dsh).
+"""
+import glob, json, os, re, signal, subprocess, sys, threading, uuid
+
+VERSION = "0.1.0"
+DSH = os.environ.get("DSH_BIN") or "dsh"
+DSH_HOME = os.environ.get("DSH_HOME") or os.path.join(os.path.expanduser("~"), ".dsh")
+STATE = os.path.join(os.path.expanduser("~"), ".local", "state", "dsh-acp", "sessions.json")
+
+_out = threading.Lock()
+_state_lock = threading.Lock()
+SESS = {}  # acp id -> {"dsh": session id or None, "cwd", "proc", "cancelled"}
+
+
+def log(*a):
+    print("[dsh-acp]", *a, file=sys.stderr, flush=True)
+
+
+def send(msg):
+    data = json.dumps(msg, ensure_ascii=False)
+    with _out:
+        sys.stdout.write(data + "\n")
+        sys.stdout.flush()
+
+
+def update(sid, upd):
+    send({"jsonrpc": "2.0", "method": "session/update", "params": {"sessionId": sid, "update": upd}})
+
+
+def text_chunk(kind, text):
+    return {"sessionUpdate": kind, "content": {"type": "text", "text": text}}
+
+
+# ------------------------------------------------------------------ state
+def load_state():
+    try:
+        with open(STATE) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def remember(acp_id, dsh_id, cwd):
+    with _state_lock:
+        st = load_state()
+        st[acp_id] = {"dsh": dsh_id, "cwd": cwd}
+        os.makedirs(os.path.dirname(STATE), exist_ok=True)
+        tmp = STATE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(st, f)
+        os.replace(tmp, STATE)
+
+
+def resolve(acp_id, cwd=None):
+    s = SESS.get(acp_id)
+    if s is None:
+        hit = load_state().get(acp_id) or {}
+        dsh_id = hit.get("dsh") or (acp_id if acp_id.startswith("session-") else None)
+        s = SESS.setdefault(acp_id, {"dsh": dsh_id, "cwd": hit.get("cwd") or cwd})
+    if cwd and not s.get("cwd"):
+        s["cwd"] = cwd
+    return s
+
+
+def adopt(dsh_id, cwd):
+    """Queue the session for the desktop sidebar (dsh-session-adopt reads names without a dot)."""
+    queue = os.path.join(DSH_HOME, "adopt-queue")
+    os.makedirs(queue, exist_ok=True)
+    tmp = os.path.join(queue, "." + dsh_id + ".tmp")
+    with open(tmp, "w") as f:
+        f.write(cwd + "\n")
+    os.rename(tmp, os.path.join(queue, dsh_id))
+
+
+# ------------------------------------------------------------------ session log -> replay
+def session_file(dsh_id):
+    for pattern in ("session.v4.jsonl.zstd", "session.jsonl.zstd"):
+        hits = glob.glob(os.path.join(DSH_HOME, "sessions", "*", dsh_id, pattern))
+        if hits:
+            return hits[0]
+    return None
+
+
+def read_records(path):
+    from compression import zstd  # Python 3.14+
+
+    with open(path, "rb") as f:
+        data = f.read()
+    out = b""
+    while data:
+        d = zstd.ZstdDecompressor()
+        out += d.decompress(data)
+        data = d.unused_data
+    for line in out.decode("utf-8", "replace").splitlines():
+        try:
+            yield json.loads(line)
+        except ValueError:
+            continue
+
+
+def tool_kind(name):
+    n = (name or "").lower()
+    if n in ("bash", "shell", "exec"):
+        return "execute"
+    if n in ("read", "view", "read_file"):
+        return "read"
+    if n in ("edit", "write", "apply_patch", "multi_edit"):
+        return "edit"
+    if n in ("grep", "glob", "search", "web_search"):
+        return "search"
+    return "other"
+
+
+def tool_title(name, args):
+    if isinstance(args, str):
+        try:
+            args = json.loads(args)
+        except ValueError:
+            args = {}
+    args = args if isinstance(args, dict) else {}
+    hint = args.get("command") or args.get("path") or args.get("file_path") or args.get("pattern") or args.get("query") or ""
+    first = (str(hint).strip().splitlines() or [""])[0][:120]
+    return (name + (": " + first if first else "")), args
+
+
+def replay(acp_id, dsh_id):
+    path = session_file(dsh_id)
+    if not path:
+        return
+    for rec in read_records(path):
+        kind, data = rec.get("type"), rec.get("data") or {}
+        if kind == "user/message" and (data.get("source") or {}).get("kind") == "user":
+            text = "\n".join(c.get("text", "") for c in data.get("content") or [] if c.get("type") == "text").strip()
+            if text:
+                update(acp_id, text_chunk("user_message_chunk", text))
+        elif kind == "assistant/message":
+            for c in (data.get("message") or {}).get("content") or []:
+                if c.get("type") == "text" and c.get("text"):
+                    update(acp_id, text_chunk("agent_message_chunk", c["text"]))
+                elif c.get("type") == "reasoning" and c.get("text"):
+                    update(acp_id, text_chunk("agent_thought_chunk", c["text"]))
+                elif c.get("type") == "tool-call":
+                    title, args = tool_title(c.get("name"), c.get("arguments"))
+                    update(acp_id, {"sessionUpdate": "tool_call", "toolCallId": c.get("id") or str(uuid.uuid4()),
+                                    "title": title, "kind": tool_kind(c.get("name")), "status": "completed", "rawInput": args})
+        elif kind == "tool/result":
+            msg = data.get("message") or {}
+            text = "\n".join(c.get("text", "") for c in msg.get("content") or [] if c.get("type") == "text")
+            update(acp_id, {"sessionUpdate": "tool_call_update", "toolCallId": msg.get("toolCallId") or "",
+                            "status": "failed" if msg.get("isError") else "completed",
+                            **({"content": [{"type": "content", "content": {"type": "text", "text": text[:20000]}}]} if text else {})})
+
+
+# ------------------------------------------------------------------ prompt text
+# The client's notes (its collaboration tools, runtime info) are for agents that can use them; DSH
+# cannot reach those tools, and the notes would show in the DSH App as part of your message.
+_NOTES = re.compile(r"\s*<(t3_code_instructions|runtime_info|pull_request_linking)>.*?</\1>\s*", re.S)
+_REQUEST = re.compile(r"<user_request>\n?(.*?)\n?</user_request>", re.S)
+
+
+def prompt_text(blocks):
+    parts = []
+    for b in blocks or []:
+        t = b.get("type")
+        if t == "text":
+            parts.append(b.get("text") or "")
+        elif t == "resource_link":
+            parts.append(b.get("uri") or "")
+        elif t == "resource":
+            r = b.get("resource") or {}
+            parts.append(r.get("text") or r.get("uri") or "")
+    text = "\n".join(x for x in parts if x)
+    m = _REQUEST.search(text)
+    if m:
+        text = text[: m.start()] + m.group(1) + text[m.end():]
+    return _NOTES.sub("\n\n", text).strip()
+
+
+# ------------------------------------------------------------------ one turn
+def run_turn(acp_id, s, text, cwd):
+    cmd = [DSH, "--profile", "headless", "--json"]
+    if s.get("dsh"):
+        cmd += ["--session-id", s["dsh"]]
+    proc = subprocess.Popen(cmd + ["-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            cwd=cwd, text=True, bufsize=1, start_new_session=True)
+    s["proc"] = proc
+    errors = []
+    threading.Thread(target=lambda: errors.append(proc.stderr.read()), daemon=True).start()
+    proc.stdin.write(text)
+    proc.stdin.close()
+    reason, error, new_id = None, None, None
+    for line in proc.stdout:
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        kind = e.get("type")
+        if kind == "session":
+            new_id = e.get("sessionId")
+        elif kind == "text" and e.get("text"):
+            update(acp_id, text_chunk("agent_message_chunk", e["text"]))
+        elif kind == "thinking" and e.get("text"):
+            update(acp_id, text_chunk("agent_thought_chunk", e["text"]))
+        elif kind == "tool_call":
+            title, args = tool_title(e.get("tool"), e.get("input"))
+            update(acp_id, {"sessionUpdate": "tool_call", "toolCallId": e.get("callId") or str(uuid.uuid4()),
+                            "title": title, "kind": tool_kind(e.get("tool")), "status": "in_progress", "rawInput": args})
+        elif kind == "tool_result":
+            result = e.get("result")
+            result = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False)
+            update(acp_id, {"sessionUpdate": "tool_call_update", "toolCallId": e.get("callId") or "",
+                            "status": "completed" if e.get("status") == "completed" else "failed",
+                            **({"content": [{"type": "content", "content": {"type": "text", "text": result[:20000]}}]} if result else {})})
+        elif kind == "final":
+            reason = (e.get("reason") or {}).get("kind")
+        elif kind == "error":
+            error = e.get("message") or "DSH reported an error"
+    code = proc.wait()
+    s["proc"] = None
+    if error is None and code not in (0, None) and not s.get("cancelled"):
+        error = (errors[0] if errors else "").strip().splitlines()[-1:] or ["dsh exited with %s" % code]
+        error = error[0] if isinstance(error, list) else error
+    return new_id, reason, error
+
+
+def h_prompt(p):
+    acp_id = p["sessionId"]
+    s = resolve(acp_id)
+    text = prompt_text(p.get("prompt"))
+    if not text:
+        return {"stopReason": "end_turn"}
+    cwd = s.get("cwd") or os.getcwd()
+    s["cancelled"] = False
+    new_id, reason, error = run_turn(acp_id, s, text, cwd)
+    moved = re.search(r'was recorded in "(.+?)", not "', error or "")
+    if moved:  # a resumed session runs only from the directory it was recorded in
+        cwd = s["cwd"] = moved.group(1)
+        new_id, reason, error = run_turn(acp_id, s, text, cwd)
+    if new_id and not s.get("dsh"):
+        s["dsh"] = new_id
+        remember(acp_id, new_id, cwd)
+        try:
+            adopt(new_id, cwd)
+        except OSError as e:
+            log("adopt:", e)
+    if error and not s.get("cancelled"):
+        if "active write handle" in error:
+            error = "This session is open in the DSH App, which holds it for writing. Quit DSH or start a new session."
+        update(acp_id, text_chunk("agent_message_chunk", "\n\n" + error))
+    if s.get("cancelled"):
+        return {"stopReason": "cancelled"}
+    return {"stopReason": "max_tokens" if reason == "max_tokens" else "end_turn"}
+
+
+# ------------------------------------------------------------------ handlers
+def h_initialize(p):
+    return {"protocolVersion": 1,
+            "agentCapabilities": {"loadSession": True,
+                                  "promptCapabilities": {"image": False, "audio": False, "embeddedContext": True},
+                                  "mcpCapabilities": {"http": False, "sse": False}},
+            "authMethods": [],
+            "agentInfo": {"name": "dsh-acp", "title": "DeepSeek Harness", "version": VERSION}}
+
+
+def h_new(p):
+    acp_id = "dsh-new-" + uuid.uuid4().hex
+    SESS[acp_id] = {"dsh": None, "cwd": p.get("cwd")}
+    return {"sessionId": acp_id}
+
+
+def h_load(p):
+    acp_id = p["sessionId"]
+    s = resolve(acp_id, p.get("cwd"))
+    if s.get("dsh"):
+        replay(acp_id, s["dsh"])
+    return {}
+
+
+def h_cancel(p):
+    s = SESS.get(p.get("sessionId"))
+    proc = s and s.get("proc")
+    if proc and proc.poll() is None:
+        s["cancelled"] = True
+        try:
+            os.killpg(proc.pid, signal.SIGINT)
+        except OSError:
+            proc.terminate()
+
+
+HANDLERS = {"initialize": h_initialize, "session/new": h_new, "session/load": h_load, "session/prompt": h_prompt}
+NOTIFICATIONS = {"session/cancel": h_cancel}
+
+
+def handle(msg):
+    method, mid, params = msg.get("method"), msg.get("id"), msg.get("params") or {}
+    if mid is None:
+        fn = NOTIFICATIONS.get(method)
+        if fn:
+            try:
+                fn(params)
+            except Exception as e:  # noqa: BLE001
+                log(method, e)
+        return
+    fn = HANDLERS.get(method)
+    if fn is None:
+        return send({"jsonrpc": "2.0", "id": mid, "error": {"code": -32601, "message": "Method not found: %s" % method}})
+    try:
+        send({"jsonrpc": "2.0", "id": mid, "result": fn(params)})
+    except Exception as e:  # noqa: BLE001
+        log("%s failed: %r" % (method, e))
+        send({"jsonrpc": "2.0", "id": mid, "error": {"code": -32603, "message": "%s: %s" % (type(e).__name__, e)}})
+
+
+def main():
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            msg = json.loads(line)
+        except ValueError:
+            continue
+        if "method" in msg:
+            threading.Thread(target=handle, args=(msg,), daemon=True).start()
+
+
+if __name__ == "__main__":
+    main()

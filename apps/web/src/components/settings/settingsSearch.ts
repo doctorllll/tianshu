@@ -788,7 +788,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/general",
     searchTerms: [
       msg(
-      // oxlint-disable-next-line t3code/no-hardcoded-ui-han -- search keywords in every supported language
+        // oxlint-disable-next-line t3code/no-hardcoded-ui-han -- search keywords in every supported language
         "locale translation english deutsch german español spanish français french português portuguese brasil brazilian chinese 中文 japanese 日本語 korean 한국어 russian русский swedish svenska sprache idioma langue 语言 言語 언어 язык",
       ),
     ],
@@ -1017,12 +1017,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     desktopOnly: true,
   },
   {
-    id: "mobile-app",
-    title: msg("Mobile app"),
-    to: "/settings/about",
-    searchTerms: [msg("phone tablet iPhone iPad iOS Android App Store Google Play QR")],
-  },
-  {
     id: "welcome-page",
     title: msg("Welcome page"),
     to: "/settings/about",
@@ -1030,17 +1024,16 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("onboarding setup first run getting started agents import projects")],
   },
   {
-    id: "telemetry-opt-in",
-    title: "Share anonymous usage data",
-    to: "/settings/about",
-    scope: "environment",
-    searchTerms: ["telemetry analytics usage statistics tracking privacy opt in off default"],
-  },
-  {
     id: "privacy-policy",
-    title: msg("Privacy policy"),
+    title: msg("Data and privacy"),
     to: "/settings/about",
     searchTerms: [msg("telemetry analytics usage data tracking legal opt out")],
+  },
+  {
+    id: "based-on",
+    title: msg("Based on"),
+    to: "/settings/about",
+    searchTerms: [msg("T3 Code open source fork credits license")],
   },
   {
     id: "telemetry-export",

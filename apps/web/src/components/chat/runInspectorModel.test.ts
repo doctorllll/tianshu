@@ -66,7 +66,7 @@ it("marks cached quota last known when offline, failed, or stale", () => {
   ).toEqual([]);
 });
 it("only uses a safe displayName for account aliases", () => {
-  expect(accountAlias("小新工作号")).toBe("小新工作号");
+  expect(accountAlias("我的工作号")).toBe("我的工作号");
   expect(accountAlias("user@example.com")).toBeNull();
   expect(accountAlias(undefined)).toBeNull();
   expect(accountAlias("token=private")).toBeNull();

@@ -26,10 +26,9 @@ export interface ComposerThreadItem {
 }
 
 /**
- * Threads to reference from the composer, matched and ranked like the command
- * palette, without subagent threads or other threads' side chats. The agent reads threads
- * on its own server and on the machines it links to, so candidates stay within those, and a
- * linked machine's threads say which machine they are on.
+ * Threads to reference from the composer, ranked like the palette; the composer thread's own
+ * sub-sessions first, other threads' subagents and side chats left out. Candidates stay on
+ * this server and the machines it links to, which are named.
  */
 export function matchComposerThreadItems(
   input: {
@@ -52,20 +51,30 @@ export function matchComposerThreadItems(
     shell.environmentId === input.environmentId &&
     shell.lineage.parentThreadId === input.excludeThreadId &&
     shell.latestUserMessageAt !== null;
+  const isOwnSubSession = (shell: ComposerThreadCandidate) =>
+    shell.lineage.relationshipToParent === "subagent" &&
+    shell.lineage.sideChat !== true &&
+    shell.environmentId === input.environmentId &&
+    input.excludeThreadId !== null &&
+    shell.lineage.parentThreadId === input.excludeThreadId;
   const candidates = input.shells.filter(
     (shell) =>
       (shell.environmentId === input.environmentId ||
         input.linkedEnvironments.has(shell.environmentId)) &&
       shell.id !== input.excludeThreadId &&
       shell.archivedAt === null &&
-      (isListedThreadLineage(shell.lineage) || isOwnSideChat(shell)),
+      (isListedThreadLineage(shell.lineage) || isOwnSideChat(shell) || isOwnSubSession(shell)),
   );
-  return rankSearchItems(candidates, (shell, options) =>
+  const ranked = rankSearchItems(candidates, (shell, options) =>
     scoreThreadSearch(query, threadSearchSubject(shell, null), input.now, {
       ...options,
       picks: false,
     }),
-  )
+  );
+  return [
+    ...ranked.filter(({ item }) => isOwnSubSession(item)),
+    ...ranked.filter(({ item }) => !isOwnSubSession(item)),
+  ]
     .slice(0, COMPOSER_THREAD_RESULT_LIMIT)
     .map(({ item: shell }) => {
       const machine =
@@ -79,9 +88,11 @@ export function matchComposerThreadItems(
         label: shell.title,
         description: isOwnSideChat(shell)
           ? resolve(msg("Side chat"))
-          : machine === undefined
-            ? resolve(msg("Thread", { $context: "noun, search result type" }))
-            : resolve(msg("Thread on {machine}", { machine })),
+          : isOwnSubSession(shell)
+            ? resolve(msg("Sub-session"))
+            : machine === undefined
+              ? resolve(msg("Thread", { $context: "noun, search result type" }))
+              : resolve(msg("Thread on {machine}", { machine })),
       };
     });
 }

@@ -13,6 +13,7 @@ import { extractDroidElicitationForm } from "./droidAcp.ts";
 import { makeKimiPromptOutcomeWatch } from "./kimiAcp.ts";
 import { extractOmpElicitationForm } from "./ompAcp.ts";
 import { extractOpenCodeElicitationForm } from "./opencodeAcp.ts";
+import { isZcodeAcpCommand, makeZcodeConfiguredMcpServers } from "./zcodeAcp.ts";
 import {
   copilotClientCapabilitiesMeta,
   extractCopilotSubagentUpdate,
@@ -256,6 +257,11 @@ export const makeAcpRegistryAdapterV2 = Effect.fn("makeAcpRegistryAdapterV2")(fu
   const watchKimiPromptOutcome = isKimi
     ? yield* makeKimiPromptOutcomeWatch(options.environment.KIMI_CODE_HOME)
     : undefined;
+  const zcodeMcpServers =
+    options.settings.source === "local" &&
+    isZcodeAcpCommand(options.settings.commandPath, options.settings.commandArgs)
+      ? yield* makeZcodeConfiguredMcpServers(options.environment.ZCODE_HOME)
+      : undefined;
   const copilotRouting = isCopilot ? makeCopilotSubagentRouting() : undefined;
   // Copilot CLI 1.0.105 rejects stdio MCP servers from the client, and Command Code cannot
   // start the stdio bridge on Windows (it spawns MCP commands through cmd.exe, which splits
@@ -343,6 +349,9 @@ export const makeAcpRegistryAdapterV2 = Effect.fn("makeAcpRegistryAdapterV2")(fu
           alwaysSetModel: true,
         }),
     mcpOverHttp: useHttpMcpServers,
+    ...(zcodeMcpServers === undefined
+      ? {}
+      : { nativeMcpServers: zcodeMcpServers, promptInstructionsLast: true }),
     makeRuntime: options.makeRuntime ?? makeAcpRegistryRuntime(runtimeOptions, catalog),
     ...(runtimeCoordinator === undefined
       ? {}

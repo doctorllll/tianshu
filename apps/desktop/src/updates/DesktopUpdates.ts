@@ -497,7 +497,7 @@ export const make = Effect.gen(function* () {
       .exists(environment.path.join(environment.resourcesPath, "stardust-build.json"))
       .pipe(Effect.orElseSucceed(() => false));
     if (customBuild)
-      return Option.some("T3 星尘版通过迁移感知安装器手动更新；官方自动更新已禁用。");
+      return Option.some("天枢没有自动更新：新版本在本机重新打包后安装。");
     const bakedFeed = Option.getOrUndefined(yield* Ref.get(appUpdateYmlConfigRef));
     if (
       bakedFeed !== undefined &&

@@ -1,0 +1,547 @@
+#!/usr/bin/env python3
+"""antigravity-acp: Google Antigravity as an ACP agent (stdio JSON-RPC), for Tianshu and other ACP clients.
+
+Antigravity runs its agent inside the language server the desktop App starts. This bridge talks to
+that server the way the App's own window does: StartCascade with the session's folder, then
+SendUserCascadeMessage with the cascade config the App itself last sent (only the model swapped),
+then reads the steps back. Conversations are the App's own: they show in its sidebar, under the
+project that holds the folder when there is one, and the App can open and continue them.
+
+The App must be running. Its server writes ~/.gemini/antigravity/daemon/hub_<port>.json with the
+ports and the CSRF token; nothing else is read from the App.
+
+Environment: AG_DAEMON_DIR (default ~/.gemini/antigravity/daemon).
+"""
+import glob, json, os, pathlib, re, sys, threading, time, urllib.error, urllib.parse, urllib.request, uuid
+
+VERSION = "0.1.0"
+DAEMON = os.environ.get("AG_DAEMON_DIR") or os.path.join(os.path.expanduser("~"), ".gemini", "antigravity", "daemon")
+SERVICE = "exa.language_server_pb.LanguageServerService"
+POLL = 0.6
+NOT_RUNNING = "Antigravity is not running. Open the Antigravity App (or start it from Tianshu's banner) and try again."
+
+_out = threading.Lock()
+_hub = {"value": None}
+SESS = {}  # cascade id -> {"cwd", "model", "cancelled", "started"}
+_pending = {}  # outgoing request id -> [event, response]
+_template = {"at": 0.0, "config": None, "model": None}
+
+
+def log(*a):
+    print("[antigravity-acp]", *a, file=sys.stderr, flush=True)
+
+
+def send(msg):
+    data = json.dumps(msg, ensure_ascii=False)
+    with _out:
+        sys.stdout.write(data + "\n")
+        sys.stdout.flush()
+
+
+def update(sid, upd):
+    send({"jsonrpc": "2.0", "method": "session/update", "params": {"sessionId": sid, "update": upd}})
+
+
+def text_chunk(kind, text):
+    return {"sessionUpdate": kind, "content": {"type": "text", "text": text}}
+
+
+def ask_client(method, params, timeout=3600):
+    rid = "ag-" + uuid.uuid4().hex
+    slot = [threading.Event(), None]
+    _pending[rid] = slot
+    send({"jsonrpc": "2.0", "id": rid, "method": method, "params": params})
+    slot[0].wait(timeout)
+    _pending.pop(rid, None)
+    return slot[1] or {}
+
+
+# ------------------------------------------------------------------ the App's language server
+class NotRunning(Exception):
+    pass
+
+
+def alive(pid):
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def find_hub():
+    hubs = sorted(glob.glob(os.path.join(DAEMON, "hub_*.json")), key=os.path.getmtime, reverse=True)
+    for path in hubs:
+        try:
+            with open(path) as f:
+                hub = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if hub.get("csrfToken") and hub.get("httpPort") and alive(hub.get("pid")):
+            return hub
+    return None
+
+
+def ls(method, body, timeout=30):
+    for attempt in (0, 1):
+        hub = _hub["value"] or find_hub()
+        if hub is None:
+            raise NotRunning(NOT_RUNNING)
+        _hub["value"] = hub
+        req = urllib.request.Request(
+            "http://127.0.0.1:%s/%s/%s" % (hub["httpPort"], SERVICE, method),
+            data=json.dumps(body).encode(), method="POST",
+            headers={"Content-Type": "application/json", "Connect-Protocol-Version": "1",
+                     "x-codeium-csrf-token": hub["csrfToken"]})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return json.loads(r.read() or b"{}")
+        except urllib.error.HTTPError as e:
+            detail = (e.read() or b"").decode("utf-8", "replace")
+            try:
+                detail = json.loads(detail).get("message") or detail
+            except ValueError:
+                pass
+            raise RuntimeError("%s: %s" % (method, re.sub(r"\s*\(error ID:[^)]+\)", "", detail)[:400]))
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            _hub["value"] = None  # the App restarted on new ports, or quit
+            if attempt:
+                raise NotRunning(NOT_RUNNING)
+
+
+# ------------------------------------------------------------------ models and the App's config
+def model_choices():
+    data = ls("GetUserStatus", {}).get("userStatus") or {}
+    cm = data.get("cascadeModelConfigData") or {}
+    out = []
+    for c in cm.get("clientModelConfigs") or []:
+        model = (c.get("modelOrAlias") or {}).get("model")
+        if model and not c.get("disabled"):
+            out.append({"value": model, "name": c.get("label") or model})
+    default = ((cm.get("defaultOverrideModelConfig") or {}).get("modelOrAlias") or {}).get("model")
+    return out, default
+
+
+def app_template():
+    """The cascade config the App sent with its latest message: what the App would send now."""
+    if _template["config"] is not None and time.time() - _template["at"] < 600:
+        return _template["config"], _template["model"]
+    config, model = None, None
+    try:
+        sums = ls("GetAllCascadeTrajectories", {}).get("trajectorySummaries") or {}
+        recent = sorted(sums.items(), key=lambda kv: kv[1].get("lastUserInputTime") or kv[1].get("lastModifiedTime") or "", reverse=True)
+        for cid, summary in recent[:8]:
+            index = summary.get("lastUserInputStepIndex")
+            if index is None:
+                continue
+            steps = ls("GetCascadeTrajectorySteps", {"cascadeId": cid, "stepOffset": int(index)}).get("steps") or []
+            cfg = ((steps[0] if steps else {}).get("userInput") or {}).get("userConfig") or {}
+            if (cfg.get("plannerConfig") or {}).get("planModel"):
+                config, model = cfg, cfg["plannerConfig"]["planModel"]
+                break
+    except (RuntimeError, NotRunning) as e:
+        log("template:", e)
+    _template.update(at=time.time(), config=config, model=model)
+    return config, model
+
+
+def cascade_config(model):
+    template, _ = app_template()
+    if template is None:
+        return {"plannerConfig": {"planModel": model, "conversational": {
+            "plannerMode": "CONVERSATIONAL_PLANNER_MODE_DEFAULT", "agenticMode": True}}}
+    config = json.loads(json.dumps(template))
+    config.setdefault("plannerConfig", {})["planModel"] = model
+    return config
+
+
+def config_options(s):
+    choices, default = model_choices()
+    if not s.get("model"):
+        _, last = app_template()
+        values = {c["value"] for c in choices}
+        s["model"] = last if last in values else (default if default in values else (choices[0]["value"] if choices else None))
+    return [{"id": "model", "name": "Model", "category": "model", "type": "select",
+             "currentValue": s.get("model") or "", "options": choices}], choices
+
+
+def session_models(s):
+    options, choices = config_options(s)
+    models = {"currentModelId": s.get("model") or "",
+              "availableModels": [{"modelId": c["value"], "name": c["name"]} for c in choices]}
+    return {"configOptions": options, "models": models}
+
+
+# ------------------------------------------------------------------ folders and projects
+def folder_uri(cwd):
+    return pathlib.Path(os.path.abspath(cwd)).as_uri()
+
+
+def same_folder(a, b):
+    def norm(u):
+        return urllib.parse.unquote(u or "").rstrip("/")
+    return norm(a) == norm(b)
+
+
+def project_for(uri):
+    """The App's project holding this folder, as the App's own folder picker finds it."""
+    try:
+        ids = ls("ListProjects", {}).get("projectIds") or []
+    except RuntimeError:
+        return None
+    for pid in ids:
+        if pid == "outside-of-project":
+            continue
+        try:
+            project = ls("ReadProject", {"id": pid}).get("project") or {}
+        except RuntimeError:
+            continue
+        for res in (project.get("projectResources") or {}).get("resources") or []:
+            folder = res.get("folderUri") or (res.get("gitFolder") or {}).get("folderUri")
+            if folder and same_folder(folder, uri):
+                return pid
+    return None
+
+
+def start_cascade(cid, cwd):
+    body = {"cascadeId": cid, "source": "CORTEX_TRAJECTORY_SOURCE_CASCADE_CLIENT",
+            "trajectoryType": "CORTEX_TRAJECTORY_TYPE_CASCADE"}
+    if cwd:
+        uri = folder_uri(cwd)
+        project = project_for(uri)
+        if project:
+            body["workspaceUris"] = []
+            body["projectEnvConfig"] = {"projectId": project, "defaultProjectEnvironment": {}}
+        else:
+            body["workspaceUris"] = [uri]
+    ls("StartCascade", body)
+
+
+def summary_of(cid):
+    return (ls("GetAllCascadeTrajectories", {}).get("trajectorySummaries") or {}).get(cid)
+
+
+# ------------------------------------------------------------------ steps -> ACP
+SILENT = {"USER_INPUT", "PLANNER_RESPONSE", "CHECKPOINT", "EPHEMERAL_MESSAGE", "CONVERSATION_HISTORY",
+          "KNOWLEDGE_ARTIFACTS", "SYSTEM_MESSAGE", "ERROR_MESSAGE", "DUMMY", "FINISH", "BRAIN_UPDATE",
+          "DIRECTORY_RULES", "MEMORY", "KI_INSERTION"}
+KINDS = {"RUN_COMMAND": "execute", "COMMAND_STATUS": "execute", "VIEW_FILE": "read", "LIST_DIRECTORY": "read",
+         "CODE_ACTION": "edit", "FILE_CHANGE": "edit", "MOVE": "move", "DELETE_DIRECTORY": "delete",
+         "GREP_SEARCH": "search", "FIND": "search", "CODE_SEARCH": "search", "INTERNAL_SEARCH": "search",
+         "SEARCH_WEB": "fetch", "READ_URL_CONTENT": "fetch", "MCP_TOOL": "other"}
+
+
+def short_type(step):
+    return (step.get("type") or "").replace("CORTEX_STEP_TYPE_", "")
+
+
+def path_of(uri):
+    if not uri:
+        return ""
+    return urllib.parse.unquote(uri[7:]) if uri.startswith("file://") else uri
+
+
+def describe(step):
+    """(title, kind, raw input, output text) for a tool step."""
+    t = short_type(step)
+    kind = KINDS.get(t, "other")
+    if t == "RUN_COMMAND":
+        rc = step.get("runCommand") or {}
+        out = (rc.get("combinedOutput") or {}).get("full") or ""
+        return "Run: " + (rc.get("commandLine") or rc.get("proposedCommandLine") or "")[:160], kind, \
+            {"command": rc.get("commandLine"), "cwd": rc.get("cwd")}, out
+    if t == "VIEW_FILE":
+        p = path_of((step.get("viewFile") or {}).get("absolutePathUri"))
+        return "Read " + p, kind, {"path": p}, ""
+    if t == "CODE_ACTION":
+        spec = (step.get("codeAction") or {}).get("actionSpec") or {}
+        action, body = next(iter(spec.items()), ("edit", {}))
+        p = path_of(((body or {}).get("path") or {}).get("absoluteUri") or (body or {}).get("absoluteUri"))
+        return "%s %s" % (re.sub(r"(?<!^)([A-Z])", r" \1", action).capitalize(), p), kind, {"path": p}, ""
+    if t == "LIST_DIRECTORY":
+        p = path_of((step.get("listDirectory") or {}).get("directoryPathUri"))
+        return "List " + p, kind, {"path": p}, ""
+    if t == "SEARCH_WEB":
+        q = (step.get("searchWeb") or {}).get("query") or ""
+        return "Search the web: " + q[:160], kind, {"query": q}, ""
+    if t == "MCP_TOOL":
+        mcp = step.get("mcpTool") or {}
+        target = mcp.get("serverName") and "%s/%s" % (mcp.get("serverName"), mcp.get("toolName") or "")
+        if not target:
+            grants = (step.get("permissions") or {}).get("permissionGrants") or [{}]
+            target = grants[0].get("target") or "tool"
+        return "MCP " + target, kind, mcp, ""
+    if t == "GENERIC":  # a tool call the server has not typed yet: its arguments as the model wrote them
+        args = (step.get("generic") or {}).get("args") or {}
+        hint = args.get("CommandLine") or args.get("AbsolutePath") or args.get("Query") or ""
+        title = args.get("toolSummary") or "Tool"
+        return (title + (": " + str(hint)[:120] if hint else "")), "execute" if args.get("CommandLine") else "other", args, ""
+    body = step.get(t[:1].lower() + re.sub(r"_([a-z])", lambda m: m.group(1).upper(), t.lower())[1:]) or {}
+    return t.replace("_", " ").capitalize(), kind, body if isinstance(body, dict) else {}, ""
+
+
+def step_status(step):
+    st = (step.get("status") or "").replace("CORTEX_STEP_STATUS_", "")
+    if st == "DONE":
+        return "completed"
+    if st in ("ERROR", "CANCELED", "INVALID", "HALTED", "INTERRUPTED"):
+        return "failed"
+    return "pending" if st in ("PENDING", "QUEUED", "WAITING") else "in_progress"
+
+
+def error_text(step):
+    err = (step.get("errorMessage") or {}).get("error") or step.get("error") or {}
+    return err.get("userErrorMessage") or err.get("shortError") or ""
+
+
+class Turn:
+    """What of each step has been sent to the client, so each poll sends only what is new."""
+
+    def __init__(self, cid):
+        self.cid = cid
+        self.sent = {}  # index -> {"thinking": n, "response": n, "tool": status, "asked": bool}
+
+    def emit(self, index, step):
+        seen = self.sent.setdefault(index, {"thinking": 0, "response": 0, "tool": None, "title": None, "asked": False})
+        t = short_type(step)
+        if t == "PLANNER_RESPONSE":
+            pr = step.get("plannerResponse") or {}
+            # `response` grows while the model writes; the App's `modifiedResponse` lands only at the end.
+            for key, kind in (("thinking", "agent_thought_chunk"), ("response", "agent_message_chunk")):
+                text = pr.get(key) or ""
+                if len(text) > seen[key]:
+                    update(self.cid, text_chunk(kind, text[seen[key]:]))
+                    seen[key] = len(text)
+            return
+        if t == "ERROR_MESSAGE":
+            text = error_text(step)
+            if text and not seen["response"]:
+                update(self.cid, text_chunk("agent_message_chunk", "\n\n" + text))
+                seen["response"] = 1
+            return
+        if t in SILENT:
+            return
+        status = step_status(step)
+        tool_id = "%s:%d" % (self.cid, index)
+        title, kind, raw, out = describe(step)
+        if seen["tool"] is None:
+            update(self.cid, {"sessionUpdate": "tool_call", "toolCallId": tool_id, "title": title,
+                              "kind": kind, "status": status, "rawInput": raw})
+        elif seen["tool"] != status or seen["title"] != title:
+            text = (out or error_text(step)) if status in ("completed", "failed") else ""
+            update(self.cid, {"sessionUpdate": "tool_call_update", "toolCallId": tool_id, "status": status,
+                              **({"title": title, "kind": kind, "rawInput": raw} if seen["title"] != title else {}),
+                              **({"content": [{"type": "content", "content": {"type": "text", "text": text[-20000:]}}]} if text else {})})
+        seen["tool"], seen["title"] = status, title
+        if step.get("requestedInteraction") and step_status(step) == "pending" and not seen["asked"]:
+            seen["asked"] = True
+            threading.Thread(target=self.ask, args=(index, step, tool_id), daemon=True).start()
+
+    def ask(self, index, step, tool_id):
+        interaction = (step.get("requestedInteraction") or {})
+        perm = interaction.get("permission") or {}
+        target = (perm.get("resource") or {}).get("target") or ""
+        title, kind, raw, _ = describe(step)
+        answer = ask_client("session/request_permission", {
+            "sessionId": self.cid,
+            "toolCall": {"toolCallId": tool_id, "title": perm.get("actionDescription") or title, "kind": kind,
+                         "status": "pending", "rawInput": raw or {"target": target}},
+            "options": [{"optionId": "allow_once", "name": "Allow once", "kind": "allow_once"},
+                        {"optionId": "allow_always", "name": "Always allow", "kind": "allow_always"},
+                        {"optionId": "reject_once", "name": "Deny", "kind": "reject_once"}]})
+        outcome = (answer.get("outcome") or {})
+        choice = outcome.get("optionId") if outcome.get("outcome") == "selected" else "reject_once"
+        info = (step.get("metadata") or {}).get("sourceTrajectoryStepInfo") or {}
+        reply = {"trajectoryId": info.get("trajectoryId"), "stepIndex": info.get("stepIndex", index),
+                 "permission": {"allow": choice != "reject_once",
+                                "scope": "PERMISSION_SCOPE_GLOBAL" if choice == "allow_always" else "PERMISSION_SCOPE_ONCE"}}
+        try:
+            ls("HandleCascadeUserInteraction", {"cascadeId": self.cid, "interaction": reply})
+        except (RuntimeError, NotRunning) as e:
+            log("permission reply:", e)
+
+
+def replay(cid):
+    steps = ls("GetCascadeTrajectorySteps", {"cascadeId": cid}, timeout=60).get("steps") or []
+    turn = Turn(cid)
+    for index, step in enumerate(steps):
+        if short_type(step) == "USER_INPUT":
+            ui = step.get("userInput") or {}
+            text = ui.get("userResponse") or "\n".join(i.get("text", "") for i in ui.get("items") or [])
+            if text:
+                update(cid, text_chunk("user_message_chunk", text))
+            continue
+        turn.emit(index, step)
+
+
+# ------------------------------------------------------------------ prompt text
+# The client's notes (its collaboration tools, runtime info) are for agents that can use them;
+# Antigravity cannot reach those tools, and the notes would show in the App as your message.
+_NOTES = re.compile(r"\s*<(t3_code_instructions|runtime_info|pull_request_linking)>.*?</\1>\s*", re.S)
+_REQUEST = re.compile(r"<user_request>\n?(.*?)\n?</user_request>", re.S)
+
+
+def prompt_text(blocks):
+    parts = []
+    for b in blocks or []:
+        t = b.get("type")
+        if t == "text":
+            parts.append(b.get("text") or "")
+        elif t == "resource_link":
+            parts.append(b.get("uri") or "")
+        elif t == "resource":
+            r = b.get("resource") or {}
+            parts.append(r.get("text") or r.get("uri") or "")
+    text = "\n".join(x for x in parts if x)
+    m = _REQUEST.search(text)
+    if m:
+        text = text[: m.start()] + m.group(1) + text[m.end():]
+    return _NOTES.sub("\n\n", text).strip()
+
+
+# ------------------------------------------------------------------ handlers
+def session(cid, cwd=None):
+    s = SESS.setdefault(cid, {"cwd": cwd, "model": None, "cancelled": False, "started": None})
+    if cwd and not s.get("cwd"):
+        s["cwd"] = cwd
+    return s
+
+
+def h_initialize(p):
+    return {"protocolVersion": 1,
+            "agentCapabilities": {"loadSession": True,
+                                  "promptCapabilities": {"image": False, "audio": False, "embeddedContext": True},
+                                  "mcpCapabilities": {"http": False, "sse": False}},
+            "authMethods": [],
+            "agentInfo": {"name": "antigravity-acp", "title": "Antigravity", "version": VERSION}}
+
+
+def h_new(p):
+    # The App's conversation is started with the first message, as the App does, so a session
+    # that is only opened (or probed) leaves nothing in the App's sidebar.
+    cid = str(uuid.uuid4())
+    s = session(cid, p.get("cwd"))
+    s["started"] = False
+    return {"sessionId": cid, **session_models(s)}
+
+
+def h_load(p):
+    cid = p["sessionId"]
+    s = session(cid, p.get("cwd"))
+    if summary_of(cid) is not None:
+        s["started"] = True
+        replay(cid)
+    return session_models(s)
+
+
+def h_set_option(p):
+    s = session(p["sessionId"])
+    if p.get("configId") == "model" and p.get("value"):
+        s["model"] = p["value"]
+    return {"configOptions": config_options(s)[0]}
+
+
+def h_set_model(p):
+    s = session(p["sessionId"])
+    if p.get("modelId"):
+        s["model"] = p["modelId"]
+    return {}
+
+
+def h_prompt(p):
+    cid = p["sessionId"]
+    s = session(cid)
+    text = prompt_text(p.get("prompt"))
+    if not text:
+        return {"stopReason": "end_turn"}
+    s["cancelled"] = False
+    if not s.get("model"):
+        config_options(s)
+    if not s.get("started"):
+        if summary_of(cid) is None:
+            start_cascade(cid, s.get("cwd"))
+        s["started"] = True
+    summary = summary_of(cid) or {}
+    offset = int(summary.get("stepCount") or 0)
+    ls("SendUserCascadeMessage", {"cascadeId": cid, "items": [{"text": text}],
+                                  "cascadeConfig": cascade_config(s["model"])}, timeout=120)
+    turn = Turn(cid)
+    began, idle_since = time.time(), None
+    while True:
+        time.sleep(POLL)
+        steps = ls("GetCascadeTrajectorySteps", {"cascadeId": cid, "stepOffset": offset}, timeout=60).get("steps") or []
+        for i, step in enumerate(steps):
+            if short_type(step) != "USER_INPUT":
+                turn.emit(offset + i, step)
+        status = ((summary_of(cid) or {}).get("status") or "").replace("CASCADE_RUN_STATUS_", "")
+        settled = steps and short_type(steps[-1]) != "USER_INPUT" and step_status(steps[-1]) in ("completed", "failed")
+        if status == "IDLE" and (settled or time.time() - began > 20):
+            # The summary can read IDLE a moment before the last step lands; take one more look.
+            if idle_since is None:
+                idle_since = time.time()
+                continue
+            break
+        idle_since = None
+    if s.get("cancelled"):
+        return {"stopReason": "cancelled"}
+    return {"stopReason": "end_turn"}
+
+
+def h_cancel(p):
+    cid = p.get("sessionId")
+    s = SESS.get(cid)
+    if s is not None:
+        s["cancelled"] = True
+    try:
+        ls("CancelCascadeInvocation", {"cascadeId": cid})
+    except (RuntimeError, NotRunning) as e:
+        log("cancel:", e)
+
+
+HANDLERS = {"initialize": h_initialize, "session/new": h_new, "session/load": h_load,
+            "session/prompt": h_prompt, "session/set_config_option": h_set_option,
+            "session/set_model": h_set_model}
+NOTIFICATIONS = {"session/cancel": h_cancel}
+
+
+def handle(msg):
+    method, mid, params = msg.get("method"), msg.get("id"), msg.get("params") or {}
+    if mid is None:
+        fn = NOTIFICATIONS.get(method)
+        if fn:
+            try:
+                fn(params)
+            except Exception as e:  # noqa: BLE001
+                log(method, e)
+        return
+    fn = HANDLERS.get(method)
+    if fn is None:
+        return send({"jsonrpc": "2.0", "id": mid, "error": {"code": -32601, "message": "Method not found: %s" % method}})
+    try:
+        send({"jsonrpc": "2.0", "id": mid, "result": fn(params)})
+    except NotRunning as e:
+        send({"jsonrpc": "2.0", "id": mid, "error": {"code": -32000, "message": str(e)}})
+    except Exception as e:  # noqa: BLE001
+        log("%s failed: %r" % (method, e))
+        send({"jsonrpc": "2.0", "id": mid, "error": {"code": -32603, "message": "%s: %s" % (type(e).__name__, e)}})
+
+
+def main():
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            msg = json.loads(line)
+        except ValueError:
+            continue
+        if "method" in msg:
+            threading.Thread(target=handle, args=(msg,), daemon=True).start()
+        elif msg.get("id") in _pending:
+            slot = _pending[msg["id"]]
+            slot[1] = msg.get("result") or {}
+            slot[0].set()
+
+
+if __name__ == "__main__":
+    main()

@@ -207,7 +207,11 @@ import {
   ProviderUploadFeedbackInput,
   ProviderUploadFeedbackResult,
 } from "./provider.ts";
-import { ProviderInstanceId, ProviderInstanceMutation } from "./providerInstance.ts";
+import {
+  ProviderInstanceId,
+  ProviderInstanceMutation,
+  ProviderNativeHostStatus,
+} from "./providerInstance.ts";
 import {
   IssueCandidates,
   IssueCommentInput,
@@ -530,6 +534,8 @@ export const WS_METHODS = {
   providerInstallCancel: "provider.install.cancel",
   providerInstallSubscribe: "provider.install.subscribe",
   providerInstallRemove: "provider.install.remove",
+  providerNativeHostStatus: "provider.nativeHost.status",
+  providerNativeHostStart: "provider.nativeHost.start",
 
   vcsPull: "vcs.pull",
   vcsRefreshStatus: "vcs.refreshStatus",
@@ -889,6 +895,22 @@ const WsProviderInstallRemoveRpc = Rpc.make(WS_METHODS.providerInstallRemove, {
   payload: ProviderSetupInput,
   success: ProviderInstallState,
   error: ProviderSetupRpcError,
+});
+
+const ProviderNativeHostInput = Schema.Struct({ instanceId: ProviderInstanceId });
+
+/** Null when the instance needs no native app. */
+const WsProviderNativeHostStatusRpc = Rpc.make(WS_METHODS.providerNativeHostStatus, {
+  payload: ProviderNativeHostInput,
+  success: Schema.NullOr(ProviderNativeHostStatus),
+  error: Schema.Union([EnvironmentAuthorizationError, ServerSettingsError]),
+});
+
+/** Starts the native app in the background and replies once it answers or gives up. */
+const WsProviderNativeHostStartRpc = Rpc.make(WS_METHODS.providerNativeHostStart, {
+  payload: ProviderNativeHostInput,
+  success: Schema.NullOr(ProviderNativeHostStatus),
+  error: Schema.Union([EnvironmentAuthorizationError, ServerSettingsError]),
 });
 
 const WsServerGetNpmReleaseRpc = Rpc.make(WS_METHODS.serverGetNpmRelease, {
@@ -2447,6 +2469,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsProviderInstallCancelRpc,
   WsProviderInstallSubscribeRpc,
   WsProviderInstallRemoveRpc,
+  WsProviderNativeHostStatusRpc,
+  WsProviderNativeHostStartRpc,
   WsServerUpdateServerRpc,
   WsServerGetNpmReleaseRpc,
   WsServerUpdateServerWithProgressRpc,

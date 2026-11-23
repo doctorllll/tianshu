@@ -24,7 +24,13 @@ import {
 } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { normalizeProviderAccentColor } from "@t3tools/client-runtime/state/provider-instance-display";
-import { type LimitPace, paceOf, paceRemainingPercent, remainingPercent, type ResetCreditChoice } from "@t3tools/shared/usageLimits";
+import {
+  type LimitPace,
+  paceOf,
+  paceRemainingPercent,
+  remainingPercent,
+  type ResetCreditChoice,
+} from "@t3tools/shared/usageLimits";
 import { formatResetsIn } from "@t3tools/shared/usageLimitsCopy";
 import { GaugeIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
 import { Fragment, useLayoutEffect, useState, type ReactNode } from "react";
@@ -47,7 +53,7 @@ import {
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { UsageLimitsPooled } from "./UsageLimitsPooled";
+import { UsageLimitsByAgent } from "./UsageLimitsByAgent";
 import { PROVIDER_PRESENTATION } from "./usageProviders";
 const PACE: Record<
   LimitPace,
@@ -592,5 +598,5 @@ export function UsageLimitsSection({
       ];
     }),
   );
-  return <UsageLimitsPooled presentations={selected} now={now} refreshControl={refreshControl} />;
+  return <UsageLimitsByAgent presentations={selected} now={now} refreshControl={refreshControl} />;
 }

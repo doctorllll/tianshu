@@ -139,7 +139,8 @@ describe("quota topbar interactions", () => {
     await expect
       .element(screen.getByRole("button", { name: "Weekly remaining", exact: true }))
       .toBeVisible();
-    expect(screen.container.querySelectorAll("[data-quota-id] [data-compact]").length).toBe(3);
+    // Tianshu pins four by default, its subscription agents first.
+    expect(screen.container.querySelectorAll("[data-quota-id] [data-compact]").length).toBe(4);
     await screen.getByRole("button", { name: "View quotas" }).click();
     await page.getByRole("button", { name: "Customize", exact: true }).click();
     const shortWindow = page
@@ -156,8 +157,9 @@ describe("quota topbar interactions", () => {
   it("grows the panel out of the chip that opened it", async () => {
     await page.viewport(1440, 900);
     await using screen = await render(<Harness />);
-    const first = screen.container.querySelector<HTMLElement>('[data-quota-id="0"]')!;
-    const last = screen.container.querySelector<HTMLElement>('[data-quota-id="2"]')!;
+    const chips = screen.container.querySelectorAll<HTMLElement>("[data-quota-id]");
+    const first = chips[0]!;
+    const last = chips[chips.length - 1]!;
     first.click();
     const popup = await vi.waitFor(() => {
       const node = document.querySelector<HTMLElement>("[data-liquid-quota-popup]");
@@ -224,15 +226,14 @@ describe("quota topbar interactions", () => {
       [...screen.container.querySelectorAll("[data-quota-id]")].map((e) =>
         e.getAttribute("data-quota-id"),
       ),
-    ).toEqual(["1", "0", "2"]);
+    ).toEqual(["2", "4", "1", "0"]);
     await page.getByRole("checkbox", { name: /Pin Cursor.*Account 1/ }).click();
-    await page.getByRole("checkbox", { name: /Pin Grok.*Account 1/ }).click();
     await expect
       .element(page.getByRole("status"))
       .toHaveTextContent("Unpin an item before adding a fifth.");
     await page.getByRole("switch", { name: "Show provider names" }).click();
     expect(screen.container.querySelectorAll("[data-quota-name]").length).toBe(0);
-    for (const label of ["Codex", "Claude", "Gemini", "Cursor"])
+    for (const label of ["Codex", "Claude", "Gemini", "Grok"])
       await page.getByRole("checkbox", { name: new RegExp(`Pin ${label}.*Account 1`) }).click();
     await page.getByRole("button", { name: "Finish setup", exact: true }).click();
     expect(screen.container.querySelectorAll("[data-quota-id]").length).toBe(0);

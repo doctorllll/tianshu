@@ -96,5 +96,8 @@ describe("T3 device instructions", () => {
       "Again.",
     );
     assert.notInclude(t3AcpPromptWithInstructions({ prompt: "Hi.", state }), "## T3 Code devices");
+    const userFirst = t3AcpPromptWithInstructions({ prompt: "Hi.", state, instructionsLast: true });
+    assert.isTrue(userFirst.startsWith("Hi.\n\n<t3_code_instructions>"));
+    assert.notInclude(userFirst, "<user_request>");
   });
 });

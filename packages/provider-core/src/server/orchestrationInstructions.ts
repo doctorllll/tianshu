@@ -94,6 +94,8 @@ export function t3AcpPromptWithInstructions(input: {
   readonly prompt: string;
   readonly state: T3AcpInstructionState;
   readonly previousState?: T3AcpInstructionState;
+  /** The user's words first, for agents that title a session from its first prompt (ZCode). */
+  readonly instructionsLast?: boolean;
 }): string {
   // Native slash commands must remain at the start of the prompt.
   if (input.prompt.trimStart().startsWith("/")) return input.prompt;
@@ -117,7 +119,10 @@ export function t3AcpPromptWithInstructions(input: {
         ]
       : []),
   ];
-  return `<t3_code_instructions>\n${instructions.join("\n\n")}\n</t3_code_instructions>\n\n<user_request>\n${input.prompt}\n</user_request>`;
+  const notes = `<t3_code_instructions>\n${instructions.join("\n\n")}\n</t3_code_instructions>`;
+  return input.instructionsLast === true
+    ? `${input.prompt}\n\n${notes}`
+    : `${notes}\n\n<user_request>\n${input.prompt}\n</user_request>`;
 }
 
 const orchestrationInstructions = (hasDeviceTools: boolean) =>

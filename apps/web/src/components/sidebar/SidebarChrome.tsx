@@ -1,4 +1,4 @@
-import "./stardustWordmark.css";
+import { TianshuWordmark } from "../TianshuWordmark";
 import { useUiText } from "~/i18n/useUiText";
 import { useMemoryProposalNotification } from "../settings/useMemoryProposalNotification";
 
@@ -190,18 +190,8 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
     </Link>
   );
 }
-/** The English product wordmark; it is a name, not copy, so it is never translated. */
-const STARDUST_WORDMARK = "T3 Stardust";
 function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
-  return (
-    <span
-      data-stardust-wordmark
-      data-on-backdrop={onBackdrop || undefined}
-      className="truncate text-sm font-bold tracking-tight [text-box:trim-both_cap_alphabetic] supports-[text-box:trim-both_cap_alphabetic]:py-1"
-    >
-      {STARDUST_WORDMARK}
-    </span>
-  );
+  return <TianshuWordmark onDark={onBackdrop} className="h-7" />;
 }
 function SidebarUtilityItem({
   icon,

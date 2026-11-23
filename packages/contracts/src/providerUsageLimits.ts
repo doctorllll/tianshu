@@ -20,8 +20,50 @@ export const ServerProviderUsageWindow = Schema.Struct({
   usedPercent: Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 100 })),
   resetsAt: Schema.optional(IsoDateTime),
   windowDurationMins: Schema.optional(NonNegativeInt),
+  /** The reading a one-line summary of this account shows. */
+  primary: Schema.optional(Schema.Boolean),
+  /** Whether the percentage is the provider's own reading or worked out from a ledger. */
+  source: Schema.optional(Schema.Literals(["official", "estimate"])),
+  /** The amounts behind the percentage, such as "$104 / $1,100". */
+  amount: Schema.optional(TrimmedNonEmptyString),
 });
 export type ServerProviderUsageWindow = typeof ServerProviderUsageWindow.Type;
+
+/** A full breakdown of one account's usage, shown in its module of the usage page. */
+export const ServerProviderUsageGauge = Schema.Struct({
+  label: TrimmedNonEmptyString,
+  usedPercent: Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 100 })),
+  source: Schema.Literals(["official", "estimate"]),
+  amount: Schema.optional(TrimmedNonEmptyString),
+  resetsAt: Schema.optional(IsoDateTime),
+  hint: Schema.optional(TrimmedNonEmptyString),
+});
+export type ServerProviderUsageGauge = typeof ServerProviderUsageGauge.Type;
+
+export const ServerProviderUsageBreakdown = Schema.Struct({
+  title: TrimmedNonEmptyString,
+  items: ForwardCompatibleArray(
+    Schema.Struct({
+      label: TrimmedNonEmptyString,
+      percent: Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 100 })),
+      amount: TrimmedNonEmptyString,
+    }),
+  ),
+});
+export type ServerProviderUsageBreakdown = typeof ServerProviderUsageBreakdown.Type;
+
+export const ServerProviderUsageSection = Schema.Struct({
+  title: TrimmedNonEmptyString,
+  subtitle: Schema.optional(TrimmedNonEmptyString),
+  observedAt: Schema.optional(IsoDateTime),
+  gauges: ForwardCompatibleArray(ServerProviderUsageGauge),
+  facts: ForwardCompatibleArray(
+    Schema.Struct({ label: TrimmedNonEmptyString, value: TrimmedNonEmptyString }),
+  ),
+  breakdowns: ForwardCompatibleArray(ServerProviderUsageBreakdown),
+  note: Schema.optional(TrimmedNonEmptyString),
+});
+export type ServerProviderUsageSection = typeof ServerProviderUsageSection.Type;
 
 /** One kind of banked reset, such as Claude's weekly reset or its Fable-only reset. */
 export const ServerProviderResetCreditOption = Schema.Struct({
@@ -63,6 +105,9 @@ export const ServerProviderUsageLimits = Schema.Struct({
       message: Schema.optional(TrimmedNonEmptyString),
     }),
   ),
+  /** Per-login detail beyond the windows (fastctx: official readings beside its ledger's estimate). */
+  sections: Schema.optional(ForwardCompatibleArray(ServerProviderUsageSection)),
+  footnote: Schema.optional(TrimmedNonEmptyString),
 });
 export type ServerProviderUsageLimits = typeof ServerProviderUsageLimits.Type;
 

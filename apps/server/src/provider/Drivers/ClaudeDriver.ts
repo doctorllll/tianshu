@@ -417,6 +417,22 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
       ),
     );
 
+    // magpie and `claude /model` rewrite settings.json outside T3; re-probe so the models follow.
+    if (effectiveConfig.enabled) {
+      yield* fileSystem.watch(configDir).pipe(
+        Stream.filter((event) => path.basename(event.path) === "settings.json"),
+        Stream.debounce(Duration.millis(500)),
+        Stream.runForEach(() =>
+          Cache.invalidateAll(capabilitiesProbeCache).pipe(
+            Effect.andThen(snapshot.refresh),
+            Effect.ignoreCause({ log: true }),
+          ),
+        ),
+        Effect.catchReason("PlatformError", "NotFound", () => Effect.void),
+        Effect.ignoreCause({ log: true }),
+        Effect.forkScoped,
+      );
+    }
     return {
       instanceId,
       driverKind: DRIVER_KIND,
