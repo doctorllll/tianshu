@@ -286,10 +286,10 @@ function buildConnectingSplashDataUrl(
   const track = shouldUseDarkColors ? "rgba(248,250,252,0.18)" : "rgba(31,41,55,0.18)";
   const message =
     mode === "closing"
-      ? "Closing T3 Code…"
+      ? "Closing Tianshu…"
       : mode === "wsl"
         ? "Connecting to WSL…"
-        : "Starting T3 Code…";
+        : "Starting Tianshu…";
   const detail =
     mode === "closing"
       ? "Stopping local services. Running local tasks will be interrupted."
@@ -1273,8 +1273,8 @@ export const make = Effect.gen(function* () {
             title: "Drafts are not saved",
             message: "Quit without saving draft changes?",
             detail:
-              "Keep T3 Code open to retry saving or export drafts from the composer. Quitting now can lose unsaved input and attachments.",
-            buttons: ["Keep T3 Code open", "Quit without saving"],
+              "Keep Tianshu open to retry saving or export drafts from the composer. Quitting now can lose unsaved input and attachments.",
+            buttons: ["Keep Tianshu open", "Quit without saving"],
             defaultId: 0,
             cancelId: 0,
             noLink: true,

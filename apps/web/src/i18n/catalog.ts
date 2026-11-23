@@ -559,7 +559,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "It's no longer on your T3 Connect account.": "它已不在你的 T3 Connect 账号中。",
   "This doesn't change your T3 Connect account. To deregister it there, use":
     "此操作不会更改你的 T3 Connect 账号。如需在账号中注销，请使用",
-  "On the computer with your code, start T3 Code or run": "在存放代码的电脑上启动 T3 Code，或运行",
+  "On the computer with your code, start T3 Code or run": "在存放代码的电脑上启动天枢，或运行",
   ", then run:": "，然后运行：",
   "On a tailnet, run": "如使用 Tailscale 网络，请改为运行",
   "instead.": "。",
@@ -600,7 +600,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "This environment did not accept your session. Reconnect to try again.":
     "此环境未接受当前连接。请重新连接后重试。",
   "Could not verify your permissions. Retrying automatically.": "无法核验权限，正在自动重试。",
-  "T3 Code home": "T3 Code 首页",
+  "T3 Code home": "天枢首页",
   "{label} source": "{label}来源",
   "{label} reference": "{label}引用",
   "Enter a valid secret reference.": "请输入有效的密钥引用。",
@@ -615,7 +615,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "The name needs at least one letter or digit.": "名称至少需要包含一个英文字母或数字。",
   "A secret provider with this name exists.": "已存在同名密钥提供方。",
   "Update T3 Code on {environment} to manage its secret providers.":
-    "更新{environment}上的 T3 Code，以管理密钥提供方。",
+    "更新{environment}上的天枢，以管理密钥提供方。",
   "Connect an environment to manage the secret providers its provider variables read from.":
     "连接环境后，可管理模型通道变量读取的密钥提供方。",
   "Environment-wide setting. Select an environment to change it.":
@@ -797,7 +797,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Fast mode on": "已开启快速模式",
   Ultrafast: "极速",
   "Install T3 Code on your phone and sign in to T3 Connect to get push notifications and Live Activities.":
-    "在手机上安装 T3 Code 并登录 T3 Connect，即可接收推送通知和实时活动。",
+    "在手机上安装天枢并登录 T3 Connect，即可接收推送通知和实时活动。",
   "Mobile devices that get notifications from your environments.":
     "接收来自你的环境的通知的移动设备。",
   "Prompt font preview": "输入区字体预览",
@@ -915,7 +915,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Settings search results": "设置搜索结果",
   Language: "语言",
   "Choose the language used by T3 Code. Follow system uses your browser or operating system language.":
-    "选择 T3 Code 的界面语言。跟随系统时，将使用浏览器或操作系统的语言。",
+    "选择天枢的界面语言。跟随系统时，将使用浏览器或操作系统的语言。",
   "App language": "应用语言",
   "Follow system": "跟随系统",
   English: "English",
@@ -1384,7 +1384,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Brings back the original sidebar with per-project thread trees. The default sidebar shows one flat list: active work as rich cards, settled threads as compact rows.":
     "恢复按项目显示任务树的原版侧栏。默认侧栏使用一个扁平列表：活跃工作显示为详细卡片，已收起任务显示为紧凑行。",
   "Choose how T3 Code looks. Use a built-in theme or make your own.":
-    "选择 T3 Code 的显示方式。使用内置主题，或创建自己的主题。",
+    "选择天枢的显示方式。使用内置主题，或创建自己的主题。",
   "Appearance mode": "外观模式",
   "Follow the system appearance": "跟随系统外观",
   "Use {mode} mode": "使用{mode}模式",
@@ -1466,7 +1466,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Update existing": "更新现有主题",
   "Keep both": "全部保留",
   "Theme file": "主题文件",
-  "Drop T3 Code or VS Code .json files": "将 T3 Code 或 VS Code 的 .json 文件拖到此处",
+  "Drop T3 Code or VS Code .json files": "将天枢或 VS Code 的 .json 文件拖到此处",
   "Add theme": "添加主题",
   "Search community themes": "搜索社区主题",
   "Find open-source themes from Open VSX.": "从 Open VSX 查找开源主题。",
@@ -1647,8 +1647,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "API endpoint": "API 地址",
   "Override the Cursor API endpoint for this instance.": "覆盖此实例使用的 Cursor API 地址。",
   "Server URL": "服务器 URL",
-  "Leave blank to let T3 Code spawn the server when needed.":
-    "留空时，由 T3 Code 在需要时启动服务器。",
+  "Leave blank to let T3 Code spawn the server when needed.": "留空时，由天枢在需要时启动服务器。",
   "Server password": "服务器密码",
   "Stored in plain text on disk.": "以明文形式保存在磁盘上。",
   "Auto-compact after": "达到以下用量后自动压缩",
@@ -1683,7 +1682,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   Available: "可用",
   "Installed and ready, but authentication could not be verified.":
     "已安装并可使用，但无法验证认证状态。",
-  "{provider} is disabled in T3 Code settings.": "已在 T3 Code 设置中禁用 {provider}。",
+  "{provider} is disabled in T3 Code settings.": "已在天枢设置中禁用 {provider}。",
   "{provider} CLI ({command}) is not installed or not on PATH.":
     "未安装 {provider} CLI（{command}），或其不在 PATH 中。",
   "{provider} {current} is too old for {model}. Upgrade to {required} or newer to access it.":
@@ -1922,9 +1921,9 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Enable network access?": "启用网络访问？",
   "Disable network access?": "停用网络访问？",
   "T3 Code will restart to expose this environment over the network.":
-    "T3 Code 将重新启动，并允许通过网络访问此环境。",
+    "天枢将重新启动，并允许通过网络访问此环境。",
   "T3 Code will restart and limit this environment back to this machine.":
-    "T3 Code 将重新启动，并把此环境限制为仅本机可访问。",
+    "天枢将重新启动，并把此环境限制为仅本机可访问。",
   "Restarting...": "正在重新启动...",
   "Restart and enable": "重新启动并启用",
   "Restart and disable": "重启并禁用",
@@ -1935,17 +1934,17 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Run only the WSL backend?": "仅运行 WSL 后端？",
   "Re-enable the Windows backend?": "重新启用 Windows 后端？",
   "T3 Code will restart on the Windows backend. Threads and projects opened against WSL stay safe inside the distro and become available again when you re-enable WSL.":
-    "T3 Code 将在 Windows 后端上重新启动。通过 WSL 打开的任务和项目会安全保留在发行版中，重新启用 WSL 后即可再次使用。",
+    "天枢将在 Windows 后端上重新启动。通过 WSL 打开的任务和项目会安全保留在发行版中，重新启用 WSL 后即可再次使用。",
   "The WSL backend will stop. Threads and projects opened against WSL stay safe inside the distro, but they'll be unavailable in T3 Code until you re-enable WSL.":
-    "WSL 后端将停止。通过 WSL 打开的任务和项目会安全保留在发行版中，但在重新启用 WSL 前无法在 T3 Code 中访问。",
+    "WSL 后端将停止。通过 WSL 打开的任务和项目会安全保留在发行版中，但在重新启用 WSL 前无法在天枢中访问。",
   "T3 Code will restart the WSL backend on the new distro. Sessions still running on the current distro will be interrupted.":
-    "T3 Code 将在新的发行版上重新启动 WSL 后端。当前发行版中仍在运行的会话会被中断。",
+    "天枢将在新的发行版上重新启动 WSL 后端。当前发行版中仍在运行的会话会被中断。",
   "Run the WSL backend alongside the Windows one, or stop the Windows backend and use only WSL? You can change this later from Settings.":
     "可以让 WSL 与 Windows 后端同时运行，也可以停止 Windows 后端并仅使用 WSL。之后仍可在设置中更改。",
   "T3 Code will restart and start only the WSL backend. Your Windows-side projects won't be accessible until you turn this off again.":
-    "T3 Code 将重新启动并仅运行 WSL 后端。再次关闭此选项前，Windows 侧的项目将无法访问。",
+    "天枢将重新启动并仅运行 WSL 后端。再次关闭此选项前，Windows 侧的项目将无法访问。",
   "T3 Code will restart and bring the Windows backend back up alongside WSL.":
-    "T3 Code 将重新启动，并在 WSL 之外恢复 Windows 后端。",
+    "天枢将重新启动，并在 WSL 之外恢复 Windows 后端。",
   "Applying...": "正在应用...",
   "Use only WSL": "仅使用 WSL",
   "Run both backends": "同时运行两个后端",
@@ -2041,7 +2040,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Default distro": "默认发行版",
   "WSL only": "仅使用 WSL",
   "Stop the Windows backend and run only the WSL backend. Useful if you develop entirely inside WSL and don't want a second backend process. T3 Code restarts when you change this.":
-    "停止 Windows 后端，仅运行 WSL 后端。适合完全在 WSL 中开发且不需要第二个后端进程的情况。修改后 T3 Code 会重启。",
+    "停止 Windows 后端，仅运行 WSL 后端。适合完全在 WSL 中开发且不需要第二个后端进程的情况。修改后天枢会重启。",
   "Run WSL only": "仅运行 WSL 后端",
   "Tailscale HTTPS": "Tailscale HTTPS",
   "Enable Tailscale HTTPS": "启用 Tailscale HTTPS",
@@ -2055,10 +2054,10 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Pending MagicDNS endpoint": "等待生成 MagicDNS 地址",
   "Disable Tailscale HTTPS?": "禁用 Tailscale HTTPS？",
   "T3 Code will restart the local backend without Tailscale Serve.":
-    "T3 Code 将重启本地后端，并停止使用 Tailscale Serve。",
+    "天枢将重启本地后端，并停止使用 Tailscale Serve。",
   "Set up Tailscale HTTPS?": "设置 Tailscale HTTPS？",
   "T3 Code will restart the local backend with Tailscale Serve enabled and ask Tailscale to proxy HTTPS traffic to this backend.":
-    "T3 Code 将重启本地后端、启用 Tailscale Serve，并让 Tailscale 将 HTTPS 流量转发到此后端。",
+    "天枢将重启本地后端、启用 Tailscale Serve，并让 Tailscale 将 HTTPS 流量转发到此后端。",
   "Administrative access": "管理权限",
   "Pairing links and client-session management require the access:write scope for this backend.":
     "管理配对链接和客户端会话需要此后端的 access:write 权限。",
@@ -2127,7 +2126,7 @@ export const zhCN: Readonly<Record<string, string>> = {
     "请在服务器上安装 Git，并按工作区需要添加可选的托管服务集成或凭据，然后重新扫描。",
   Scan: "扫描",
   "Some shortcuts may be claimed by the browser before T3 Code sees them. Use the desktop app for better keybinding support.":
-    "部分快捷键可能会先被浏览器占用，T3 Code 无法接收。使用桌面应用可获得更完整的快捷键支持。",
+    "部分快捷键可能会先被浏览器占用，天枢无法接收。使用桌面应用可获得更完整的快捷键支持。",
   Keybinding: "快捷键",
   When: "生效条件",
   Status: "状态",
@@ -2168,7 +2167,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Unknown condition: {condition}": "未知条件：{condition}",
   "Unknown conditions: {conditions}": "未知条件：{conditions}",
   "T3 Code does not recognize this condition yet. It can still be saved, but it may not match unless the runtime provides it.":
-    "T3 Code 暂时无法识别此条件。仍可保存，但只有运行时提供该条件时才可能匹配。",
+    "天枢暂时无法识别此条件。仍可保存，但只有运行时提供该条件时才可能匹配。",
   "Conflicts with {binding}.": "与 {binding} 冲突。",
   "Conflicts with {bindings}{more}.": "与 {bindings}{more} 冲突。",
   ", and more": "等更多快捷键",
@@ -2582,9 +2581,9 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Add a reachable backend manually to start working from this browser.":
     "手动添加可访问的后端，即可在此浏览器中开始工作。",
   "Open Connections": "打开连接设置",
-  "Connect to a computer running T3 Code": "连接运行 T3 Code 的设备",
+  "Connect to a computer running T3 Code": "连接运行天枢的设备",
   "This browser connects to T3 Code running on your computer or a server. Start the T3 Code desktop app or command-line server on that machine and keep it running.":
-    "此浏览器会连接到电脑或服务器上运行的 T3 Code。请在该设备上启动 T3 Code 桌面客户端或命令行服务器，并保持其运行。",
+    "此浏览器会连接到电脑或服务器上运行的天枢。请在该设备上启动天枢桌面客户端或命令行服务器，并保持其运行。",
   "Enable T3 Connect on that machine, then open Connections here to sign in with the same account. You can also add the machine using a pairing link.":
     "请在该设备上启用 T3 Connect，再在此处打开“连接”并使用同一账号登录；也可以使用配对链接添加设备。",
   "Open Connections and add that machine using its pairing link. This browser must be able to reach it.":
@@ -2680,7 +2679,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Loading...": "正在加载...",
   "Load more pull requests": "加载更多拉取请求",
   "Pull requests unavailable": "拉取请求不可用",
-  "Update your T3 Code servers to browse pull requests.": "请更新 T3 Code 服务器后再浏览拉取请求。",
+  "Update your T3 Code servers to browse pull requests.": "请更新天枢服务器后再浏览拉取请求。",
   "This host could not be read.": "无法读取此托管服务。",
   "The latest request failed. Showing the last pull requests loaded.":
     "最近一次请求失败，当前显示上次已加载的拉取请求。",
@@ -3205,20 +3204,19 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Activating installation": "正在启用安装",
   "Install relay client?": "安装中继客户端？",
   "T3 Code is preparing this environment for secure access through T3 Connect.":
-    "T3 Code 正在为此环境配置通过 T3 Connect 的安全访问。",
+    "天枢正在为此环境配置通过 T3 Connect 的安全访问。",
   "T3 Code needs the relay client to make this environment available through T3 Connect.":
-    "T3 Code 需要安装中继客户端，才能通过 T3 Connect 访问此环境。",
+    "天枢需要安装中继客户端，才能通过 T3 Connect 访问此环境。",
   "{current} of {total}": "第 {current} 项，共 {total} 项",
   "Relay client installation progress": "中继客户端安装进度",
-  "Keep T3 Code open while the relay client is installed.":
-    "安装中继客户端期间请保持 T3 Code 运行。",
+  "Keep T3 Code open while the relay client is installed.": "安装中继客户端期间请保持天枢运行。",
   "Managed relay client": "托管中继客户端",
   "T3 Code will download and install version {version} locally.":
-    "T3 Code 将在本机下载并安装版本 {version}。",
+    "天枢将在本机下载并安装版本 {version}。",
   "Download and install": "下载并安装",
   "SSH Password Required": "需要 SSH 密码",
   "T3 needs your SSH password to connect to {target}. The password is passed to the local SSH process for this connection attempt and is not saved by T3 Code.":
-    "T3 需要使用 SSH 密码连接到 {target}。密码只会传递给本机 SSH 进程完成本次连接，T3 Code 不会保存该密码。",
+    "T3 需要使用 SSH 密码连接到 {target}。密码只会传递给本机 SSH 进程完成本次连接，天枢不会保存该密码。",
   Password: "密码",
   Expired: "已过期",
   "This SSH password prompt expired. Try connecting again.": "此 SSH 密码请求已过期，请重新连接。",
@@ -3578,7 +3576,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Could not start implementation thread": "无法启动实施任务",
   "An error occurred while creating the new thread.": "创建新任务时发生错误。",
   "Update this environment's T3 Code server to browse pull requests.":
-    "请更新此环境的 T3 Code 服务端以浏览拉取请求。",
+    "请更新此环境的天枢服务端以浏览拉取请求。",
   "Scroll to end": "滚动到底部",
   "Connecting to {environment}": "正在连接到{environment}",
   "Reconnecting to {environment}": "正在重新连接到{environment}",
@@ -3742,7 +3740,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "ChatGPT shared usage": "ChatGPT 共享用量",
   Unpriced: "未定价",
   "This app connects to T3 Code running on your computer or a server. Start the T3 Code desktop app or command-line server on that machine and keep it running.":
-    "此应用连接到你电脑或服务器上运行的 T3 Code。请在该设备上启动 T3 Code 桌面应用或命令行服务器，并保持运行。",
+    "此应用连接到你电脑或服务器上运行的天枢。请在该设备上启动天枢桌面应用或命令行服务器，并保持运行。",
   "Filter by provider": "按提供商筛选",
   "Restore device defaults": "恢复此设备的默认设置",
   "to change its settings.": "以更改其设置。",
@@ -4026,7 +4024,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   Agents: "Agent",
   "Could not finish setup": "无法完成设置",
   "Your settings could not be saved. Try again.": "无法保存设置，请重试。",
-  "Set up T3 Code": "设置 T3 Code",
+  "Set up T3 Code": "设置天枢",
   "Connect your computers": "连接你的设备",
   "Choose one or more computers. We’ll set up agents and projects on each.":
     "选择一台或多台设备，我们会在每台设备上设置 Agent 和项目。",
@@ -4037,12 +4035,12 @@ export const zhCN: Readonly<Record<string, string>> = {
   "No computers linked yet.": "尚未关联设备。",
   "Run this on each computer you want to connect.": "请在每台要连接的设备上运行此命令。",
   "Keep T3 Code running. Select the computers you want to set up above.":
-    "请保持 T3 Code 运行，并在上方选择要设置的设备。",
+    "请保持天枢运行，并在上方选择要设置的设备。",
   "Pairing failed.": "配对失败。",
   "Need a pairing link?": "需要配对链接？",
   Pair: "配对",
   "Run this on the computer with your code.": "请在存放代码的设备上运行此命令。",
-  "Start T3 Code first, or run": "请先启动 T3 Code，或运行",
+  "Start T3 Code first, or run": "请先启动天枢，或运行",
   "Add --tailscale to use your tailnet.": "如需使用 Tailnet，请添加 --tailscale。",
   "Your agents": "你的 Agent",
   "Agents available on your selected computers.": "所选设备上可用的 Agent。",
@@ -4132,7 +4130,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Could not read settings": "无法读取设置",
   "Still connecting": "仍在连接",
   "Your saved settings could not be loaded.": "无法加载已保存的设置。",
-  "T3 Code could not confirm this workspace.": "T3 Code 无法确认此工作区。",
+  "T3 Code could not confirm this workspace.": "天枢无法确认此工作区。",
   Reload: "重新加载",
   "No actions configured.": "尚未配置操作。",
   "This project has no checkout on this machine.": "此项目在当前设备上没有检出目录。",
@@ -4521,7 +4519,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Restoring your threads…": "正在恢复你的会话…",
   "Nightly needs the beta mobile app": "夜间版需要测试版移动应用",
   "Nightly uses the new orchestrator. The App Store and Google Play versions of T3 Code cannot connect to it.":
-    "夜间版使用新的编排器。App Store 和 Google Play 上的 T3 Code 无法连接它。",
+    "夜间版使用新的编排器。App Store 和 Google Play 上的天枢无法连接它。",
   "Mobile app": "移动应用",
   "Nightly needs the beta app. The App Store and Google Play versions cannot connect.":
     "夜间版需要测试版应用。App Store 和 Google Play 版本无法连接。",
@@ -4716,7 +4714,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Loading earlier turns…": "正在加载更早的回合…",
   "User message": "用户消息",
   "Sent by automation": "由自动化发送",
-  "Sent by T3 Code": "由 T3 Code 发送",
+  "Sent by T3 Code": "由天枢发送",
   "Open sending thread": "打开发送方会话",
   "Sent by another agent": "由另一个智能体发送",
   You: "你",
@@ -4927,7 +4925,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Sign in": "去登录",
   "Don&apos;t show this again": "不再显示",
   "Enabling…": "正在启用…",
-  "T3 Code will download and install version": "T3 Code 将下载并安装版本",
+  "T3 Code will download and install version": "天枢将下载并安装版本",
   "locally.": "（本地）。",
   "Reconnecting…": "正在重新连接…",
   "This context is no longer available. Remove it or attach it again.":
@@ -5181,7 +5179,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Profile:": "配置文件：",
   "Clear cookies": "清除 Cookie",
   "Clear cache": "清除缓存",
-  "Preview is only available in the T3 Code desktop app.": "预览仅在 T3 Code 桌面应用中可用。",
+  "Preview is only available in the T3 Code desktop app.": "预览仅在天枢桌面应用中可用。",
   "Pair this client again with preview access to control browser previews.":
     "请重新配对此客户端并授予预览权限，才能控制浏览器预览。",
   "This file can&rsquo;t be shown here": "此文件无法在这里显示",
@@ -5206,7 +5204,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Unable to capture screenshot": "无法截取屏幕",
   "Could not capture the picked element": "无法捕获所选元素",
   "The annotation was kept without the screenshot.": "标注已保留，但没有截图。",
-  "This tab is open in the T3 Code desktop app.": "此标签页在 T3 Code 桌面应用中打开。",
+  "This tab is open in the T3 Code desktop app.": "此标签页在天枢桌面应用中打开。",
   "Recording preview": "录制预览",
   "Open in right panel": "在右侧面板中打开",
   "Press a shortcut. Use": "按下快捷键。使用",
@@ -5219,12 +5217,12 @@ export const zhCN: Readonly<Record<string, string>> = {
   "It opens as a draft. Nothing runs until you press Send.":
     "它会作为草稿打开。按下发送之前不会运行。",
   "This prompt had hidden characters, it may be malicious": "此提示含有隐藏字符，可能是恶意内容",
-  "T3 Code removed": "T3 Code 已移除",
+  "T3 Code removed": "天枢已移除",
   "hidden character": "个隐藏字符",
   "Open in app": "在应用中打开",
   "Open in desktop app": "在桌面应用中打开",
   "Continue here": "在此继续",
-  "Get T3 Code": "获取 T3 Code",
+  "Get T3 Code": "获取天枢",
   "Remember my choice": "记住我的选择",
   "Opening the link...": "正在打开链接…",
   "This link is open": "此链接已打开",
@@ -5483,17 +5481,17 @@ export const zhCN: Readonly<Record<string, string>> = {
   "is open, so its cookies can&rsquo;t be read yet. Quit it, then continue.":
     "正打开着，因此还不能读取其 Cookie。请退出它，然后继续。",
   "I&rsquo;ve quit it": "我已退出",
-  "Let T3 Code read": "允许 T3 Code 读取",
+  "Let T3 Code read": "允许天枢读取",
   "&rsquo;s cookies": "的 Cookie",
   "To import cookies from": "要从以下来源导入 Cookie：",
   // oxlint-disable-next-line t3code/no-em-dash-copy -- Exact upstream strings are translation lookup keys.
   ", T3 Code needs Full Disk Access. Turn it on in System Settings, then come back to finish the import — you can revoke it again once the import is done.":
-    "，T3 Code 需要完全磁盘访问权限。请在系统设置中开启，然后返回完成导入，导入完成后可以再次关闭。",
+    "，天枢需要完全磁盘访问权限。请在系统设置中开启，然后返回完成导入，导入完成后可以再次关闭。",
   "Full Disk Access": "完全磁盘访问权限",
   "Access is still required. Quit and reopen T3 Code if you just allowed it, then retry the import.":
-    "仍需要访问权限。若刚刚允许，请退出并重新打开 T3 Code，然后重试导入。",
+    "仍需要访问权限。若刚刚允许，请退出并重新打开天枢，然后重试导入。",
   "If access doesn't update after you allow it, quit and reopen T3 Code, then retry the import.":
-    "若允许后访问权限没有更新，请退出并重新打开 T3 Code，然后重试导入。",
+    "若允许后访问权限没有更新，请退出并重新打开天枢，然后重试导入。",
   "Choose which cookies to import for": "选择要为以下对象导入哪些 Cookie：",
   "Checking Full Disk Access.": "正在检查完全磁盘访问权限。",
   "Checking access…": "正在检查访问权限…",
@@ -5514,15 +5512,15 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Save shortcut": "保存快捷键",
   "Remove shortcut": "移除快捷键",
   "Allow T3 Code to read your desktop settings. You'll review any changes here before saving.":
-    "允许 T3 Code 读取你的桌面设置。保存前，你可以在这里查看任何更改。",
+    "允许天枢读取你的桌面设置。保存前，你可以在这里查看任何更改。",
   "Preparing changes…": "正在准备更改…",
   "Review changes": "查看更改",
-  "Update T3 Code to finish setting up your shortcut.": "请更新 T3 Code，以完成快捷键设置。",
+  "Update T3 Code to finish setting up your shortcut.": "请更新天枢，以完成快捷键设置。",
   "Connecting to your desktop…": "正在连接你的桌面…",
-  "Restart T3 Code to finish connecting your shortcut.": "请重启 T3 Code，以完成快捷键连接。",
+  "Restart T3 Code to finish connecting your shortcut.": "请重启天枢，以完成快捷键连接。",
   Troubleshooting: "故障排除",
   "Settings file": "设置文件",
-  "T3 Code also reads any files included by this file.": "T3 Code 也会读取此文件包含的所有文件。",
+  "T3 Code also reads any files included by this file.": "天枢也会读取此文件包含的所有文件。",
   "Linked to": "已链接到",
   "Choose a different file…": "选择其他文件…",
   "Remove shortcut…": "移除快捷键…",
@@ -5540,7 +5538,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Change the keys if needed.": "需要的话可以改键。",
   "Copy shortcut": "复制快捷键",
   "Turn capture off in T3 Code to stop it. Remove the shortcut from":
-    "在 T3 Code 中关闭捕获即可停止。请从",
+    "在天枢中关闭捕获即可停止。请从",
   "to free up the keys.": "中移除该快捷键以释放按键。",
   "I've added the shortcut": "我已添加快捷键",
   "Reconnect ChatGPT": "重新连接 ChatGPT",
@@ -5551,7 +5549,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Continue with ChatGPT": "使用 ChatGPT 继续",
   "Your ChatGPT plan is connected": "你的 ChatGPT 套餐已连接",
   "Eligible usage in T3 Code uses your ChatGPT plan. Manage your shared usage and any credit settings in ChatGPT.":
-    "T3 Code 中符合条件的用量会计入你的 ChatGPT 套餐。共享用量和积分设置请在 ChatGPT 中管理。",
+    "天枢中符合条件的用量会计入你的 ChatGPT 套餐。共享用量和积分设置请在 ChatGPT 中管理。",
   "Signed in as": "登录身份",
   "Connected with your Codex CLI.": "已通过你的 Codex CLI 连接。",
   "Checking your Codex CLI...": "正在检查你的 Codex CLI…",
@@ -5563,7 +5561,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Open ChatGPT sign-in": "打开 ChatGPT 登录",
   "Signing in...": "正在登录…",
   "If sign-in doesn't return to T3 Code, paste the URL from the final localhost page.":
-    "若登录没有回到 T3 Code，请粘贴最终 localhost 页面上的 URL。",
+    "若登录没有回到天枢，请粘贴最终 localhost 页面上的 URL。",
   "ChatGPT sign-in redirect URL": "ChatGPT 登录重定向 URL",
   "Paste the URL from the sign-in tab": "粘贴登录标签页中的 URL",
   "Try sign-in in your browser": "尝试在浏览器中登录",
@@ -5577,7 +5575,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Change account": "更改账户",
   "Could not read Codex setup status. Reconnect and try again.":
     "无法读取 Codex 设置状态。请重新连接后再试。",
-  "Selected by T3 Code.": "由 T3 Code 选择。",
+  "Selected by T3 Code.": "由天枢选择。",
   "Codex binary path": "Codex 二进制路径",
   "Could not read runtime path": "无法读取运行时路径",
   "Shared Codex config, sessions, and state.": "共享的 Codex 配置、会话和状态。",
@@ -5643,7 +5641,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "WSL backend couldn't start:": "WSL 后端无法启动：",
   "(default)": "（默认）",
   "Run only the WSL backend. T3 Code restarts when this changes.":
-    "只运行 WSL 后端。更改后 T3 Code 会重启。",
+    "只运行 WSL 后端。更改后天枢会重启。",
   "This connection cannot view or change network exposure.": "此连接无法查看或更改网络暴露。",
   "Remote access is already configured. Change network exposure where the server starts.":
     "远程访问已经配置。请在服务器启动处更改网络暴露。",
@@ -5658,9 +5656,9 @@ export const zhCN: Readonly<Record<string, string>> = {
   "This connection can create access links but cannot view authorized clients.":
     "此连接可以创建访问链接，但不能查看已授权的客户端。",
   "Let your other devices connect to T3 Code over the network. Pair devices to give them access. T3 Code will restart.":
-    "让其他设备通过网络连接到 T3 Code。配对设备以授予访问权限。T3 Code 将会重启。",
+    "让其他设备通过网络连接到天枢。配对设备以授予访问权限。天枢将会重启。",
   "Devices connected over your local network will disconnect. Existing tunnels, such as T3 Connect or Tailscale HTTPS, keep working. T3 Code will restart.":
-    "通过本地网络连接的设备将会断开。现有隧道（如 T3 Connect 或 Tailscale HTTPS）会继续工作。T3 Code 将会重启。",
+    "通过本地网络连接的设备将会断开。现有隧道（如 T3 Connect 或 Tailscale HTTPS）会继续工作。天枢将会重启。",
   "Applying…": "正在应用…",
   "No environment selected": "未选择环境",
   "Connect an environment to view its settings and access.": "连接环境后即可查看其设置和访问权限。",
@@ -5758,9 +5756,9 @@ export const zhCN: Readonly<Record<string, string>> = {
     "对话和终端中的链接在哪里打开。无论此设置如何，按住 ⌘ 或 Ctrl 点击链接都会用默认浏览器打开。",
   "link target": "链接目标",
   "Clicking a pull request link opens it in T3 Code. Turn off to open pull request links like any other link, on GitHub or your git host.":
-    "点击拉取请求链接会在 T3 Code 中打开。关闭后，拉取请求链接会像其他链接一样，在 GitHub 或你的 Git 托管上打开。",
-  "open pull requests in T3 Code": "在 T3 Code 中打开拉取请求",
-  "Open pull requests in T3 Code": "在 T3 Code 中打开拉取请求",
+    "点击拉取请求链接会在天枢中打开。关闭后，拉取请求链接会像其他链接一样，在 GitHub 或你的 Git 托管上打开。",
+  "open pull requests in T3 Code": "在天枢中打开拉取请求",
+  "Open pull requests in T3 Code": "在天枢中打开拉取请求",
   "Device settings not saved on all environments": "设备设置未在所有环境上保存",
   "Check versions": "检查版本",
   "Device hub": "设备中心",
@@ -5792,19 +5790,19 @@ export const zhCN: Readonly<Record<string, string>> = {
   "New threads in shared projects start on the machine with the most free CPU and memory, weighted by each machine's preference.":
     "共享项目中的新会话会在空闲 CPU 和内存最多的机器上启动，并按每台机器的偏好加权。",
   "Run agents on this computer. Turn off to use T3 Code only with remote environments.":
-    "在这台计算机上运行智能体。关闭后，T3 Code 只使用远程环境。",
+    "在这台计算机上运行智能体。关闭后，天枢只使用远程环境。",
   "Turned off. Agents only run in remote environments.": "已关闭。智能体只在远程环境中运行。",
   "Local environment": "本地环境",
   "Turn off local environment?": "关闭本地环境？",
   "Turn on local environment?": "打开本地环境？",
   "T3 Code will restart without running a server on this computer. Any agents and terminals running here will stop, and other devices will no longer be able to connect to this computer. Your projects, history, and remote environments are unaffected.":
-    "T3 Code 将重启，并且不再在这台计算机上运行服务器。这里正在运行的智能体和终端会停止，其他设备也将无法再连接到这台计算机。你的项目、历史和远程环境不受影响。",
+    "天枢将重启，并且不再在这台计算机上运行服务器。这里正在运行的智能体和终端会停止，其他设备也将无法再连接到这台计算机。你的项目、历史和远程环境不受影响。",
   "T3 Code will restart and start running a server on this computer again.":
-    "T3 Code 将重启，并再次在这台计算机上运行服务器。",
+    "天枢将重启，并再次在这台计算机上运行服务器。",
   "Restart and turn off": "重启并关闭",
   "Restart and turn on": "重启并打开",
   "System alerts when a thread finishes, fails, or needs input or approval. Applies to this device while T3 Code is open.":
-    "会话完成、失败或需要输入或批准时发出系统提醒。仅当 T3 Code 在此设备上打开时生效。",
+    "会话完成、失败或需要输入或批准时发出系统提醒。仅当天枢在此设备上打开时生效。",
   "Thread notifications": "会话通知",
   "Project source": "项目来源",
   "Search open-source licenses": "搜索开源许可证",
@@ -6174,7 +6172,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Inspect processes, resource use, and logs on one environment at a time.":
     "一次查看一个环境上的进程、资源使用和日志。",
   "Notices for dependencies, assets, and optional tools used by T3 Code.":
-    "T3 Code 所用依赖、资源和可选工具的声明。",
+    "天枢所用依赖、资源和可选工具的声明。",
   "View licenses": "查看许可证",
   Archived: "已归档",
   "· Created": "· 创建于",
@@ -6203,7 +6201,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Animate snapshots": "为快照加上动画",
   "Install the extension": "安装扩展",
   "The T3 Code GNOME extension lets you capture other windows and bring them into your draft. Sign out once after installing.":
-    "T3 Code 的 GNOME 扩展可以捕获其他窗口并带入草稿。安装后请退出登录一次。",
+    "天枢的 GNOME 扩展可以捕获其他窗口并带入草稿。安装后请退出登录一次。",
   "Extension installed": "扩展已安装",
   "Save your work, then sign out and back in. Your setup will be waiting here.":
     "请保存工作，然后退出登录再登录。你的设置会留在这里。",
@@ -6213,7 +6211,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Open GNOME Extensions and turn on extensions, then check again.":
     "打开 GNOME Extensions 并打开扩展，然后再次检查。",
   "Enable the extension": "启用扩展",
-  "Enable T3 Code SnapShots to start capturing windows.": "启用 T3 Code SnapShots 以开始捕获窗口。",
+  "Enable T3 Code SnapShots to start capturing windows.": "启用天枢 SnapShots 以开始捕获窗口。",
   "Capture is ready": "捕获已就绪",
   "Next, choose your shortcut.": "接下来，选择你的快捷键。",
   "Automatic capture isn't available": "自动捕获不可用",
@@ -6221,7 +6219,7 @@ export const zhCN: Readonly<Record<string, string>> = {
     "请从命令面板使用「拍摄快照」来选择窗口。",
   "Couldn't set up the extension": "无法设置扩展",
   "Check T3 Code SnapShots in GNOME Extensions, then try again.":
-    "请在 GNOME Extensions 中检查 T3 Code SnapShots，然后重试。",
+    "请在 GNOME Extensions 中检查天枢 SnapShots，然后重试。",
   "Let's try that again": "再试一次",
   "Couldn't check snapshots. Try again to continue.": "无法检查快照。请重试以继续。",
   "Check capture access": "检查捕获访问权限",
@@ -6230,7 +6228,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Try reinstalling the capture helper, then check again.":
     "请尝试重新安装捕获助手，然后再次检查。",
   "T3 Code's capture helper lets you capture other apps and return to your draft. It's included with T3 Code.":
-    "T3 Code 的捕获助手可以捕获其他应用并返回草稿。它随 T3 Code 一起提供。",
+    "天枢的捕获助手可以捕获其他应用并返回草稿。它随天枢一起提供。",
   "Choose a window each time": "每次选择一个窗口",
   "Your desktop doesn't support automatic capture. You'll choose the window to capture instead.":
     "你的桌面不支持自动捕获。你将改为选择要捕获的窗口。",
@@ -6242,7 +6240,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Capture needs attention. Go back to check access.": "捕获需要处理。请返回检查访问权限。",
   "Couldn't finish this step. Try again or check Advanced for help.":
     "无法完成此步骤。请重试，或查看高级选项中的帮助。",
-  "Included with T3 Code. No download needed.": "随 T3 Code 提供。无需下载。",
+  "Included with T3 Code. No download needed.": "随天枢提供。无需下载。",
   "Disable extension": "禁用扩展",
   "Remove capture helper": "移除捕获助手",
   "Update helper": "更新助手",
@@ -6498,8 +6496,8 @@ export const zhCN: Readonly<Record<string, string>> = {
   TypeScript: "TypeScript",
   Vue: "Vue",
   Zig: "Zig",
-  "T3 Code Desktop": "T3 Code 桌面版",
-  "T3 Code Web": "T3 Code 网页版",
+  "T3 Code Desktop": "天枢桌面版",
+  "T3 Code Web": "天枢网页版",
   "Open with": "打开方式",
   "Failed to remove project": "移除项目失败",
   "Model preferences not saved": "模型偏好未保存",
@@ -6571,7 +6569,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Failed to copy PR link": "复制拉取请求链接失败",
   "Preview is desktop-only": "预览仅限桌面端",
   "Open T3 Code in the desktop app to use the in-app preview.":
-    "请在桌面应用中打开 T3 Code 以使用应用内预览。",
+    "请在桌面应用中打开天枢以使用应用内预览。",
   "Connect an environment to set up its providers.": "连接环境后才能设置其模型通道。",
   "environment-data:agent-sessions:scan": "environment-data:agent-sessions:scan",
   "environment-data:agent-sessions:import": "environment-data:agent-sessions:import",
@@ -6749,7 +6747,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "{0} additions, {1} deletions": "新增 {0}，删除 {1}",
   "{0} app": "{0} 应用",
   "Jump to message: {0}": "跳转到消息：{0}",
-  "T3 Code": "T3 Code",
+  "T3 Code": "天枢",
   "{0} is still running. Show setup progress.": "{0} 仍在运行。显示准备进度。",
   "{0}{1}, tool call failed": "{0}{1}，工具调用失败",
   "{0}, tool call failed": "{0}，工具调用失败",
@@ -6810,7 +6808,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "You don't have {0}": "你还没有 {0}",
   "Check out {0}/{1}#{2}?": "检出 {0}/{1}#{2}？",
   "T3 Code removed {0} hidden character{1}. Read the prompt before you send it.":
-    "T3 Code 已移除 {0} 个隐藏字符{1}。发送前请先阅读这段提示词。",
+    "天枢已移除 {0} 个隐藏字符{1}。发送前请先阅读这段提示词。",
   "Open checks: {0}": "打开检查：{0}",
   "viewed in {0}": "在 {0} 中已查看",
   "Review pull request, {0} {1} pending": "评审拉取请求，{0} 条{1}待提交",
@@ -6966,7 +6964,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "{0} of {1} updated": "已更新 {0}/{1}",
   "Downloading{0}": "正在下载{0}",
   "T3 Code is still on {0}. Install {1} again from the update button.":
-    "T3 Code 仍是 {0}。请通过更新按钮再次安装 {1}。",
+    "天枢仍是 {0}。请通过更新按钮再次安装 {1}。",
   "text-primary": "text-primary",
   "{0} saturation and brightness": "{0}的饱和度与亮度",
   "{0}, step {1}{2}": "{0}，第 {1} 步{2}",
@@ -7040,11 +7038,11 @@ export const zhCN: Readonly<Record<string, string>> = {
     "输入超过 {2} 字符上限，多出 {0} {1}。请缩短或拆分后发送。",
   "This install is using the correct architecture.": "当前安装版本与设备架构匹配。",
   "This Mac has Apple Silicon, but T3 Code is still running the Intel build under Rosetta. Download the available update to switch to the native Apple Silicon build.":
-    "此 Mac 使用 Apple Silicon，但 T3 Code 正通过 Rosetta 运行 Intel 版本。下载更新可切换到原生 Apple Silicon 版本。",
+    "此 Mac 使用 Apple Silicon，但天枢正通过 Rosetta 运行 Intel 版本。下载更新可切换到原生 Apple Silicon 版本。",
   "This Mac has Apple Silicon, but T3 Code is still running the Intel build under Rosetta. Restart to install the downloaded Apple Silicon build.":
-    "此 Mac 使用 Apple Silicon，但 T3 Code 正通过 Rosetta 运行 Intel 版本。重新启动以安装已下载的 Apple Silicon 版本。",
+    "此 Mac 使用 Apple Silicon，但天枢正通过 Rosetta 运行 Intel 版本。重新启动以安装已下载的 Apple Silicon 版本。",
   "This Mac has Apple Silicon, but T3 Code is still running the Intel build under Rosetta. The next app update will replace it with the native Apple Silicon build.":
-    "此 Mac 使用 Apple Silicon，但 T3 Code 正通过 Rosetta 运行 Intel 版本。下次应用更新将切换到原生 Apple Silicon 版本。",
+    "此 Mac 使用 Apple Silicon，但天枢正通过 Rosetta 运行 Intel 版本。下次应用更新将切换到原生 Apple Silicon 版本。",
   "Update {0} did not apply. Click to retry.": "更新 {0} 未生效，点击重试。",
   "Update {0} ready to download": "更新 {0} 已可下载",
   "Downloading update{0}": "正在下载更新{0}",
@@ -7052,7 +7050,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Download failed for {0}. Click to retry.": "{0} 下载失败，点击重试。",
   "Install failed for {0}. Click to retry.": "{0} 安装失败，点击重试。",
   "Install update{0} and restart T3 Code?\n\nAny running tasks will be interrupted. Make sure you're ready before continuing.":
-    "安装更新{0}并重启 T3 Code？\n\n正在运行的任务将被中断，请准备好后继续。",
+    "安装更新{0}并重启天枢？\n\n正在运行的任务将被中断，请准备好后继续。",
   "Enable this environment to open simulators and emulators, whether they run here or on a remote device host.":
     "启用此环境以打开本地或远程设备主机上的模拟器。",
   "Allow new agent sessions in this environment to start and control local and remote devices, with required tools set up automatically.":
@@ -7197,7 +7195,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Custom search URL": "自定义搜索网址",
   "Use %s where the search terms go.": "用 %s 标记搜索词的位置。",
   "Clicking a pull request link opens it in T3 Code. Turn off to open pull request links like any other link, on your git host.":
-    "点击拉取请求链接时在 T3 Code 内打开。关闭后，会像其他链接一样在代码托管平台打开。",
+    "点击拉取请求链接时在天枢内打开。关闭后，会像其他链接一样在代码托管平台打开。",
   "Open simulators and emulators in the Device panel. Hub:": "在设备面板中打开模拟器。设备中心：",
   "New agent sessions can open and drive these devices. agent-device:":
     "新智能体会话可以打开并操作这些设备。agent-device：",
@@ -7226,7 +7224,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Loading linked environments…": "正在加载关联环境…",
   "No linked environments": "暂无关联环境",
   "Link another machine running T3 Code, such as a VPS, so agents here can launch and drive threads there.":
-    "关联另一台运行 T3 Code 的机器（例如 VPS），让本机智能体在对方创建并执行会话。",
+    "关联另一台运行天枢的机器（例如 VPS），让本机智能体在对方创建并执行会话。",
   "unlink environment": "解除环境关联",
   "link environment": "关联环境",
   "Link an environment": "关联环境",
@@ -7350,9 +7348,9 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Quit {0} to import": "退出 {0} 后导入",
   "{0} is open, so its cookies can't be read yet. Quit it, then continue.":
     "{0} 正在运行，暂时无法读取其 Cookie。请退出后继续。",
-  "Let T3 Code read {0}'s cookies": "允许 T3 Code 读取 {0} 的 Cookie",
+  "Let T3 Code read {0}'s cookies": "允许天枢读取 {0} 的 Cookie",
   "To import cookies from {0}, T3 Code needs Full Disk Access. Turn it on in System Settings, then come back to finish the import. You can revoke it again once the import is done.":
-    "从 {0} 导入 Cookie 需要为 T3 Code 开启“完全磁盘访问权限”。请前往系统设置开启，再返回完成导入；完成后可撤销该权限。",
+    "从 {0} 导入 Cookie 需要为天枢开启“完全磁盘访问权限”。请前往系统设置开启，再返回完成导入；完成后可撤销该权限。",
   "Import from {0}": "从 {0} 导入",
   "Choose which cookies to import for {0}.": "选择要为 {0} 导入的 Cookie。",
   "Checking {0}": "正在检查 {0}",
@@ -7364,13 +7362,13 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Let agents here work on your other machines, and theirs here. Turn it on for each machine, then link them in {0}. While it is off, nothing new starts over a link; tasks already running finish.":
     "允许本机智能体在其他机器上工作，也允许对方在本机工作。请在各机器开启，再前往{0}进行关联。关闭后，不再通过关联启动新任务；已运行的任务会继续完成。",
   "Let the Device panel lease simulators and emulators from your own {0} pool, added in {1}. An alpha that may change or break. T3 Code never installs Simlock.":
-    "允许设备面板从你在{1}中添加的 {0} 设备池租用模拟器。这是早期测试功能，可能变化或失效。T3 Code 不会安装 Simlock。",
+    "允许设备面板从你在{1}中添加的 {0} 设备池租用模拟器。这是早期测试功能，可能变化或失效。天枢不会安装 Simlock。",
   "This app has no address for {0} that another machine can reach. Enter its https or Tailscale address.":
     "此应用没有可供其他机器访问 {0} 的地址。请输入其 HTTPS 或 Tailscale 地址。",
   "Create a link on {0}: Settings → Connections → Create link, then paste its code here.":
     "在 {0} 上打开“设置 → 连接 → 创建关联”，再将关联码粘贴到这里。",
   "We do not recommend managing multiple {0} accounts in T3 Code. {1}":
-    "不建议在 T3 Code 中管理多个 {0} 账号。{1}",
+    "不建议在天枢中管理多个 {0} 账号。{1}",
   "This instance uses {0}, which is not available in this build. Its configuration is preserved.":
     "此实例使用 {0}，当前版本不支持该服务商。其配置已保留。",
   "Checked {0} {1}": "检查于 {0} {1}",
@@ -7544,7 +7542,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Full access skips approvals, but an ask rule in the agent's own settings matches this action, so it still asks. Remove or narrow that rule to stop these prompts.":
     "完全访问通常会跳过授权，但智能体自身设置中的询问规则匹配了此操作，因此仍需确认。移除该规则或缩小其范围后，可减少这类提示。",
   "Full access skips approvals, but the agent still stops for a few safety checks of its own that no setting can skip, such as a delete whose path it can't verify. T3 Code can't turn these off, so check the request and approve it if it's what you expect.":
-    "完全访问通常会跳过授权，但智能体自身仍有少量无法通过设置跳过的安全检查，例如无法核实删除目标路径时。T3 Code 无法关闭这些检查，请核对实际操作，符合预期后再批准。",
+    "完全访问通常会跳过授权，但智能体自身仍有少量无法通过设置跳过的安全检查，例如无法核实删除目标路径时。天枢无法关闭这些检查，请核对实际操作，符合预期后再批准。",
   "Provider process is gone. Interrupt or restart the run to respond.":
     "模型通道进程已退出，请中断或重启任务后再处理此请求。",
   "Allow {server} to run {tool}?": "允许 {server} 运行 {tool}？",

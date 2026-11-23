@@ -186,7 +186,7 @@ export interface TurnDetailMemory {
 }
 
 /** The heading every agent message has in the timeline. */
-const MESSAGE_AUTHOR = "T3 Code";
+const messageAuthor = () => m(msg("Tianshu"));
 
 /**
  * Decides which of the turn's messages and steps a screen reader hears next.
@@ -226,7 +226,7 @@ export function nextTurnDetailAnnouncement(
           : m(msg("{text} More in the thread.", { text: markdownPlainText(cut) }));
       })
       .filter((text) => text !== "")
-      .map((text) => `${MESSAGE_AUTHOR}: ${text}`),
+      .map((text) => `${messageAuthor()}: ${text}`),
     activity:
       next.level === "everything" && memory.activity !== previous.activity ? memory.activity : null,
   };
