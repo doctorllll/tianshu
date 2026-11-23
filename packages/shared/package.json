@@ -651,6 +651,10 @@
     "./paletteSearchCopy": {
       "types": "./src/paletteSearchCopy.ts",
       "import": "./src/paletteSearchCopy.ts"
+    },
+    "./subSessionPrompt": {
+      "types": "./src/subSessionPrompt.ts",
+      "import": "./src/subSessionPrompt.ts"
     }
   },
   "scripts": {

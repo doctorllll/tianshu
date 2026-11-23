@@ -654,6 +654,10 @@
     "./provider-instance-ids": {
       "types": "./src/providerInstanceIds.ts",
       "default": "./src/providerInstanceIds.ts"
+    },
+    "./state/sub-session-proposals": {
+      "types": "./src/state/subSessionProposals.ts",
+      "import": "./src/state/subSessionProposals.ts"
     }
   },
   "scripts": {

@@ -224,6 +224,7 @@ import {
 } from "./ComposerCommandMenu";
 import { ComposerAttachButton } from "./ComposerAttachButton";
 import { SubSessionButton } from "./SubSessionButton";
+import { SubSessionProposalCards } from "./SubSessionProposalCards";
 import {
   ComposerAttachmentFileList,
   ComposerAttachmentMediaRow,
@@ -3619,6 +3620,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             isRevertingCheckpoint
           }
           onContinue={props.onInboxContinue ?? onResume}
+        />
+      ) : null}
+      {activeThreadId ? (
+        <SubSessionProposalCards
+          environmentId={environmentId}
+          threadId={activeThreadId}
+          providers={providerStatuses}
         />
       ) : null}
       <DraftPersistenceNotice />

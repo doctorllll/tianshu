@@ -11,6 +11,12 @@ import {
   StorageManagementError,
 } from "./storageManagement.ts";
 import { DiskSpaceInput, DiskSpaceReport } from "./diskSpace.ts";
+import {
+  RespondSubSessionProposalInput,
+  RespondSubSessionProposalResult,
+  SubSessionProposalError,
+  SubSessionProposalList,
+} from "./subSessionProposal.ts";
 import { UserMemoryMutation } from "./memory.ts";
 import {
   OrchestrationV2SearchThreadError,
@@ -733,6 +739,8 @@ export const WS_METHODS = {
   subscribeServerLifecycle: "subscribeServerLifecycle",
   subscribeAuthAccess: "subscribeAuthAccess",
   subscribeResourceTelemetry: "subscribeResourceTelemetry",
+  subscribeSubSessionProposals: "subscribeSubSessionProposals",
+  respondSubSessionProposal: "subSessionProposal.respond",
 } as const;
 
 const WsServerUpsertKeybindingRpc = Rpc.make(WS_METHODS.serverUpsertKeybinding, {
@@ -2067,6 +2075,19 @@ const WsSubscribeDiscoveredLocalServersRpc = Rpc.make(WS_METHODS.subscribeDiscov
   stream: true,
 });
 
+const WsSubscribeSubSessionProposalsRpc = Rpc.make(WS_METHODS.subscribeSubSessionProposals, {
+  payload: Schema.Struct({}),
+  success: SubSessionProposalList,
+  error: EnvironmentAuthorizationError,
+  stream: true,
+});
+
+const WsRespondSubSessionProposalRpc = Rpc.make(WS_METHODS.respondSubSessionProposal, {
+  payload: RespondSubSessionProposalInput,
+  success: RespondSubSessionProposalResult,
+  error: Schema.Union([SubSessionProposalError, EnvironmentAuthorizationError]),
+});
+
 const WsDeviceTestHostRpc = Rpc.make(WS_METHODS.deviceTestHost, {
   payload: SshDeviceHostConfig,
   success: DeviceHostSummary,
@@ -2650,6 +2671,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsSubscribePreviewEventsRpc,
   WsPreviewStopLocalServerRpc,
   WsSubscribeDiscoveredLocalServersRpc,
+  WsSubscribeSubSessionProposalsRpc,
+  WsRespondSubSessionProposalRpc,
   WsDeviceConfigureRpc,
   WsDeviceListRpc,
   WsDeviceTestHostRpc,

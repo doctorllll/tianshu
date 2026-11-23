@@ -1,11 +1,6 @@
 import type { ServerProvider } from "@t3tools/contracts";
 
-export interface SubSessionRequest {
-  readonly instanceId: string;
-  readonly model: string | null;
-  readonly title: string;
-  readonly task: string;
-}
+export { subSessionPrompt, type SubSessionRequest } from "@t3tools/shared/subSessionPrompt";
 
 /** Agents a sub-session can run on: enabled, installed, and not reporting an error. */
 export function subSessionAgents(providers: ReadonlyArray<ServerProvider>) {
@@ -78,26 +73,4 @@ export function rankSubSessionAgents(
 export function defaultSubSessionModel(provider: ServerProvider | undefined): string | null {
   if (provider === undefined) return null;
   return (provider.models.find((model) => model.isDefault) ?? provider.models[0])?.slug ?? null;
-}
-
-/**
- * The message that asks the thread's own agent to start the sub-session with delegate_task, so
- * the child is a real sub-session of this thread and its completion wakes this thread.
- */
-export function subSessionPrompt(request: SubSessionRequest): string {
-  const target = {
-    providerInstanceId: request.instanceId,
-    ...(request.model ? { model: request.model } : {}),
-  };
-  const title = request.title.trim();
-  return [
-    "New sub-session: start it with delegate_task as below. Pass the task verbatim; do not do it yourself or rewrite it. Then end your turn; its completion wakes you with its reply.",
-    `- target: ${JSON.stringify(target)}`,
-    ...(title ? [`- title: ${title}`] : []),
-    // A blank line ends the list, so the task does not render as part of its last item.
-    "",
-    "<task>",
-    request.task.trim(),
-    "</task>",
-  ].join("\n");
 }

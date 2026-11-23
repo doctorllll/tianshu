@@ -606,6 +606,9 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.autoUpdateProviders !== DEFAULT_UNIFIED_SETTINGS.autoUpdateProviders
       ? [gt("Update agents automatically")]
       : []),
+    ...(settings.confirmSubSessionDispatch !== DEFAULT_UNIFIED_SETTINGS.confirmSubSessionDispatch
+      ? [gt("Confirm sub-sessions before they start")]
+      : []),
     ...(settings.continueThreadsAfterServerUpdate !==
     DEFAULT_UNIFIED_SETTINGS.continueThreadsAfterServerUpdate
       ? [gt("Continue threads after restarts")]
@@ -741,6 +744,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       responseStreamingMode: DEFAULT_UNIFIED_SETTINGS.responseStreamingMode,
       enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,
       autoUpdateProviders: DEFAULT_UNIFIED_SETTINGS.autoUpdateProviders,
+      confirmSubSessionDispatch: DEFAULT_UNIFIED_SETTINGS.confirmSubSessionDispatch,
       continueThreadsAfterServerUpdate: DEFAULT_UNIFIED_SETTINGS.continueThreadsAfterServerUpdate,
       backgroundActivity: DEFAULT_UNIFIED_SETTINGS.backgroundActivity,
       keepAwakeWhileAgentsWork: DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork,
@@ -1403,6 +1407,37 @@ export function ChatSettingsPanel() {
                 </SelectItem>
               </SelectPopup>
             </Select>
+          }
+        />
+        <SettingsRow
+          serverScoped
+          settingKeys={["confirmSubSessionDispatch"]}
+          {...setting("sub-session-confirmation")}
+          description={gt(
+            "Show each sub-session an agent starts before it runs, so you can change its agent, model, thinking level or task, or decline it.",
+          )}
+          resetAction={
+            settings.confirmSubSessionDispatch !==
+            DEFAULT_UNIFIED_SETTINGS.confirmSubSessionDispatch ? (
+              <SettingResetButton
+                ariaLabel={gt("Reset sub-session confirmation to default")}
+                onClick={() =>
+                  updateSettings({
+                    confirmSubSessionDispatch: DEFAULT_UNIFIED_SETTINGS.confirmSubSessionDispatch,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <ScopedSwitch
+              settingKeys={["confirmSubSessionDispatch"]}
+              checked={settings.confirmSubSessionDispatch}
+              onCheckedChange={(checked) =>
+                updateSettings({ confirmSubSessionDispatch: Boolean(checked) })
+              }
+              aria-label={gt("Confirm sub-sessions before they start")}
+            />
           }
         />
       </SettingsSection>

@@ -1,4 +1,5 @@
-import type { ServerProvider } from "@t3tools/contracts";
+import type { ProviderOptionDescriptor, ServerProvider } from "@t3tools/contracts";
+import { isReasoningSelect } from "@t3tools/client-runtime/model-traits";
 import { GitBranchPlusIcon } from "lucide-react";
 import { useState } from "react";
 
@@ -23,6 +24,7 @@ import {
   rankSubSessionAgents,
   type SubSessionAgentRank,
   subSessionPrompt,
+  type SubSessionRequest,
 } from "./subSessionPrompt";
 import "./composerV9.css";
 
@@ -64,9 +66,13 @@ export function SubSessionButton({
             <SubSessionForm
               providers={providers}
               onCancel={() => setOpen(false)}
-              onSubmit={(text) => {
+              submitLabel={uiText("Put in composer")}
+              description={uiText(
+                "This thread's agent starts it with delegate_task; when it finishes, its reply wakes this thread.",
+              )}
+              onSubmit={(request) => {
                 setOpen(false);
-                onInsert(text);
+                onInsert(subSessionPrompt(request));
               }}
             />
           ) : null}
@@ -76,35 +82,81 @@ export function SubSessionButton({
   );
 }
 
-function SubSessionForm({
+/** The model's reasoning select, the one choice a sub-session form offers besides the model. */
+export function subSessionEffortControl(
+  provider: ServerProvider | undefined,
+  model: string | null,
+): Extract<ProviderOptionDescriptor, { type: "select" }> | undefined {
+  const entry = provider?.models.find((candidate) => candidate.slug === model);
+  return entry?.capabilities?.optionDescriptors?.find(isReasoningSelect);
+}
+
+function defaultEffort(
+  control: Extract<ProviderOptionDescriptor, { type: "select" }> | undefined,
+): string | null {
+  if (control === undefined) return null;
+  return (
+    control.currentValue ??
+    control.options.find((choice) => choice.isDefault)?.id ??
+    control.options[0]?.id ??
+    null
+  );
+}
+
+export function SubSessionForm({
   providers,
+  initial,
+  description,
+  submitLabel,
   onCancel,
   onSubmit,
 }: {
   readonly providers: ReadonlyArray<ServerProvider>;
+  /** What an agent proposed; absent for a new sub-session. */
+  readonly initial?: SubSessionRequest;
+  readonly description: string;
+  readonly submitLabel: string;
   readonly onCancel: () => void;
-  readonly onSubmit: (text: string) => void;
+  readonly onSubmit: (request: SubSessionRequest) => void;
 }) {
   const uiText = useUiText();
   const [openedAt] = useState(() => Date.now());
   const ranked = rankSubSessionAgents(providers, openedAt);
   const agents = ranked.map((entry) => entry.provider);
-  const [instanceId, setInstanceId] = useState<string>(agents[0]?.instanceId ?? "");
+  const first =
+    agents.find((candidate) => candidate.instanceId === initial?.instanceId) ?? agents[0];
+  const [instanceId, setInstanceId] = useState<string>(first?.instanceId ?? "");
   const agent = agents.find((candidate) => candidate.instanceId === instanceId);
   const rank = ranked.find((entry) => entry.provider.instanceId === instanceId);
-  const [model, setModel] = useState<string | null>(defaultSubSessionModel(agents[0]));
-  const [title, setTitle] = useState("");
-  const [task, setTask] = useState("");
+  const [model, setModel] = useState<string | null>(
+    initial?.model && first?.models.some((item) => item.slug === initial.model)
+      ? initial.model
+      : defaultSubSessionModel(first),
+  );
+  const control = subSessionEffortControl(agent, model);
+  const proposedEffort = initial?.options?.find((option) => option.id === control?.id)?.value;
+  const [effort, setEffort] = useState<string | null>(
+    typeof proposedEffort === "string" ? proposedEffort : defaultEffort(control),
+  );
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [task, setTask] = useState(initial?.task ?? "");
   const ready = agent !== undefined && task.trim().length > 0;
+  const pickModel = (provider: ServerProvider | undefined, slug: string | null) => {
+    setModel(slug);
+    const next = subSessionEffortControl(provider, slug);
+    setEffort((current) =>
+      next?.options.some((choice) => choice.id === current) ? current : defaultEffort(next),
+    );
+  };
+  const options = [
+    ...(initial?.options ?? []).filter((option) => option.id !== control?.id),
+    ...(control !== undefined && effort !== null ? [{ id: control.id, value: effort }] : []),
+  ];
   return (
     <>
       <DialogHeader>
         <DialogTitle>{uiText("New sub-session")}</DialogTitle>
-        <DialogDescription>
-          {uiText(
-            "This thread's agent starts it with delegate_task; when it finishes, its reply wakes this thread.",
-          )}
-        </DialogDescription>
+        <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
       <DialogPanel>
         <div className="flex flex-col gap-4">
@@ -116,9 +168,8 @@ function SubSessionForm({
                 onValueChange={(value) => {
                   if (value === null) return;
                   setInstanceId(value);
-                  setModel(
-                    defaultSubSessionModel(agents.find((item) => item.instanceId === value)),
-                  );
+                  const next = agents.find((item) => item.instanceId === value);
+                  pickModel(next, defaultSubSessionModel(next));
                 }}
               >
                 <SelectTrigger aria-label={uiText("Agent")}>
@@ -143,7 +194,7 @@ function SubSessionForm({
               <Select
                 value={model ?? ""}
                 onValueChange={(value) => {
-                  if (value !== null) setModel(value);
+                  if (value !== null) pickModel(agent, value);
                 }}
               >
                 <SelectTrigger aria-label={uiText("Model")}>
@@ -166,6 +217,32 @@ function SubSessionForm({
               {rank.recommended
                 ? uiText("Recommended: the most quota left that would otherwise go unused soonest.")
                 : uiText("Agents are ordered by quota left and how soon it resets.")}
+            </div>
+          ) : null}
+          {control !== undefined ? (
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label>{uiText("Thinking level")}</Label>
+              <Select
+                value={effort ?? ""}
+                onValueChange={(value) => {
+                  if (value !== null) setEffort(value);
+                }}
+              >
+                <SelectTrigger aria-label={uiText("Thinking level")}>
+                  <SelectValue>
+                    {uiText(
+                      control.options.find((choice) => choice.id === effort)?.label ?? effort ?? "",
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectPopup alignItemWithTrigger={false}>
+                  {control.options.map((choice) => (
+                    <SelectItem key={choice.id} value={choice.id}>
+                      {uiText(choice.label)}
+                    </SelectItem>
+                  ))}
+                </SelectPopup>
+              </Select>
             </div>
           ) : null}
           <div className="flex flex-col gap-1.5">
@@ -196,10 +273,10 @@ function SubSessionForm({
           disabled={!ready}
           onClick={() => {
             if (!agent) return;
-            onSubmit(subSessionPrompt({ instanceId: agent.instanceId, model, title, task }));
+            onSubmit({ instanceId: agent.instanceId, model, options, title, task });
           }}
         >
-          {uiText("Put in composer")}
+          {submitLabel}
         </Button>
       </DialogFooter>
     </>

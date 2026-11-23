@@ -869,6 +869,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("queue steer running turn send default behavior composer")],
   },
   {
+    id: "sub-session-confirmation",
+    title: msg("Confirm sub-sessions before they start"),
+    to: "/settings/chat",
+    searchTerms: [msg("sub-session delegate child agent confirm preview approve")],
+    scope: "environment-defaults",
+  },
+  {
     id: "side-thread-open-target",
     title: msg("Open subagents and side chats in"),
     to: "/settings/chat",

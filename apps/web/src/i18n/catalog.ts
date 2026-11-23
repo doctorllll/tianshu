@@ -9744,4 +9744,16 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Install the updates found above by itself, for agents that support one-click updates, while they have nothing running. Agents that update themselves or need manual steps are left alone.":
     "对支持一键更新的 Agent，在它没有任务运行时自动安装上面检查到的更新。会自行更新或需要手动更新的 Agent 不受影响。",
   "Reset automatic agent updates to default": "将自动更新 Agent 恢复默认",
+  "{agent} wants to start a sub-session": "{agent} 想派一个子会话",
+  "Don't start": "不派",
+  "Change before starting": "修改",
+  "Start sub-session": "派发",
+  "The agent asked for this sub-session. Change anything before it starts.":
+    "Agent 想派发这个子会话。派发前可以修改其中任意一项。",
+  "Thinking level": "思考等级",
+  "Confirm sub-sessions before they start": "子会话派发前确认",
+  "Show each sub-session an agent starts before it runs, so you can change its agent, model, thinking level or task, or decline it.":
+    "Agent 派发子会话前先给你预览，可以改派给哪个 Agent、模型、思考等级和任务，也可以不派。",
+  "Reset sub-session confirmation to default": "将子会话派发前确认恢复默认",
+  "sub-session delegate child agent confirm preview approve": "子会话 派发 确认 预览 Agent",
 };
