@@ -14,6 +14,7 @@ import {
   zcodePlanModels,
   zcodePlatformKey,
 } from "./zcodeBuiltin.ts";
+import { ZCODE_ENGINE_SHIM_NAME, ZCODE_ENGINE_SHIM_SOURCE } from "./zcodeEngineShim.ts";
 
 const table = (revision: number, models: ReadonlyArray<string>) =>
   JSON.stringify({
@@ -120,7 +121,7 @@ const makeFixture = Effect.fn("zcodeBuiltin.test.fixture")(function* () {
 const offline = HttpClient.make(() => Effect.die("offline"));
 
 describe("makeZcodeBuiltinTables", () => {
-  it.effect("hands the bridge a mirror carrying ZCode's newer synced table", () =>
+  it.effect("hands the bridge the shim in a mirror carrying ZCode's newer synced table", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
@@ -138,8 +139,17 @@ describe("makeZcodeBuiltinTables", () => {
         "builtin:bigmodel-start-plan\\GLM-5-Turbo",
       ]);
       expect(mirrored).toBe(
-        path.join(root, "state", "engines", "3.19.1-r47-2", "Resources", "glm", "zcode.cjs"),
+        path.join(
+          root,
+          "state",
+          "engines",
+          "3.19.1-r47-3",
+          "Resources",
+          "glm",
+          ZCODE_ENGINE_SHIM_NAME,
+        ),
       );
+      expect(yield* fileSystem.readFileString(mirrored)).toBe(ZCODE_ENGINE_SHIM_SOURCE);
       const glm = path.dirname(mirrored);
       expect(yield* fileSystem.realPath(path.join(glm, "zcode.cjs"))).toBe(
         yield* fileSystem.realPath(engine),
@@ -151,12 +161,14 @@ describe("makeZcodeBuiltinTables", () => {
       expect(yield* fileSystem.readFileString(path.join(glm, "..", "..", "Info.plist"))).toBe(
         PLIST,
       );
-      // Reused, not rebuilt, on the next launch.
+      // Reused, not rebuilt, on the next launch; an older shim is replaced.
+      yield* fileSystem.writeFileString(mirrored, "// older shim");
       expect((yield* tables.engineFor({ engine, zcodeHome })).engine).toBe(mirrored);
+      expect(yield* fileSystem.readFileString(mirrored)).toBe(ZCODE_ENGINE_SHIM_SOURCE);
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 
-  it.effect("fetches the official table and keeps the app's engine when nothing is newer", () =>
+  it.effect("fetches the official table and runs the bundled one when nothing is newer", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
@@ -182,14 +194,22 @@ describe("makeZcodeBuiltinTables", () => {
         directory,
         platformKey: "darwin-aarch64",
       }).pipe(Effect.provideService(HttpClient.HttpClient, official));
-      expect((yield* tables.engineFor({ engine, zcodeHome })).engine).toBe(engine);
+      const bundled = path.join(
+        directory,
+        "engines",
+        "3.19.1-r44-3",
+        "Resources",
+        "glm",
+        ZCODE_ENGINE_SHIM_NAME,
+      );
+      expect((yield* tables.engineFor({ engine, zcodeHome })).engine).toBe(bundled);
       expect(requested[0]).toBe(
         "https://zcode.z.ai/api/v1/client/configs?app_version=3.19.1&platform=darwin-aarch64",
       );
       expect(requested).toHaveLength(2);
       // Within the refresh interval the endpoint is not asked again.
       published = table(48, ["GLM-5.5"]);
-      expect((yield* tables.engineFor({ engine, zcodeHome })).engine).toBe(engine);
+      expect((yield* tables.engineFor({ engine, zcodeHome })).engine).toBe(bundled);
       expect(requested).toHaveLength(2);
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );

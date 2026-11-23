@@ -1,7 +1,7 @@
 /**
- * ZCode's official model table (`zcode-builtin.json`). ZCode uses the higher revision of its bundled
- * and downloaded copies; zcode-acp-server reads only the bundled one, so newer plan models never
- * reach a bridge session. Model API requests are unchanged.
+ * ZCode's official model table (`zcode-builtin.json`). zcode-acp-server reads only the bundled copy,
+ * so the bridge runs Tianshu's engine directory: the newest table, and the app's engine behind
+ * zcodeEngineShim.ts. Model API requests are unchanged.
  */
 import * as Clock from "effect/Clock";
 import * as Duration from "effect/Duration";
@@ -15,6 +15,8 @@ import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import { collectUint8StreamText } from "@t3tools/provider-core/server/collectStreamText";
+
+import { ZCODE_ENGINE_SHIM_NAME, ZCODE_ENGINE_SHIM_SOURCE } from "./zcodeEngineShim.ts";
 
 const CLIENT_CONFIG_URL = "https://zcode.z.ai/api/v1/client/configs";
 const TABLE_URL = /^https:\/\/[a-z0-9.-]+\.z\.ai\//i;
@@ -192,7 +194,7 @@ export const inspectZcodeEngine = Effect.fn("ZcodeBuiltin.inspect")(function* (i
 });
 
 export interface ZcodeEngineChoice {
-  /** The app's own engine, or a mirror carrying a newer table. */
+  /** Tianshu's engine directory with the newest table, or the app's own engine if none can be made. */
   readonly engine: string;
   /** `provider\model` slugs of the plan models that engine's table offers. */
   readonly planModels: ReadonlyArray<string>;
@@ -256,20 +258,33 @@ export const makeZcodeBuiltinTables = Effect.fn("ZcodeBuiltin.make")(function* (
     yield* fileSystem.writeFileString(metaPath, tableUrl);
   });
 
-  /** `<engines>/<version>-r<revision>/Resources`: the app's Resources linked, a real `glm/provider`. */
+  /** Writes the shim unless the same script is already there; a running copy keeps its file. */
+  const placeShim = Effect.fn("ZcodeBuiltin.placeShim")(function* (shim: string) {
+    const current = yield* fileSystem.readFileString(shim).pipe(Effect.orElseSucceed(() => ""));
+    if (current === ZCODE_ENGINE_SHIM_SOURCE) return;
+    const temp = `${shim}.tmp-${yield* Clock.currentTimeMillis}`;
+    yield* fileSystem.writeFileString(temp, ZCODE_ENGINE_SHIM_SOURCE);
+    yield* fileSystem.rename(temp, shim);
+  });
+
+  /**
+   * `<engines>/<version>-r<revision>-3/Resources`: the app's Resources linked, a real
+   * `glm/provider`, and the shim the bridge launches.
+   */
   const mirror = Effect.fn("ZcodeBuiltin.mirror")(function* (
     install: ZcodeEngineInstall,
     table: ZcodeBuiltinTable,
   ) {
-    // `-2`: the layout also carries the app's Info.plist, where bridges from 0.91 read its version.
-    const root = path.join(enginesDir, `${install.version}-r${table.revision}-2`);
-    const engine = path.join(root, "Resources", "glm", "zcode.cjs");
+    // `-2` added the app's Info.plist, where bridges from 0.91 read its version; `-3` the shim.
+    const root = path.join(enginesDir, `${install.version}-r${table.revision}-3`);
+    const shim = path.join(root, "Resources", "glm", ZCODE_ENGINE_SHIM_NAME);
     if (
       yield* fileSystem.exists(
         path.join(root, "Resources", "glm", "provider", "zcode-builtin.json"),
       )
     ) {
-      return engine;
+      yield* placeShim(shim);
+      return shim;
     }
     const now = yield* Clock.currentTimeMillis;
     const staging = path.join(enginesDir, `.staging-${now}`);
@@ -291,10 +306,15 @@ export const makeZcodeBuiltinTables = Effect.fn("ZcodeBuiltin.make")(function* (
     // A copy, not a link: the bridge re-reads the table before model requests and ZCode rewrites
     // its own copy in place.
     yield* fileSystem.copyFile(table.path, path.join(glm, "provider", "zcode-builtin.json"));
+    yield* fileSystem.writeFileString(
+      path.join(glm, ZCODE_ENGINE_SHIM_NAME),
+      ZCODE_ENGINE_SHIM_SOURCE,
+    );
     yield* fileSystem
       .rename(staging, root)
       .pipe(Effect.catch(() => fileSystem.remove(staging, { recursive: true })));
-    return engine;
+    yield* placeShim(shim);
+    return shim;
   });
 
   const newestEngine = Effect.fn("ZcodeBuiltin.engineFor")(function* (request: {
@@ -312,9 +332,6 @@ export const makeZcodeBuiltinTables = Effect.fn("ZcodeBuiltin.make")(function* (
     const install = yield* inspectZcodeEngine({ ...request, directory: input.directory });
     const newest = install?.newest;
     if (!install || !newest) return unchanged;
-    if (newest.revision <= (install.bundled?.revision ?? -1)) {
-      return { engine: request.engine, planModels: zcodePlanModelSlugs(newest) };
-    }
     return { engine: yield* mirror(install, newest), planModels: zcodePlanModelSlugs(newest) };
   });
 
