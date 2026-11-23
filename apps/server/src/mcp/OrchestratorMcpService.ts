@@ -131,6 +131,7 @@ import * as ThreadPlans from "../plans/ThreadPlans.ts";
 import { withParentPlan } from "../plans/planHandoff.ts";
 import {
   clientModeCeiling,
+  isMcpCapability,
   type McpInvocationScope,
   type McpThreadInvocationScope,
   requireThreadScope,
@@ -1777,7 +1778,21 @@ const make = Effect.gen(function* () {
         title: input.title ?? null,
         task: input.task,
       },
-      (choice) => startConfirmedSubSession(callerScope, input, choice),
+      {
+        caller: {
+          environmentId: callerScope.environmentId,
+          capabilities: [...callerScope.capabilities],
+          issuedAt: callerScope.issuedAt,
+          requestNamespace: callerScope.requestNamespace,
+          thread: {
+            threadId: scope.thread.threadId,
+            providerSessionId: scope.thread.providerSessionId,
+            providerInstanceId: scope.thread.providerInstanceId,
+            ...(scope.thread.subagent === undefined ? {} : { subagent: scope.thread.subagent }),
+          },
+        },
+        input,
+      },
     );
     return yield* failure(
       "awaiting_user_confirmation",
@@ -1796,13 +1811,29 @@ const make = Effect.gen(function* () {
     return runs[0];
   });
 
-  /** Starts a sub-session the user confirmed, from the parent's latest run even if it has ended. */
+  /**
+   * Starts a sub-session the user confirmed, from the parent's latest run even if it has ended,
+   * as the thread that asked for it; after a restart that thread's agent session may be gone.
+   */
   const startConfirmedSubSession = Effect.fn("OrchestratorMcpService.startConfirmedSubSession")(
     function* (
-      callerScope: McpInvocationScope,
-      input: OrchestratorMcpDelegateTaskInput,
+      request: SubSessionProposals.SubSessionRequest,
       choice: SubSessionProposals.SubSessionChoice,
     ) {
+      const { caller, input } = request;
+      const callerScope: McpInvocationScope = {
+        environmentId: caller.environmentId,
+        capabilities: new Set(caller.capabilities.filter(isMcpCapability)),
+        issuedAt: caller.issuedAt,
+        requestNamespace: caller.requestNamespace,
+        thread: {
+          threadId: caller.thread.threadId,
+          providerSessionId: caller.thread.providerSessionId,
+          providerInstanceId: caller.thread.providerInstanceId,
+          ...(caller.thread.subagent === undefined ? {} : { subagent: caller.thread.subagent }),
+        },
+        client: undefined,
+      };
       const { scope, parent } = yield* loadThreadCaller(callerScope, "delegate_task");
       const active = ThreadManagementService.latestActiveRun(parent);
       const parentRun = active ?? (yield* latestRunOf(scope.thread.threadId));
@@ -2667,6 +2698,11 @@ const make = Effect.gen(function* () {
     }
     return task;
   });
+
+  // Requests that waited through a restart start here too, once this service is up.
+  if (subSessionProposals !== undefined) {
+    yield* subSessionProposals.setStarter(startConfirmedSubSession);
+  }
 
   return OrchestratorMcpService.of({
     scheduleTask: Effect.fn("OrchestratorMcpService.scheduleTask")(function* (scope, input) {

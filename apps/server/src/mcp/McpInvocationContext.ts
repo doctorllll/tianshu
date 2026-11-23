@@ -27,6 +27,9 @@ const ALL_MCP_CAPABILITIES = [
 ] as const;
 export type McpCapability = (typeof ALL_MCP_CAPABILITIES)[number];
 
+export const isMcpCapability = (value: string): value is McpCapability =>
+  ALL_MCP_CAPABILITIES.some((capability) => capability === value);
+
 export interface McpThreadCaller {
   readonly threadId: ThreadId;
   readonly providerSessionId: string;
