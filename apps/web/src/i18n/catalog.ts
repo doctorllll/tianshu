@@ -9776,4 +9776,5 @@ export const zhCN: Readonly<Record<string, string>> = {
     "只读：这是 Antigravity 自己的任务文件。",
   "Could not read the plan: {error}": "读不到计划：{error}",
   "No plan yet.": "还没有计划。",
+  "the previous agent": "上一个 agent",
 };

@@ -53,7 +53,13 @@ export function ThreadPlanPanel({
     }
   };
   const author = (who: string) =>
-    who === "agent" ? uiText("the agent") : who === "user" ? uiText("you") : who;
+    who === "agent"
+      ? uiText("the agent")
+      : who === "user"
+        ? uiText("you")
+        : who === "handoff"
+          ? uiText("the previous agent")
+          : who;
 
   const save = async () => {
     if (draft === null) return;

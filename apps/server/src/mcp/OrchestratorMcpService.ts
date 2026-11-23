@@ -127,6 +127,8 @@ import * as ScheduledTaskService from "../scheduledTasks/ScheduledTaskService.ts
 import * as ServerSettings from "../serverSettings.ts";
 import { subSessionPromptApproves } from "@t3tools/shared/subSessionPrompt";
 import * as SubSessionProposals from "./SubSessionProposals.ts";
+import * as ThreadPlans from "../plans/ThreadPlans.ts";
+import { withParentPlan } from "../plans/planHandoff.ts";
 import {
   clientModeCeiling,
   type McpInvocationScope,
@@ -1341,6 +1343,22 @@ const make = Effect.gen(function* () {
   const subSessionProposals = Option.getOrUndefined(
     yield* Effect.serviceOption(SubSessionProposals.SubSessionProposals),
   );
+  // Optional, so servers and tests built without plans delegate as before.
+  const threadPlans = Option.getOrUndefined(yield* Effect.serviceOption(ThreadPlans.ThreadPlans));
+
+  /** The sub-session's first message: its task, then the parent's plan to align with. */
+  const delegatedTaskText = (parentThreadId: ThreadId, task: string) =>
+    threadPlans === undefined
+      ? Effect.succeed(task)
+      : threadPlans.read(parentThreadId).pipe(
+          Effect.map((plan) =>
+            plan.error === null
+              ? withParentPlan(task, { threadId: parentThreadId, markdown: plan.markdown })
+              : task,
+          ),
+          Effect.timeout("10 seconds"),
+          Effect.orElseSucceed(() => task),
+        );
 
   const requireProject = (projectId: ProjectId) =>
     projects.getById(projectId).pipe(
@@ -1621,6 +1639,10 @@ const make = Effect.gen(function* () {
       workspaceStrategy = { type: "worktree", baseRef: base.commitSha, startFromOrigin: false };
     }
     const parentNodeId = parentRun.rootNodeId;
+    // A retry sends the text its accepted request sent, so the plan is not read again.
+    const task = isRetryOfAcceptedDelegation
+      ? taskPrompt(input)
+      : yield* delegatedTaskText(scope.thread.threadId, taskPrompt(input));
     // The command commits the child's preparing run, which only this call
     // prepares, so a caller that goes away must not stop it in between.
     return yield* Effect.uninterruptibleMask((restore) =>
@@ -1637,7 +1659,7 @@ const make = Effect.gen(function* () {
             parentThreadId: scope.thread.threadId,
             parentRunId: parentRun.id,
             parentNodeId,
-            task: taskPrompt(input),
+            task,
             ...(input.title === undefined ? {} : { title: input.title }),
             modelSelection: target.modelSelection,
             runtimeMode,

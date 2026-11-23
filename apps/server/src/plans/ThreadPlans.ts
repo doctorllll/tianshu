@@ -15,6 +15,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as PubSub from "effect/PubSub";
+import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 
@@ -22,6 +23,7 @@ import * as ServerConfig from "../config.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { EMPTY_PLAN, type PlanDocument, readPlanDir, writePlanDir } from "./PlanFiles.ts";
+import { type CarriedPlan, shouldCarry } from "./planHandoff.ts";
 
 /**
  * Where a thread's plan lives. Agents with a plan of their own keep it there: fastctx in its
@@ -83,6 +85,31 @@ export function dshSessionId(nativeId: string, sessions: unknown): string | null
   return id !== null && /^session-[\w-]+$/.test(id) ? id : null;
 }
 
+/** Where a plan lives, so a thread that moved to another agent can tell its plan moved too. */
+export function planLocationKey(location: PlanLocation): string | null {
+  switch (location.source) {
+    case "tianshu":
+      return "tianshu";
+    case "dsh":
+    case "antigravity":
+      return location.dir === null ? null : `${location.source}:${location.dir}`;
+    case "fastctx":
+      return location.owner === null
+        ? null
+        : `fastctx:${location.owner.resident}@${location.owner.machine ?? ""}`;
+  }
+}
+
+const CarriedPlanJson = Schema.fromJsonString(
+  Schema.Struct({
+    key: Schema.String,
+    markdown: Schema.String,
+    updatedAt: Schema.NullOr(Schema.String),
+  }),
+);
+const decodeCarried = Schema.decodeUnknownEffect(CarriedPlanJson);
+const encodeCarried = Schema.encodeEffect(CarriedPlanJson);
+
 const ANTIGRAVITY_SESSION = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ANTIGRAVITY_ARTIFACTS = ["task.md", "implementation_plan.md"] as const;
 const FASTCTX_WEB_URL = "http://127.0.0.1:8765";
@@ -137,15 +164,15 @@ export const make = Effect.gen(function* () {
       Effect.orElseSucceed((): unknown => undefined),
     );
 
+  const tianshuDir = (threadId: ThreadId) =>
+    path.join(config.stateDir, "plans", encodeURIComponent(threadId));
+
   const locate = Effect.fn("ThreadPlans.locate")(function* (threadId: ThreadId) {
     const notFound = () => new ThreadPlanError({ message: `No thread ${threadId}.` });
     const { thread } = yield* projections
       .getThreadProviderContext(threadId)
       .pipe(Effect.mapError(notFound));
-    const tianshu: PlanLocation = {
-      source: "tianshu",
-      dir: path.join(config.stateDir, "plans", encodeURIComponent(threadId)),
-    };
+    const tianshu: PlanLocation = { source: "tianshu", dir: tianshuDir(threadId) };
     const settings = yield* settingsService.getSettings.pipe(Effect.orElseSucceed(() => null));
     const instance = settings?.providerInstances[thread.providerInstanceId];
     const source =
@@ -320,58 +347,128 @@ export const make = Effect.gen(function* () {
     }
   };
 
+  const writeAt = Effect.fn("ThreadPlans.writeAt")(function* (
+    threadId: ThreadId,
+    location: PlanLocation,
+    input: {
+      readonly markdown: string;
+      readonly expectedVersion: number | null;
+      readonly updatedBy: string;
+    },
+  ) {
+    const refused = (message: string) => new ThreadPlanError({ message });
+    const now = DateTime.formatIso(yield* DateTime.now);
+    const saved = (result: "saved" | "conflict") =>
+      readAt(threadId, location).pipe(Effect.map((plan) => ({ result, plan })));
+    switch (location.source) {
+      case "tianshu":
+      case "dsh": {
+        if (location.dir === null) {
+          return yield* refused("DSH has not started this session yet; send it a message first.");
+        }
+        const outcome = yield* writePlanDir({
+          dir: location.dir,
+          markdown: input.markdown,
+          expectedVersion: input.expectedVersion,
+          updatedBy: input.updatedBy,
+          now,
+        }).pipe(
+          Effect.provide(files),
+          Effect.mapError(() => refused("Could not write the plan file.")),
+        );
+        return yield* saved(outcome.result);
+      }
+      case "fastctx": {
+        if (location.owner === null) {
+          return yield* refused(
+            "fastctx has not opened this session yet; send it a message first.",
+          );
+        }
+        const reply = yield* fastctxCall({
+          call: "plan_write",
+          hub: null,
+          account: null,
+          owner: location.owner.resident,
+          machine: location.owner.machine,
+          expected: input.expectedVersion,
+          markdown: input.markdown,
+        }).pipe(Effect.mapError(refused));
+        const result = isRecord(reply) && isRecord(reply.result) ? reply.result.result : undefined;
+        return yield* saved(result === "conflict" ? "conflict" : "saved");
+      }
+      case "antigravity":
+        return yield* refused(
+          "Antigravity keeps its plan in its own task files; Tianshu only shows them.",
+        );
+    }
+  });
+
+  const carryFile = (threadId: ThreadId) => path.join(tianshuDir(threadId), "carry.json");
+
+  const readCarried = (threadId: ThreadId) =>
+    fs.readFileString(carryFile(threadId)).pipe(
+      Effect.flatMap(decodeCarried),
+      Effect.orElseSucceed((): CarriedPlan | null => null),
+    );
+
+  /** Notes where the thread's plan is now, so a later agent switch can bring it along. */
+  const remember = Effect.fn("ThreadPlans.remember")(function* (
+    threadId: ThreadId,
+    key: string,
+    plan: ThreadPlan,
+    carried: CarriedPlan | null,
+  ) {
+    if (plan.markdown.trim() === "") return;
+    if (carried !== null && carried.key === key && carried.markdown === plan.markdown) return;
+    const text = yield* encodeCarried({ key, markdown: plan.markdown, updatedAt: plan.updatedAt });
+    yield* fs.makeDirectory(tianshuDir(threadId), { recursive: true });
+    yield* fs.writeFileString(carryFile(threadId), text);
+  });
+
+  /**
+   * The plan read now, brought over from where it was kept before when the thread moved to an
+   * agent whose own plan is empty or older.
+   */
+  const reconcile = Effect.fn("ThreadPlans.reconcile")(function* (
+    threadId: ThreadId,
+    location: PlanLocation,
+    plan: ThreadPlan,
+  ) {
+    const key = planLocationKey(location);
+    if (key === null || plan.error !== null) return plan;
+    const carried = yield* readCarried(threadId);
+    let current = plan;
+    if (shouldCarry(carried, { key, ...plan })) {
+      const moved = yield* writeAt(threadId, location, {
+        markdown: carried.markdown,
+        expectedVersion: plan.version,
+        updatedBy: "handoff",
+      }).pipe(writeLock.withPermits(1), Effect.option);
+      if (Option.isSome(moved) && moved.value.result === "saved") current = moved.value.plan;
+    }
+    yield* remember(threadId, key, current, carried).pipe(Effect.ignore);
+    return current;
+  });
+
   const read: ThreadPlansShape["read"] = (threadId) =>
-    locate(threadId).pipe(Effect.flatMap((location) => readAt(threadId, location)));
+    locate(threadId).pipe(
+      Effect.flatMap((location) =>
+        readAt(threadId, location).pipe(
+          Effect.flatMap((plan) => reconcile(threadId, location, plan)),
+        ),
+      ),
+    );
 
   const write: ThreadPlansShape["write"] = Effect.fn("ThreadPlans.write")(
     function* (input: Parameters<ThreadPlansShape["write"]>[0]) {
       const location = yield* locate(input.threadId);
-      const refused = (message: string) => new ThreadPlanError({ message });
-      const now = DateTime.formatIso(yield* DateTime.now);
-      const saved = (result: "saved" | "conflict") =>
-        readAt(input.threadId, location).pipe(Effect.map((plan) => ({ result, plan })));
-      switch (location.source) {
-        case "tianshu":
-        case "dsh": {
-          if (location.dir === null) {
-            return yield* refused("DSH has not started this session yet; send it a message first.");
-          }
-          const outcome = yield* writePlanDir({
-            dir: location.dir,
-            markdown: input.markdown,
-            expectedVersion: input.expectedVersion,
-            updatedBy: input.updatedBy,
-            now,
-          }).pipe(
-            Effect.provide(files),
-            Effect.mapError(() => refused("Could not write the plan file.")),
-          );
-          return yield* saved(outcome.result);
-        }
-        case "fastctx": {
-          if (location.owner === null) {
-            return yield* refused(
-              "fastctx has not opened this session yet; send it a message first.",
-            );
-          }
-          const reply = yield* fastctxCall({
-            call: "plan_write",
-            hub: null,
-            account: null,
-            owner: location.owner.resident,
-            machine: location.owner.machine,
-            expected: input.expectedVersion,
-            markdown: input.markdown,
-          }).pipe(Effect.mapError(refused));
-          const result =
-            isRecord(reply) && isRecord(reply.result) ? reply.result.result : undefined;
-          return yield* saved(result === "conflict" ? "conflict" : "saved");
-        }
-        case "antigravity":
-          return yield* refused(
-            "Antigravity keeps its plan in its own task files; Tianshu only shows them.",
-          );
+      const outcome = yield* writeAt(input.threadId, location, input);
+      const key = planLocationKey(location);
+      if (key !== null && outcome.result === "saved") {
+        const carried = yield* readCarried(input.threadId);
+        yield* remember(input.threadId, key, outcome.plan, carried).pipe(Effect.ignore);
       }
+      return outcome;
     },
     (effect, input) =>
       effect.pipe(
