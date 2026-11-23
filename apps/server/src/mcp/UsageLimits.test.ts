@@ -247,7 +247,8 @@ it.effect.each([{}, { refresh: false }])(
       ]);
       expect(result.accounts[0]).toMatchObject({
         label: "Codex",
-        alias: "1 · Work",
+        // Only repeated accounts are numbered; this Codex is the only one.
+        alias: "Work",
         windows: [
           {
             label: "Weekly",

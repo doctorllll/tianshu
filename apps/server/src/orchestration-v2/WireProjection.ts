@@ -17,6 +17,7 @@ import {
 } from "@t3tools/shared/orchestrationV2DedupedBodies";
 import { MCP_APP_OUTPUT_KEY, readMcpAppReference } from "@t3tools/shared/mcpApp";
 import {
+  commandHadNoMatches,
   commandIndicatesFailure,
   compactDynamicToolOutput,
   omitToolOutputImageData,
@@ -166,8 +167,9 @@ export function projectTurnItemForWire(item: OrchestrationV2TurnItem): Orchestra
     case "command_execution": {
       const { output, ...projected } = item;
       // A successful search can print "ENOENT" or "exit code 2", so output text
-      // decides only when the provider reported no exit code.
-      const failed = commandIndicatesFailure(item);
+      // decides only when the provider reported no exit code. A search that found
+      // nothing exits 1 quietly; it stays a miss once its output is dropped.
+      const failed = commandIndicatesFailure(item) && !commandHadNoMatches(item);
       return {
         ...projected,
         ...(failed ? { outputIndicatesFailure: true } : {}),
