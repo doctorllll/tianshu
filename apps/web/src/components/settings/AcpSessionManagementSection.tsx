@@ -238,6 +238,7 @@ function InstanceSessionManagement(
         sessionId: session.sessionId,
         title: session.title,
         updatedAt: session.updatedAt,
+        ...(session.model === undefined ? {} : { model: session.model }),
       },
     });
     if (generation !== projectGeneration.current) return;

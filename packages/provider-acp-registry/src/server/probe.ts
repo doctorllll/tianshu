@@ -775,6 +775,10 @@ export const listAcpRegistrySessions = Effect.fn("AcpRegistryProbe.listSessions"
       const sessionId = boundedOpaqueValue(session.sessionId, 1_024);
       const cwd = boundedOpaqueValue(session.cwd, 4_096);
       if (sessionId === undefined || cwd === undefined) return [];
+      // Agents such as fastctx-acp name the model each session runs.
+      const listedModel = session._meta?.["model"];
+      const model =
+        typeof listedModel === "string" ? boundedOpaqueValue(listedModel, 256) : undefined;
       return [
         {
           sessionId,
@@ -794,6 +798,7 @@ export const listAcpRegistrySessions = Effect.fn("AcpRegistryProbe.listSessions"
               ? null
               : boundedText(session.updatedAt, 128) || null,
           importedThreadId: null,
+          ...(model === undefined ? {} : { model }),
         },
       ];
     });

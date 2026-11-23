@@ -142,6 +142,7 @@ export type AcpRegistryAcceptUrlAuthResult = typeof AcpRegistryAcceptUrlAuthResu
 
 const AcpRegistrySessionId = TrimmedNonEmptyString.check(Schema.isMaxLength(1_024));
 const AcpRegistrySessionPath = TrimmedNonEmptyString.check(Schema.isMaxLength(4_096));
+const AcpRegistrySessionModel = TrimmedNonEmptyString.check(Schema.isMaxLength(256));
 
 export const AcpRegistrySession = Schema.Struct({
   sessionId: AcpRegistrySessionId,
@@ -152,6 +153,8 @@ export const AcpRegistrySession = Schema.Struct({
   importedThreadId: Schema.NullOr(ThreadId),
   /** The imported thread still lacks the session's history, so importing again copies it. */
   nativeHistoryPending: Schema.optionalKey(Schema.Boolean),
+  /** The model the session runs, when the agent lists it (`_meta.model`). */
+  model: Schema.optionalKey(AcpRegistrySessionModel),
 });
 export type AcpRegistrySession = typeof AcpRegistrySession.Type;
 
@@ -179,6 +182,8 @@ export const AcpRegistryImportSessionInput = Schema.Struct({
   updatedAt: Schema.optionalKey(
     Schema.NullOr(TrimmedNonEmptyString.check(Schema.isMaxLength(128))),
   ),
+  /** The session's own model, so the thread keeps it instead of the agent's default. */
+  model: Schema.optionalKey(AcpRegistrySessionModel),
 });
 export type AcpRegistryImportSessionInput = typeof AcpRegistryImportSessionInput.Type;
 

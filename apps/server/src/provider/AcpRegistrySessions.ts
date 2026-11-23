@@ -201,7 +201,9 @@ const make = Effect.gen(function* () {
     const provider = (yield* providerRegistry.getProviders).find(
       (candidate) => candidate.instanceId === input.instanceId,
     );
+    // The session keeps the model it runs; the agent's default is only for an unknown one.
     const model =
+      provider?.models.find((candidate) => candidate.slug === input.model)?.slug ??
       provider?.models.find((candidate) => candidate.isDefault)?.slug ??
       provider?.models[0]?.slug ??
       "default";
