@@ -46,13 +46,21 @@ export function appBundleOf(path: string): string | undefined {
 const yamlField = (yml: string, name: string) =>
   new RegExp(`^${name}:\\s*['"]?([^'"\\s]+)['"]?\\s*$`, "m").exec(yml)?.[1];
 
-/** The macOS feed of a generic-provider `app-update.yml`. */
+/** Channels that ship preview builds, often to a share of users only. */
+const PREVIEW_CHANNEL = /^(?:nightly|alpha|beta|canary|dev|preview)$/i;
+
+/**
+ * The macOS feed of a generic-provider `app-update.yml`. An app set to a preview channel is
+ * held to its releases, which DeepSeek Harness publishes on `stable`: Tianshu announces those,
+ * the way the app is installed by hand, not the previews its own updater would take.
+ */
 export function appUpdateFeedUrl(yml: string): string | undefined {
   if (yamlField(yml, "provider") !== "generic") return undefined;
   const url = yamlField(yml, "url");
   if (!url || !/^https:\/\//.test(url)) return undefined;
-  const channel = yamlField(yml, "channel") ?? "latest";
-  if (!/^[\w.-]+$/.test(channel)) return undefined;
+  const configured = yamlField(yml, "channel") ?? "latest";
+  if (!/^[\w.-]+$/.test(configured)) return undefined;
+  const channel = PREVIEW_CHANNEL.test(configured) ? "stable" : configured;
   return `${url.replace(/\/+$/, "")}/${channel}-mac.yml`;
 }
 

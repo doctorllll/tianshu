@@ -54,8 +54,12 @@ describe("appUpdate", () => {
   });
 
   it("reads the feed of a generic app-update.yml and the release it announces", () => {
+    // A preview channel is held to the releases.
     expect(appUpdateFeedUrl(FEED_CONFIG)).toBe(
-      "https://download.example.com/desk/feeds/mac-arm64/nightly-mac.yml",
+      "https://download.example.com/desk/feeds/mac-arm64/stable-mac.yml",
+    );
+    expect(appUpdateFeedUrl("provider: generic\nurl: https://x.example/f\nchannel: stable")).toBe(
+      "https://x.example/f/stable-mac.yml",
     );
     expect(appUpdateFeedUrl("provider: generic\nurl: https://x.example/f")).toBe(
       "https://x.example/f/latest-mac.yml",
@@ -84,7 +88,7 @@ describe("appUpdate", () => {
       expect(install).toEqual({
         app: yield* fs.realPath(app),
         version: "0.2.2-rc.5",
-        feedUrl: "https://download.example.com/desk/feeds/mac-arm64/nightly-mac.yml",
+        feedUrl: "https://download.example.com/desk/feeds/mac-arm64/stable-mac.yml",
       });
       const requests: string[] = [];
       const client = HttpClient.make((request) => {
