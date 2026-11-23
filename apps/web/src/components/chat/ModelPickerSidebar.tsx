@@ -2,7 +2,8 @@ import { useUiText } from "~/i18n/useUiText";
 
 import { Toolbar } from "@base-ui/react/toolbar";
 import { type ProviderInstanceId } from "@t3tools/contracts";
-import { memo } from "react";
+import { memo, useRef } from "react";
+import { useHorizontalWheelScroll } from "~/lib/useHorizontalWheelScroll";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "~/lib/utils";
@@ -47,9 +48,13 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
   };
   const showFavorites = props.showFavorites ?? true;
   const showAll = props.showAll ?? true;
+  // More agents than fit: a mouse wheel has to be able to bring the rest into view.
+  const stripRef = useRef<HTMLDivElement>(null);
+  useHorizontalWheelScroll(stripRef);
 
   return (
     <Toolbar.Root
+      ref={stripRef}
       data-model-picker-sidebar="true"
       data-v9-mp-tabs
       aria-label={uiText("Providers")}

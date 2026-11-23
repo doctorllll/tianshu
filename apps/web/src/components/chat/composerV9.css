@@ -216,6 +216,25 @@ html:root[data-theme-id="apple"].dark [data-v9-mp-search] input:focus-visible {
   display: none;
 }
 
+/* Fade the edge where more agents are hidden, so the strip reads as scrollable. */
+[data-v9-mp-tabs][data-more-after] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+}
+
+[data-v9-mp-tabs][data-more-before] {
+  mask-image: linear-gradient(to right, transparent, #000 22px);
+}
+
+[data-v9-mp-tabs][data-more-before][data-more-after] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 22px,
+    #000 calc(100% - 22px),
+    transparent
+  );
+}
+
 [data-v9-mp-tab] {
   display: inline-flex;
   align-items: center;
