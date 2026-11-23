@@ -28,12 +28,12 @@
 - **子会话**：一个会话可以把子任务派给任意 agent（比如 Claude 派给 ZCode），子会话完成后带着它的回复自动唤醒父会话；新建子会话时按「剩余额度多、离重置近」推荐 agent。
 - **套餐额度**：顶栏和用量页显示各 agent 的剩余额度与重置时间（ZCode Coding Plan、Antigravity、Grok、fastctx 等）。
 - **原生程序守护**：某个 agent 依赖的原生 app 没开时，提示并可一键在后台启动。
-- **思考强度滑块**：档位随模型变化，从小行星、行星、恒星、黑洞到星系，拖动有粒子拖尾，升档有冲击波。
+- **思考强度滑块**：档位随模型变化，从小行星、行星、恒星、黑洞到星系；恒星往上的天体会冲出滑槽，档位越高，粒子、冲击波和升档的震动越猛。
 - **中文优先**：界面默认中文。
 - **不上报**：不向任何第三方发送使用数据，没有自动更新源。
 
 <p align="center">
-  <img src="docs/images/effort-slider.png" width="560" alt="思考强度滑块：小行星 → 行星 → 恒星 → 黑洞 → 星系" />
+  <img src="docs/images/effort-slider.png" width="600" alt="思考强度滑块：恒星、黑洞、星系三档，黑洞的喷流和星系的旋臂冲出滑槽" />
 </p>
 
 ## 目录
@@ -84,6 +84,6 @@ vp run dist:desktop:dmg:arm64         # 打包 macOS（Apple Silicon），产物
 
 Tianshu (天枢, the first star of the Big Dipper) is a desktop workbench for running many coding agents side by side — Claude Code, Codex, ZCode, Antigravity, Grok, DeepSeek Harness, fastctx and more. It is only a shell: each agent runs its own native harness and sends the same requests its official app would, and sessions stay in each agent's own store, so they show up in the native apps too.
 
-Highlights: cross-agent sub-sessions that wake the parent with the child's reply, plan quota for each agent in the top bar, one-click start of an agent's native app, a per-model reasoning-effort slider, Chinese UI by default, and no telemetry.
+Highlights: cross-agent sub-sessions that wake the parent with the child's reply, plan quota for each agent in the top bar, one-click start of an agent's native app, a per-model reasoning-effort slider whose top levels (a black hole, a galaxy) burst out of the track, Chinese UI by default, and no telemetry.
 
 Tianshu is built on [T3 Code](https://github.com/pingdotgg/t3code) (MIT) and started from xiaoxin's [T3 Stardust](https://github.com/zds-xiaoxin/xiaoxin-t3code) community edition, whose UI and polish it still carries — thank you both. It is a personal project, used and tested on Apple Silicon macOS, and not affiliated with any of the agent vendors.
