@@ -16,6 +16,7 @@ import * as Clock from "effect/Clock";
 import * as Digest from "effect/crypto/Digest";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Equal from "effect/Equal";
 import * as FileSystem from "effect/FileSystem";
@@ -25,6 +26,7 @@ import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
+import * as Stream from "effect/Stream";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
@@ -1030,6 +1032,39 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
         Effect.asVoid,
       ),
     };
+
+    // magpie (and ZCode itself) rewrite ZCode's models and MCP servers outside T3. Re-probe when
+    // either file really changes, so the dropdown follows without waiting out the probe cache.
+    if (effectiveConfig.enabled && zcodeHome !== undefined) {
+      const home = zcodeHome.home?.trim() || path.join(yield* HostProcess.HomeDirectory, ".zcode");
+      for (const [dir, file] of [
+        ["v2", "provider_config.json"],
+        ["cli", "config.json"],
+      ] as const) {
+        const target = path.join(home, dir, file);
+        const seen = yield* Ref.make(
+          yield* fileSystem.readFileString(target).pipe(Effect.orElseSucceed(() => "")),
+        );
+        yield* fileSystem.watch(path.join(home, dir)).pipe(
+          Stream.filter((event) => path.basename(event.path) === file),
+          Stream.debounce(Duration.millis(500)),
+          Stream.mapEffect(() =>
+            fileSystem.readFileString(target).pipe(Effect.orElseSucceed(() => "")),
+          ),
+          Stream.filterEffect((text) =>
+            Ref.modify(seen, (previous) => [text !== previous, text] as const),
+          ),
+          Stream.runForEach(() =>
+            liveSnapshotSemaphore
+              .withPermit(invalidateEnrichmentCache)
+              .pipe(Effect.andThen(snapshot.refresh), Effect.ignoreCause({ log: true })),
+          ),
+          Effect.catchReason("PlatformError", "NotFound", () => Effect.void),
+          Effect.ignoreCause({ log: true }),
+          Effect.forkScoped,
+        );
+      }
+    }
 
     return {
       instanceId,

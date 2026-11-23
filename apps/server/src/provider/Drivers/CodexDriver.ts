@@ -9,6 +9,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { ChildProcessSpawner } from "effect/process";
@@ -403,11 +404,26 @@ export const CodexDriver: ProviderDriver<
           ),
         );
 
-    // `codex login` and `codex logout` rewrite auth.json outside T3.
+    // `codex login` and `codex logout` rewrite auth.json outside T3, and magpie rewrites
+    // config.toml (model provider, MCP servers); a config.toml rewritten unchanged is ignored.
     if (effectiveConfig.enabled) {
+      const readConfig = fileSystem
+        .readFileString(pathService.join(accountKey, "config.toml"))
+        .pipe(Effect.orElseSucceed(() => ""));
+      const seenConfig = yield* Ref.make(yield* readConfig);
+      const authTouched = yield* Ref.make(false);
       yield* fileSystem.watch(accountKey).pipe(
-        Stream.filter((event) => pathService.basename(event.path) === "auth.json"),
+        Stream.map((event) => pathService.basename(event.path)),
+        Stream.filter((file) => file === "auth.json" || file === "config.toml"),
+        Stream.tap((file) => (file === "auth.json" ? Ref.set(authTouched, true) : Effect.void)),
         Stream.debounce(Duration.millis(250)),
+        Stream.filterEffect(() =>
+          Effect.all([Ref.getAndSet(authTouched, false), readConfig]).pipe(
+            Effect.flatMap(([auth, config]) =>
+              Ref.modify(seenConfig, (previous) => [auth || config !== previous, config] as const),
+            ),
+          ),
+        ),
         Stream.runForEach(() => snapshot.refresh.pipe(Effect.ignoreCause({ log: true }))),
         Effect.catchReason("PlatformError", "NotFound", () => Effect.void),
         Effect.ignoreCause({ log: true }),

@@ -953,4 +953,51 @@ it.layer(layerTest)("CodexDriver", (it) => {
       yield* Queue.take(probes);
     }),
   );
+
+  it.effect("probes again when config.toml in the Codex home changes", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const codexHome = yield* fs.makeTempDirectoryScoped({ prefix: "t3-codex-config-watch-" });
+      yield* fs.writeFileString(`${codexHome}/config.toml`, 'model_provider = "openai"\n');
+      const homeEvents = yield* Queue.unbounded<FileSystem.WatchEvent>();
+      const probes = yield* Queue.unbounded<void>();
+      yield* CodexDriver.create({
+        instanceId: ProviderInstanceId.make("codex-config-watch"),
+        displayName: "Codex config watch",
+        enabled: true,
+        environment: [],
+        config: { ...CodexDriver.defaultConfig(), homePath: codexHome },
+      }).pipe(
+        Effect.provideService(FileSystem.FileSystem, {
+          ...fs,
+          watch: () => Stream.fromQueue(homeEvents),
+        }),
+        Effect.provideService(
+          ChildProcessSpawner.ChildProcessSpawner,
+          ChildProcessSpawner.make((command) =>
+            (ChildProcess.isStandardCommand(command) && command.args.includes("app-server")
+              ? Queue.offer(probes, undefined)
+              : Effect.void
+            ).pipe(
+              Effect.andThen(
+                PlatformError.badArgument({
+                  module: "ChildProcessSpawner",
+                  method: "spawn",
+                  description: "The fixture has no Codex executable",
+                }),
+              ),
+            ),
+          ),
+        ),
+      );
+      yield* Queue.take(probes);
+
+      // magpie points Codex at another model provider.
+      yield* fs.writeFileString(`${codexHome}/config.toml`, 'model_provider = "magpie"\n');
+      yield* Queue.offer(homeEvents, { _tag: "Update", path: "config.toml" });
+      yield* TestClock.adjust("250 millis");
+
+      yield* Queue.take(probes);
+    }),
+  );
 });
