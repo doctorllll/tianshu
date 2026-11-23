@@ -66,6 +66,7 @@ import { isProviderCommand, outputInstructions } from "./runOutput.ts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ProjectionStore from "./ProjectionStore.ts";
+import * as ThreadPlans from "../plans/ThreadPlans.ts";
 import { unsentManualContinuationSource } from "@t3tools/shared/orchestrationV2ManualContinuation";
 import * as ProviderSessionManager from "./ProviderSessionManager.ts";
 import {
@@ -290,6 +291,8 @@ export const layer: Layer.Layer<
     const runExecution = yield* RunExecutionService.RunExecutionServiceV2;
     const runtimePolicy = yield* RuntimePolicy.RuntimePolicyV2;
     const restoreMissingWorktree = yield* makeRestoreMissingWorktree;
+    // Optional, so turn starts built without plans, as in tests, take no plan over.
+    const threadPlans = Option.getOrUndefined(yield* Effect.serviceOption(ThreadPlans.ThreadPlans));
     const turnItemPositions = yield* TurnItemPositionStore.TurnItemPositionStoreV2;
 
     // Build draining callbacks outside startup scope so they cannot retain full thread history.
@@ -2051,6 +2054,39 @@ export const layer: Layer.Layer<
             persist: persistHandoff,
           });
           if (!(yield* isCurrentAttemptInStatus("running"))) return;
+          // The first turn after an agent switch or a fork brings the plan of the work along,
+          // into the new agent's own plan where it keeps one; other threads keep their own.
+          const planTransfer = projection.contextTransfers.findLast(
+            (transfer) =>
+              transfer.targetThreadId === input.threadId &&
+              transfer.targetRunId === run.id &&
+              (transfer.type === "provider_handoff" || transfer.type === "fork"),
+          );
+          const planContext =
+            threadPlans === undefined ||
+            planTransfer === undefined ||
+            compact ||
+            goalCommand ||
+            turnInput.resume
+              ? ""
+              : yield* threadPlans
+                  .handOff({
+                    kind: planTransfer.type === "fork" ? "fork" : "provider_handoff",
+                    threadId: input.threadId,
+                    sourceThreadId: planTransfer.sourceThreadId,
+                    sourceProviderInstanceId: planTransfer.sourceProviderInstanceId,
+                    targetProviderInstanceId: run.providerInstanceId,
+                    targetNativeId: runningProviderThread.nativeThreadRef?.nativeId ?? null,
+                  })
+                  .pipe(
+                    Effect.timeout("15 seconds"),
+                    Effect.catchCause((cause) =>
+                      Effect.logWarning("Could not bring the plan over", {
+                        runId: run.id,
+                        cause,
+                      }).pipe(Effect.as("")),
+                    ),
+                  );
           const start = compact ? session.compactThread! : session.startTurn;
           // Like history, the side chat context waits for a turn that sends a prompt.
           const sideChatContext =
@@ -2060,7 +2096,13 @@ export const layer: Layer.Layer<
           // Native resume must not become an extra prompted turn just to repeat approved memory.
           const memoryContext =
             compact || goalCommand || turnInput.resume ? "" : approvedMemoryContext;
-          const context = [memoryContext, delivery.context, sideChatContext, restartNote]
+          const context = [
+            memoryContext,
+            delivery.context,
+            planContext,
+            sideChatContext,
+            restartNote,
+          ]
             .filter((part) => part !== "")
             .join("\n\n");
           const { restartContinuationOfRunId: _resumedRunId, ...promptedInput } = turnInput;

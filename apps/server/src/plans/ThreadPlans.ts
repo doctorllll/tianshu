@@ -1,4 +1,5 @@
 import {
+  type ProviderInstanceId,
   type ThreadId,
   type ThreadPlan,
   ThreadPlanError,
@@ -23,7 +24,12 @@ import * as ServerConfig from "../config.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { EMPTY_PLAN, type PlanDocument, readPlanDir, writePlanDir } from "./PlanFiles.ts";
-import { type CarriedPlan, shouldCarry } from "./planHandoff.ts";
+import {
+  type CarriedPlan,
+  type PlanHandoffKind,
+  planHandoffNote,
+  shouldCarry,
+} from "./planHandoff.ts";
 
 /**
  * Where a thread's plan lives. Agents with a plan of their own keep it there: fastctx in its
@@ -125,6 +131,22 @@ export interface ThreadPlansShape {
   }) => Effect.Effect<WriteThreadPlanResult, ThreadPlanError>;
   /** The plan now, then again whenever it changes, by anyone. */
   readonly changes: (threadId: ThreadId) => Stream.Stream<ThreadPlan, ThreadPlanError>;
+  /**
+   * Brings the plan of the work a thread takes over into the plan of the agent now running it,
+   * when that one is empty or older; returns what that agent should hear on its first turn.
+   */
+  readonly handOff: (input: PlanHandoffInput) => Effect.Effect<string, ThreadPlanError>;
+}
+
+export interface PlanHandoffInput {
+  readonly kind: PlanHandoffKind;
+  readonly threadId: ThreadId;
+  readonly sourceThreadId: ThreadId;
+  /** The agent that kept the plan before, for a switch within the thread. */
+  readonly sourceProviderInstanceId: ProviderInstanceId | null;
+  /** The agent now running the thread, and its session, which may not be recorded yet. */
+  readonly targetProviderInstanceId: ProviderInstanceId;
+  readonly targetNativeId: string | null;
 }
 
 export class ThreadPlans extends Context.Service<ThreadPlans, ThreadPlansShape>()(
@@ -167,26 +189,40 @@ export const make = Effect.gen(function* () {
   const tianshuDir = (threadId: ThreadId) =>
     path.join(config.stateDir, "plans", encodeURIComponent(threadId));
 
-  const locate = Effect.fn("ThreadPlans.locate")(function* (threadId: ThreadId) {
+  /**
+   * Where the thread's plan lives with the agent running it, or with `agent` when given: one it
+   * ran before, or one whose session the store has not recorded yet.
+   */
+  const locate = Effect.fn("ThreadPlans.locate")(function* (
+    threadId: ThreadId,
+    agent?: {
+      readonly providerInstanceId: ProviderInstanceId;
+      readonly nativeId?: string | null;
+    },
+  ) {
     const notFound = () => new ThreadPlanError({ message: `No thread ${threadId}.` });
     const { thread } = yield* projections
       .getThreadProviderContext(threadId)
       .pipe(Effect.mapError(notFound));
+    const instanceId = agent?.providerInstanceId ?? thread.providerInstanceId;
     const tianshu: PlanLocation = { source: "tianshu", dir: tianshuDir(threadId) };
     const settings = yield* settingsService.getSettings.pipe(Effect.orElseSucceed(() => null));
-    const instance = settings?.providerInstances[thread.providerInstanceId];
+    const instance = settings?.providerInstances[instanceId];
     const source =
       instance?.driver === "acpRegistry" ? nativePlanSource(instance.config) : undefined;
     if (source === undefined) return tianshu;
-    const { providerThreads } = yield* projections
-      .getThreadProviderContext(threadId, thread.providerInstanceId)
-      .pipe(Effect.mapError(notFound));
-    const providerThread =
-      providerThreads.find((candidate) => candidate.id === thread.activeProviderThreadId) ??
-      providerThreads.findLast(
-        (candidate) => candidate.providerInstanceId === thread.providerInstanceId,
-      );
-    const nativeId = providerThread?.nativeThreadRef?.nativeId ?? null;
+    let nativeId = agent?.nativeId ?? null;
+    if (agent?.nativeId === undefined || agent.nativeId === null) {
+      const { providerThreads } = yield* projections
+        .getThreadProviderContext(threadId, instanceId)
+        .pipe(Effect.mapError(notFound));
+      const providerThread =
+        (instanceId === thread.providerInstanceId
+          ? providerThreads.find((candidate) => candidate.id === thread.activeProviderThreadId)
+          : undefined) ??
+        providerThreads.findLast((candidate) => candidate.providerInstanceId === instanceId);
+      nativeId = providerThread?.nativeThreadRef?.nativeId ?? null;
+    }
     const home = yield* HostProcess.HomeDirectory;
     switch (source) {
       case "fastctx": {
@@ -486,7 +522,80 @@ export const make = Effect.gen(function* () {
       Stream.changesWith(samePlan),
     );
 
-  return ThreadPlans.of({ read, write, changes });
+  /** Reads the plan again until the plan a handoff left waiting has moved in, or gives up. */
+  const settleCarried = (threadId: ThreadId) =>
+    Effect.gen(function* () {
+      for (const wait of ["10 seconds", "30 seconds", "2 minutes"] as const) {
+        yield* Effect.sleep(wait);
+        yield* read(threadId).pipe(Effect.ignore);
+        const carried = yield* readCarried(threadId);
+        if (carried === null || !carried.key.startsWith("handoff:")) return;
+      }
+    });
+
+  const handOff: ThreadPlansShape["handOff"] = Effect.fn("ThreadPlans.handOff")(function* (
+    input: PlanHandoffInput,
+  ) {
+    const sourceLocation =
+      input.kind === "provider_handoff" && input.sourceProviderInstanceId !== null
+        ? yield* locate(input.sourceThreadId, {
+            providerInstanceId: input.sourceProviderInstanceId,
+          })
+        : yield* locate(input.sourceThreadId);
+    const targetLocation = yield* locate(input.threadId, {
+      providerInstanceId: input.targetProviderInstanceId,
+      nativeId: input.targetNativeId,
+    });
+    const source = yield* readAt(input.sourceThreadId, sourceLocation);
+    if (source.error !== null || source.markdown.trim() === "") return "";
+    const sourceKey = planLocationKey(sourceLocation);
+    const targetKey = planLocationKey(targetLocation);
+    const note = (plan: ThreadPlan, saved: boolean) =>
+      planHandoffNote({
+        kind: input.kind,
+        sourceThreadId: input.sourceThreadId,
+        markdown: plan.markdown,
+        version: plan.version,
+        savedTo: saved && plan.source !== "antigravity" ? plan.source : null,
+      });
+    // Agents that keep Tianshu's plan share the thread's: a switch between them moves nothing.
+    if (input.sourceThreadId === input.threadId && sourceKey !== null && sourceKey === targetKey) {
+      return note(source, true);
+    }
+    const carried: CarriedPlan = {
+      key: `handoff:${input.sourceThreadId}:${sourceKey ?? sourceLocation.source}`,
+      markdown: source.markdown,
+      updatedAt: source.updatedAt,
+    };
+    const target = yield* readAt(input.threadId, targetLocation);
+    if (targetKey === null || !target.editable || target.error !== null) {
+      // Not writable yet: fastctx and DSH start their session with the first message this
+      // turn sends. The plan rides in that message, and moves once the session exists.
+      if (target.source !== "antigravity") {
+        yield* Effect.gen(function* () {
+          yield* fs.makeDirectory(tianshuDir(input.threadId), { recursive: true });
+          yield* fs.writeFileString(carryFile(input.threadId), yield* encodeCarried(carried));
+        }).pipe(Effect.ignore);
+        yield* Effect.forkDetach(settleCarried(input.threadId));
+      }
+      return note(source, false);
+    }
+    if (!shouldCarry(carried, { key: targetKey, ...target })) {
+      // Already there, or the new agent's own plan is newer: that one stands.
+      return note(target, true);
+    }
+    const moved = yield* writeAt(input.threadId, targetLocation, {
+      markdown: source.markdown,
+      expectedVersion: target.version,
+      updatedBy: "handoff",
+    }).pipe(writeLock.withPermits(1), Effect.option);
+    if (Option.isNone(moved) || moved.value.result !== "saved") return note(source, false);
+    yield* remember(input.threadId, targetKey, moved.value.plan, null).pipe(Effect.ignore);
+    yield* PubSub.publish(written, input.threadId);
+    return note(moved.value.plan, true);
+  });
+
+  return ThreadPlans.of({ read, write, changes, handOff });
 });
 
 export const layer = Layer.effect(ThreadPlans, make);
@@ -496,4 +605,5 @@ export const unavailable: ThreadPlansShape = {
   read: () => Effect.fail(new ThreadPlanError({ message: "Plans are not available here." })),
   write: () => Effect.fail(new ThreadPlanError({ message: "Plans are not available here." })),
   changes: () => Stream.fail(new ThreadPlanError({ message: "Plans are not available here." })),
+  handOff: () => Effect.succeed(""),
 };

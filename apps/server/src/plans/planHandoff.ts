@@ -1,6 +1,8 @@
 /**
- * How a thread's plan travels: into a sub-session's first message, and across an agent switch,
- * when the plan's home changes (Tianshu's own, fastctx's, DSH's).
+ * How a thread's plan travels, only along the work it belongs to: into a sub-session's first
+ * message as the parent's plan to align with, and into the plan of the agent that takes the
+ * work over, when the thread switches agents or is forked to continue elsewhere. Unrelated
+ * threads, even in the same project, keep their own plans; plan_read reads another's.
  */
 
 /** The most of the parent's plan a sub-session's first message carries. */
@@ -55,4 +57,44 @@ export function shouldCarry(
   const carriedAt = time(carried.updatedAt);
   const currentAt = time(current.updatedAt);
   return Number.isFinite(carriedAt) && (!Number.isFinite(currentAt) || carriedAt > currentAt);
+}
+
+/** The relationships a plan follows into another agent's hands: an agent switch, or a fork. */
+export type PlanHandoffKind = "provider_handoff" | "fork";
+
+/**
+ * What the agent taking the work over hears about the plan on its first turn: where the plan is
+ * now its own, or, when it could not be saved there yet, the plan itself.
+ */
+export function planHandoffNote(input: {
+  readonly kind: PlanHandoffKind;
+  readonly sourceThreadId: string;
+  readonly markdown: string;
+  readonly version: number | null;
+  readonly savedTo: "tianshu" | "dsh" | "fastctx" | null;
+}): string {
+  const markdown = input.markdown.trim();
+  if (markdown === "") return "";
+  const from =
+    input.kind === "fork"
+      ? `This thread continues work forked from thread ${input.sourceThreadId}.`
+      : "You are taking this thread over from another agent.";
+  const plan = input.version === null ? "Its plan" : `Its plan (version ${input.version})`;
+  switch (input.savedTo) {
+    case "tianshu":
+      return `${from} ${plan} is now this thread's plan: read it with plan_read before you continue, and keep it current with plan_edit or plan_write.`;
+    case "dsh":
+      return `${from} ${plan} is now your living plan. Read it before you continue, and keep it current.`;
+    case "fastctx":
+      return `${from} ${plan} is now your conversation plan. Read it before you continue, and keep it current.`;
+    case null: {
+      const cut = markdown.length > PARENT_PLAN_MAX_CHARS;
+      return [
+        "<thread_plan>",
+        cut ? `${markdown.slice(0, PARENT_PLAN_MAX_CHARS)}\n…` : markdown,
+        "</thread_plan>",
+        `${from} This is its plan${cut ? ", cut short" : ""}. Continue from it, and keep your own plan in line with it.`,
+      ].join("\n");
+    }
+  }
 }

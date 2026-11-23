@@ -644,7 +644,12 @@ const layerTaskFolders = TaskFolders.layer.pipe(
   Layer.provide(layerGitWorkflow),
 );
 
+// One instance for agents' plan tools, the side panel, and turns that take a plan over.
+const layerThreadPlans = ThreadPlans.layer.pipe(Layer.provide(ProjectionStoreV2.layer));
+
 const layerOrchestrationV2Runtime = RuntimeLayer.layerProduction.pipe(
+  // A switched or forked thread's first turn brings the plan of the work it takes over.
+  Layer.provide(layerThreadPlans),
   Layer.provide(UsageLimitSources.layerResetFallback),
   Layer.provide(layerTaskFolders),
   Layer.provide(layerScheduledTaskWebhookOrigin),
@@ -938,7 +943,7 @@ const layerMakeRoutes = Layer.mergeAll(
   // Sub-sessions agents ask for: held from /mcp until the user answers over WebSocket.
   Layer.provide(SubSessionProposals.layer),
   // Each thread's plan: shown in the side panel, read and written by agents over /mcp.
-  Layer.provide(ThreadPlans.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
+  Layer.provide(layerThreadPlans),
   // Share the service so HTTP/WS clients single-flight reads and invalidate each other's cached patches.
   Layer.provide(layerPullRequestService),
   Layer.provide(layerThreadIssueService),

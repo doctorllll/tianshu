@@ -1,6 +1,11 @@
-import { assert, describe, it } from "vitest";
+import { assert, describe, it } from "@effect/vitest";
 
-import { PARENT_PLAN_MAX_CHARS, shouldCarry, withParentPlan } from "./planHandoff.ts";
+import {
+  PARENT_PLAN_MAX_CHARS,
+  planHandoffNote,
+  shouldCarry,
+  withParentPlan,
+} from "./planHandoff.ts";
 
 describe("withParentPlan", () => {
   it("leaves the task alone when the parent has no plan", () => {
@@ -56,5 +61,40 @@ describe("shouldCarry", () => {
         { ...here, markdown: "# Old", updatedAt: "2026-11-23T16:00:00.000Z" },
       ),
     );
+  });
+});
+
+describe("planHandoffNote", () => {
+  const base = {
+    kind: "provider_handoff" as const,
+    sourceThreadId: "thread-1",
+    markdown: "# Goal\n- [ ] ship",
+    version: 3,
+  };
+
+  it("points the new agent at the plan where it now keeps it", () => {
+    const tianshu = planHandoffNote({ ...base, savedTo: "tianshu" });
+    assert.include(tianshu, "taking this thread over");
+    assert.include(tianshu, "(version 3)");
+    assert.include(tianshu, "plan_read");
+    assert.notInclude(tianshu, "# Goal");
+    assert.include(planHandoffNote({ ...base, savedTo: "dsh" }), "your living plan");
+    assert.include(planHandoffNote({ ...base, savedTo: "fastctx" }), "your conversation plan");
+  });
+
+  it("carries the plan itself when the new agent cannot keep it yet", () => {
+    const note = planHandoffNote({ ...base, kind: "fork", savedTo: null });
+    assert.include(note, "<thread_plan>\n# Goal\n- [ ] ship\n</thread_plan>");
+    assert.include(note, "forked from thread thread-1");
+    const long = planHandoffNote({
+      ...base,
+      markdown: "x".repeat(PARENT_PLAN_MAX_CHARS + 10),
+      savedTo: null,
+    });
+    assert.include(long, "cut short");
+  });
+
+  it("says nothing without a plan", () => {
+    assert.strictEqual(planHandoffNote({ ...base, markdown: "  ", savedTo: null }), "");
   });
 });
