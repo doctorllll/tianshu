@@ -69,6 +69,13 @@ import * as AcpRegistryAuth from "./auth.ts";
 import * as AcpRegistryAuthenticationState from "./authenticationState.ts";
 import { acpPlanUsageReader } from "./planUsage.ts";
 import { isZcodeAcpCommand, presentZcodeModels, readZcodeModelPreferences } from "./zcodeAcp.ts";
+import {
+  inspectZcodeEngine,
+  zcodeEnginePath,
+  zcodePlanModels,
+  zcodeStateDirectory,
+  zcodeTablesDirectory,
+} from "./zcodeBuiltin.ts";
 
 const DRIVER_KIND = ProviderDriverKind.make("acpRegistry");
 const decodeSettings = Schema.decodeSync(AcpRegistrySettings);
@@ -700,15 +707,40 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
       isZcodeAcpCommand(effectiveConfig.commandPath, effectiveConfig.commandArgs)
         ? { home: processEnvironment.ZCODE_HOME }
         : undefined;
+    // The bridge lists plan models from ZCode's legacy config; newer ones come from the newest
+    // official table, which the catalog hands the engine (zcodeBuiltin.ts).
+    const zcodeEngine =
+      zcodeHome === undefined
+        ? undefined
+        : {
+            engine: zcodeEnginePath(effectiveConfig.commandArgs, processEnvironment),
+            zcodeHome:
+              zcodeHome.home?.trim() || path.join(yield* HostProcess.HomeDirectory, ".zcode"),
+            directory: zcodeStateDirectory(path, host.paths.stateDir),
+          };
+    const readZcodePlanModels =
+      zcodeEngine?.engine === undefined
+        ? Effect.succeed(new Map<string, ReadonlyArray<string>>())
+        : inspectZcodeEngine({ ...zcodeEngine, engine: zcodeEngine.engine }).pipe(
+            Effect.map((install) =>
+              install?.newest
+                ? zcodePlanModels(install.newest)
+                : new Map<string, ReadonlyArray<string>>(),
+            ),
+            Effect.orElseSucceed(() => new Map<string, ReadonlyArray<string>>()),
+          );
     const presentModels = (provider: ServerProvider) =>
       zcodeHome === undefined || provider.models.length === 0
         ? Effect.succeed(provider)
-        : readZcodeModelPreferences(zcodeHome.home).pipe(
+        : Effect.all({
+            preferences: readZcodeModelPreferences(zcodeHome.home),
+            planModels: readZcodePlanModels,
+          }).pipe(
             Effect.provideService(FileSystem.FileSystem, fileSystem),
             Effect.provideService(Path.Path, path),
-            Effect.map((preferences): ServerProvider => ({
+            Effect.map(({ preferences, planModels }): ServerProvider => ({
               ...provider,
-              models: presentZcodeModels(provider.models, preferences),
+              models: presentZcodeModels(provider.models, preferences, planModels),
             })),
           );
     const applyLiveConfiguration = (
@@ -1037,15 +1069,30 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
     // either file really changes, so the dropdown follows without waiting out the probe cache.
     if (effectiveConfig.enabled && zcodeHome !== undefined) {
       const home = zcodeHome.home?.trim() || path.join(yield* HostProcess.HomeDirectory, ".zcode");
-      for (const [dir, file] of [
-        ["v2", "provider_config.json"],
-        ["cli", "config.json"],
-      ] as const) {
-        const target = path.join(home, dir, file);
+      const watched: Array<readonly [string, string]> = [
+        [path.join(home, "v2"), "provider_config.json"],
+        [path.join(home, "cli"), "config.json"],
+      ];
+      // A newly fetched official table adds plan models without a new probe.
+      const install =
+        zcodeEngine?.engine === undefined
+          ? undefined
+          : yield* inspectZcodeEngine({ ...zcodeEngine, engine: zcodeEngine.engine }).pipe(
+              Effect.provideService(FileSystem.FileSystem, fileSystem),
+              Effect.provideService(Path.Path, path),
+              Effect.orElseSucceed(() => undefined),
+            );
+      if (install !== undefined && zcodeEngine !== undefined) {
+        const tables = zcodeTablesDirectory(path, zcodeEngine.directory);
+        yield* fileSystem.makeDirectory(tables, { recursive: true }).pipe(Effect.ignore);
+        watched.push([tables, `${install.version}.json`]);
+      }
+      for (const [dir, file] of watched) {
+        const target = path.join(dir, file);
         const seen = yield* Ref.make(
           yield* fileSystem.readFileString(target).pipe(Effect.orElseSucceed(() => "")),
         );
-        yield* fileSystem.watch(path.join(home, dir)).pipe(
+        yield* fileSystem.watch(dir).pipe(
           Stream.filter((event) => path.basename(event.path) === file),
           Stream.debounce(Duration.millis(500)),
           Stream.mapEffect(() =>

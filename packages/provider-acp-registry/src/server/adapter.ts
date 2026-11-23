@@ -140,6 +140,7 @@ export function acpRegistryPromptFailure(agentId: string, cause: unknown) {
 function makeAcpRegistryRuntime(
   options: AcpRegistryAdapterV2Options,
   catalog: AcpRegistrySupport.AcpRegistryCatalog["Service"],
+  acceptedModels: { current: ReadonlyArray<string> },
 ) {
   return (
     input: AcpAdapterV2RuntimeInput,
@@ -161,6 +162,7 @@ function makeAcpRegistryRuntime(
               }),
           ),
         );
+      acceptedModels.current = resolved.acceptedModels ?? [];
       const context = yield* Layer.build(
         AcpSessionRuntime.layer({
           ...runtimeInput,
@@ -172,9 +174,10 @@ function makeAcpRegistryRuntime(
                   env: { ...resolved.spawn.env, ...processEnvironment },
                 },
           ...(options.settings.authMethodId ? { authMethodId: options.settings.authMethodId } : {}),
-          customModels: readCustomModelEntries(options.settings.customModels).map(
-            (entry) => entry.slug,
-          ),
+          customModels: [
+            ...readCustomModelEntries(options.settings.customModels).map((entry) => entry.slug),
+            ...acceptedModels.current,
+          ],
         }),
       );
       return yield* Effect.service(AcpSessionRuntime.AcpSessionRuntime).pipe(
@@ -268,6 +271,10 @@ export const makeAcpRegistryAdapterV2 = Effect.fn("makeAcpRegistryAdapterV2")(fu
   // the unquoted "T3 Code (Beta).exe" path). Both take T3's MCP endpoint over ACP HTTP.
   const useHttpMcpServers =
     copilotRouting !== undefined || prefersHttpMcpTransport(options.settings);
+  const configuredCustomModels = readCustomModelEntries(options.settings.customModels).map(
+    (entry) => entry.slug,
+  );
+  const acceptedModels: { current: ReadonlyArray<string> } = { current: [] };
   const flavor: AcpAdapterV2Flavor = {
     driver: ACP_REGISTRY_PROVIDER,
     // Cancelling a Copilot prompt also kills the background agents it started.
@@ -277,7 +284,10 @@ export const makeAcpRegistryAdapterV2 = Effect.fn("makeAcpRegistryAdapterV2")(fu
           turns: { ...AcpProviderCapabilitiesV2.turns, supportsSteeringByInterruptRestart: false },
         }
       : AcpProviderCapabilitiesV2,
-    customModels: readCustomModelEntries(options.settings.customModels).map((entry) => entry.slug),
+    // Read per session start: a ZCode session's newer plan models come with its engine.
+    get customModels() {
+      return [...configuredCustomModels, ...acceptedModels.current];
+    },
     compactViaAdvertisedCommand: true,
     ...(isAntigravityCli ? { wakeOnDetachedRequest: true, replyEndsWithUsageUpdate: true } : {}),
     promptFailure: (cause) =>
@@ -352,7 +362,8 @@ export const makeAcpRegistryAdapterV2 = Effect.fn("makeAcpRegistryAdapterV2")(fu
     ...(zcodeMcpServers === undefined
       ? {}
       : { nativeMcpServers: zcodeMcpServers, promptInstructionsLast: true }),
-    makeRuntime: options.makeRuntime ?? makeAcpRegistryRuntime(runtimeOptions, catalog),
+    makeRuntime:
+      options.makeRuntime ?? makeAcpRegistryRuntime(runtimeOptions, catalog, acceptedModels),
     ...(runtimeCoordinator === undefined
       ? {}
       : {

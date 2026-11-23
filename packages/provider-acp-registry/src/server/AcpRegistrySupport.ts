@@ -32,6 +32,14 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as AcpRegistryRuntimeCoordinator from "./AcpRegistryRuntimeCoordinator.ts";
+import { isZcodeAcpCommand } from "./zcodeAcp.ts";
+import {
+  makeZcodeBuiltinTables,
+  replaceZcodeEngine,
+  zcodeEnginePath,
+  zcodePlatformKey,
+  zcodeStateDirectory,
+} from "./zcodeBuiltin.ts";
 import * as PlatformError from "effect/PlatformError";
 import * as Ref from "effect/Ref";
 import * as Schedule from "effect/Schedule";
@@ -480,6 +488,8 @@ export interface ResolvedAcpRegistryAgent {
   readonly agent?: AcpRegistryAgent;
   readonly distribution: AcpRegistryDistributionKind | "local";
   readonly spawn: AcpSessionRuntime.AcpSpawnInput;
+  /** Models the agent accepts beyond its own list (ZCode plan models from a newer table). */
+  readonly acceptedModels?: ReadonlyArray<string>;
 }
 
 export type AcpRegistryInspection =
@@ -553,6 +563,7 @@ export const layerFromHost = Layer.merge(
         toolsDir: path.join(paths.baseDir, "tools"),
         // Beside the built-in driver's runtime temp, short for Windows' 260-character path limit.
         runtimeTempDir: path.join(paths.stateDir, "antigravity-tmp", "acp-registry"),
+        zcodeDirectory: zcodeStateDirectory(path, paths.stateDir),
       });
     }),
   ),
@@ -565,6 +576,8 @@ export interface AcpRegistryCatalogOptions {
   /** Owns the temp files of agents whose unpacker cannot clean up after a kill. */
   readonly runtimeTempDir?: string;
   readonly registryUrl?: string;
+  /** ZCode's newer model tables and the engine directories that carry them (zcodeBuiltin.ts). */
+  readonly zcodeDirectory?: string;
 }
 
 // Unpacks about 140 MB into TEMP on every launch and cannot remove it when the process is killed.
@@ -701,6 +714,33 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
     return permit.withPermits(1);
   };
   const preparedBinaryReservations = yield* Ref.make<ReadonlyMap<string, number>>(new Map());
+
+  const zcodeTables =
+    input.zcodeDirectory === undefined
+      ? undefined
+      : yield* makeZcodeBuiltinTables({
+          directory: input.zcodeDirectory,
+          platformKey: zcodePlatformKey(platform, architecture),
+        });
+  const homeDirectory = yield* HostProcess.HomeDirectory;
+  // The bridge only reads the table bundled with ZCode; hand it an engine carrying a newer one.
+  const withNewestZcodeTable = Effect.fn("AcpRegistryCatalog.withNewestZcodeTable")(function* (
+    command: string,
+    args: ReadonlyArray<string>,
+    env: NodeJS.ProcessEnv,
+  ) {
+    const engine = zcodeEnginePath(args, env);
+    if (zcodeTables === undefined || engine === undefined || !isZcodeAcpCommand(command, args)) {
+      return { args, env, acceptedModels: [] as ReadonlyArray<string> };
+    }
+    const zcodeHome = env.ZCODE_HOME?.trim() || path.join(homeDirectory, ".zcode");
+    const choice = yield* zcodeTables.engineFor({ engine, zcodeHome });
+    const acceptedModels = choice.planModels;
+    if (choice.engine === engine) return { args, env, acceptedModels };
+    return args.includes(`ZCODE_BIN=${engine}`)
+      ? { args: replaceZcodeEngine(args, engine, choice.engine), env, acceptedModels }
+      : { args, env: { ...env, ZCODE_BIN: choice.engine }, acceptedModels };
+  });
 
   const runtimeTempDir = input.runtimeTempDir;
   if (runtimeTempDir !== undefined) {
@@ -2036,9 +2076,11 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
           });
         }
         yield* validateLocalExecutable(command);
+        const zcode = yield* withNewestZcodeTable(command, settings.commandArgs, env);
         return {
           distribution: "local",
-          spawn: { command, args: settings.commandArgs, cwd, env, shell: false },
+          spawn: { command, args: zcode.args, cwd, env: zcode.env, shell: false },
+          ...(zcode.acceptedModels.length > 0 ? { acceptedModels: zcode.acceptedModels } : {}),
         } satisfies ResolvedAcpRegistryAgent;
       }
       const registry = yield* loadRegistry();

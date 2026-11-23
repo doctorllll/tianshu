@@ -153,9 +153,11 @@ const isSelect = (descriptor: ProviderOptionDescriptor): descriptor is SelectDes
  * Slugs stay the bridge's, so what is sent to ZCode does not change.
  */
 export function presentZcodeModels(
-  models: ReadonlyArray<ServerProviderModel>,
+  bridgeModels: ReadonlyArray<ServerProviderModel>,
   preferences: ZcodeModelPreferences,
+  planModels: ReadonlyMap<string, ReadonlyArray<string>> = new Map(),
 ): ReadonlyArray<ServerProviderModel> {
+  const models = withPlanModels(bridgeModels, planModels);
   const template = models
     .flatMap((model) => model.capabilities?.optionDescriptors ?? [])
     .filter(isSelect)
@@ -206,6 +208,35 @@ export function presentZcodeModels(
       ...(capabilities ? { capabilities } : {}),
     };
   });
+}
+
+/**
+ * Each plan the bridge offers, in the official table's order with the table's models it is missing
+ * (the bridge lists plans from ZCode's legacy config.json, which no longer gains new models). A
+ * plan the bridge does not offer is not entitled, so nothing is added for it.
+ */
+export function withPlanModels(
+  models: ReadonlyArray<ServerProviderModel>,
+  planModels: ReadonlyMap<string, ReadonlyArray<string>>,
+): ReadonlyArray<ServerProviderModel> {
+  let out = models;
+  for (const [providerId, ids] of planModels) {
+    const prefix = `${providerId}\\`;
+    const own = out.filter((model) => model.slug.startsWith(prefix));
+    const template = own[0];
+    if (template === undefined || ids.length === 0) continue;
+    const { isDefault: _isDefault, ...base } = template;
+    const listed = ids.map(
+      (id): ServerProviderModel =>
+        own.find((model) => model.slug === prefix + id) ?? { ...base, slug: prefix + id, name: id },
+    );
+    const block = [...listed, ...own.filter((model) => !listed.includes(model))];
+    const first = out.indexOf(template);
+    const rest = out.filter((model) => !own.includes(model));
+    const at = out.slice(0, first).filter((model) => !own.includes(model)).length;
+    out = [...rest.slice(0, at), ...block, ...rest.slice(at)];
+  }
+  return out;
 }
 
 /** Re-reads `<ZCODE_HOME or ~/.zcode>/v2/provider_config.json` so ZCode's own changes apply. */

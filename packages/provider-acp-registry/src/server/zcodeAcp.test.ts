@@ -5,6 +5,7 @@ import {
   parseZcodeMcpServers,
   parseZcodeModelPreferences,
   presentZcodeModels,
+  withPlanModels,
 } from "./zcodeAcp.ts";
 
 describe("isZcodeAcpCommand", () => {
@@ -138,5 +139,39 @@ describe("presentZcodeModels", () => {
       options: [{ id: "low" }, { id: "high" }, { id: "max" }],
     });
     expect(presentZcodeModels(shown, preferences)).toEqual(shown);
+  });
+});
+
+describe("withPlanModels", () => {
+  const model = (slug: string, extra: object = {}) => ({
+    slug,
+    name: slug,
+    isCustom: false,
+    capabilities: null,
+    ...extra,
+  });
+  it("adds the official table's missing plan models in its order, after nothing else moves", () => {
+    const out = withPlanModels(
+      [
+        model("magpie\\auto/glm-5.3", { isDefault: true }),
+        model("builtin:bigmodel-coding-plan\\GLM-5.3", { isDefault: true }),
+        model("builtin:bigmodel-coding-plan\\GLM-5.3-Flash"),
+        model("magpie\\zcode/GLM-5.2"),
+      ],
+      new Map([
+        ["builtin:bigmodel-coding-plan", ["GLM-5.4", "GLM-5.3", "GLM-5.3-Flash"]],
+        ["builtin:zai-coding-plan", ["GLM-5.4"]],
+      ]),
+    );
+    expect(out.map((entry) => entry.slug)).toEqual([
+      "magpie\\auto/glm-5.3",
+      "builtin:bigmodel-coding-plan\\GLM-5.4",
+      "builtin:bigmodel-coding-plan\\GLM-5.3",
+      "builtin:bigmodel-coding-plan\\GLM-5.3-Flash",
+      "magpie\\zcode/GLM-5.2",
+    ]);
+    expect(out[1]).toMatchObject({ name: "GLM-5.4" });
+    expect(out[1]).not.toHaveProperty("isDefault");
+    expect(out[2]).toMatchObject({ isDefault: true });
   });
 });
