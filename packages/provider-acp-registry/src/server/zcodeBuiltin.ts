@@ -261,7 +261,8 @@ export const makeZcodeBuiltinTables = Effect.fn("ZcodeBuiltin.make")(function* (
     install: ZcodeEngineInstall,
     table: ZcodeBuiltinTable,
   ) {
-    const root = path.join(enginesDir, `${install.version}-r${table.revision}`);
+    // `-2`: the layout also carries the app's Info.plist, where bridges from 0.91 read its version.
+    const root = path.join(enginesDir, `${install.version}-r${table.revision}-2`);
     const engine = path.join(root, "Resources", "glm", "zcode.cjs");
     if (
       yield* fileSystem.exists(
@@ -275,6 +276,10 @@ export const makeZcodeBuiltinTables = Effect.fn("ZcodeBuiltin.make")(function* (
     const resources = path.join(staging, "Resources");
     const glm = path.join(resources, "glm");
     yield* fileSystem.makeDirectory(path.join(glm, "provider"), { recursive: true });
+    yield* fileSystem.symlink(
+      path.join(install.resources, "..", "Info.plist"),
+      path.join(staging, "Info.plist"),
+    );
     for (const entry of yield* fileSystem.readDirectory(install.resources)) {
       if (entry === "glm") continue;
       yield* fileSystem.symlink(path.join(install.resources, entry), path.join(resources, entry));

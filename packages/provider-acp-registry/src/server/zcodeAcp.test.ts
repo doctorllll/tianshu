@@ -5,6 +5,7 @@ import {
   parseZcodeMcpServers,
   parseZcodeModelPreferences,
   presentZcodeModels,
+  withLegacyPlanSlugs,
   withPlanModels,
 } from "./zcodeAcp.ts";
 
@@ -173,5 +174,23 @@ describe("withPlanModels", () => {
     expect(out[1]).toMatchObject({ name: "GLM-5.4" });
     expect(out[1]).not.toHaveProperty("isDefault");
     expect(out[2]).toMatchObject({ isDefault: true });
+  });
+});
+
+describe("withLegacyPlanSlugs", () => {
+  it("names a 0.91 bridge's account plans by their legacy ids", () => {
+    const model = (slug: string) => ({ slug, name: slug, isCustom: false, capabilities: null });
+    expect(
+      withLegacyPlanSlugs([
+        model("magpie\\auto/glm-5.3"),
+        model("account:bigmodel-individual-coding-plan\\GLM-5.4"),
+        model("account:bigmodel-team-coding-plan\\GLM-5.4"),
+        model("account:zai-start-plan\\GLM-5-Turbo"),
+      ]).map((entry) => entry.slug),
+    ).toEqual([
+      "magpie\\auto/glm-5.3",
+      "builtin:bigmodel-coding-plan\\GLM-5.4",
+      "builtin:zai-start-plan\\GLM-5-Turbo",
+    ]);
   });
 });

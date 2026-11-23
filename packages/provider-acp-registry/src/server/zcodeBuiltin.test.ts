@@ -138,7 +138,7 @@ describe("makeZcodeBuiltinTables", () => {
         "builtin:bigmodel-start-plan\\GLM-5-Turbo",
       ]);
       expect(mirrored).toBe(
-        path.join(root, "state", "engines", "3.19.1-r47", "Resources", "glm", "zcode.cjs"),
+        path.join(root, "state", "engines", "3.19.1-r47-2", "Resources", "glm", "zcode.cjs"),
       );
       const glm = path.dirname(mirrored);
       expect(yield* fileSystem.realPath(path.join(glm, "zcode.cjs"))).toBe(
@@ -148,6 +148,9 @@ describe("makeZcodeBuiltinTables", () => {
         yield* fileSystem.readFileString(path.join(glm, "provider", "zcode-builtin.json")),
       ).toBe(table(47, ["GLM-5.4", "GLM-5.3"]));
       expect(yield* fileSystem.exists(path.join(glm, "..", "app.asar"))).toBe(true);
+      expect(yield* fileSystem.readFileString(path.join(glm, "..", "..", "Info.plist"))).toBe(
+        PLIST,
+      );
       // Reused, not rebuilt, on the next launch.
       expect((yield* tables.engineFor({ engine, zcodeHome })).engine).toBe(mirrored);
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),

@@ -167,7 +167,7 @@ export function presentZcodeModels(
   preferences: ZcodeModelPreferences,
   planModels: ReadonlyMap<string, ReadonlyArray<string>> = new Map(),
 ): ReadonlyArray<ServerProviderModel> {
-  const models = withPlanModels(bridgeModels, planModels);
+  const models = withPlanModels(withLegacyPlanSlugs(bridgeModels), planModels);
   const template = models
     .flatMap((model) => model.capabilities?.optionDescriptors ?? [])
     .filter(isSelect)
@@ -217,6 +217,26 @@ export function presentZcodeModels(
       ...(isDefault ? { isDefault: true } : {}),
       ...(capabilities ? { capabilities } : {}),
     };
+  });
+}
+
+/**
+ * Bridges from 0.91 name plan models by their account ids (`account:bigmodel-individual-coding-plan`);
+ * Tianshu keeps the legacy ids (`builtin:bigmodel-coding-plan`) that threads already store and that
+ * every bridge accepts.
+ */
+export function withLegacyPlanSlugs(
+  models: ReadonlyArray<ServerProviderModel>,
+): ReadonlyArray<ServerProviderModel> {
+  const seen = new Set<string>();
+  return models.flatMap((model) => {
+    const split = model.slug.indexOf("\\");
+    const provider = split < 0 ? model.slug : model.slug.slice(0, split);
+    const legacy = split < 0 ? provider : zcodeConfigProviderId(provider);
+    const slug = legacy === provider ? model.slug : legacy + model.slug.slice(split);
+    if (seen.has(slug)) return [];
+    seen.add(slug);
+    return [slug === model.slug ? model : { ...model, slug }];
   });
 }
 
