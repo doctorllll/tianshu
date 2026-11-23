@@ -22,6 +22,7 @@ import type { ChatFileAttachment } from "./types";
 
 const RIGHT_PANEL_KINDS = [
   "tasks",
+  "plan",
   "diff",
   "files",
   "file",
@@ -47,6 +48,7 @@ export interface DeviceTabTarget {
 
 export type RightPanelSurface =
   | { id: "tasks"; kind: "tasks" }
+  | { id: "plan"; kind: "plan" }
   | { id: `browser:${string}`; kind: "preview"; resourceId: string }
   | { id: "browser:new"; kind: "preview"; resourceId: null }
   | { id: "device" | `device:${string}`; kind: "device"; target?: DeviceTabTarget; title?: string }
@@ -295,6 +297,8 @@ const singletonSurface = (
   switch (kind) {
     case "tasks":
       return { id: "tasks", kind };
+    case "plan":
+      return { id: "plan", kind };
     case "diff":
       return { id: "diff", kind };
     case "files":

@@ -9756,4 +9756,24 @@ export const zhCN: Readonly<Record<string, string>> = {
     "Agent 派发子会话前先给你预览，可以改派给哪个 Agent、模型、思考等级和任务，也可以不派。",
   "Reset sub-session confirmation to default": "将子会话派发前确认恢复默认",
   "sub-session delegate child agent confirm preview approve": "子会话 派发 确认 预览 Agent",
+  "Version {version}": "第 {version} 版",
+  "the agent": "agent",
+  you: "你",
+  "Living plan": "计划",
+  "Tianshu plan": "天枢计划",
+  "fastctx plan": "fastctx 计划",
+  "DSH living plan": "DSH 动态计划",
+  "Antigravity tasks": "Antigravity 任务",
+  "Updated {time} by {who}": "{who} 更新于 {time}",
+  "No plan yet. On multi-step work the agent keeps one here; you can start it too.":
+    "还没有计划。多步任务里 agent 会在这里维护计划，你也可以先写。",
+  "The plan changed while you were editing. Your text is kept; check the latest version and save again.":
+    "你编辑时计划被改过了。你的修改还在，看过最新版后再保存。",
+  "Loading the plan…": "正在读取计划…",
+  "The plan this thread's agent keeps, for you and other agents to align on.":
+    "本会话 agent 维护的计划，你和其他 agent 都按它对齐。",
+  "Read-only: Antigravity keeps these in its own task files.":
+    "只读：这是 Antigravity 自己的任务文件。",
+  "Could not read the plan: {error}": "读不到计划：{error}",
+  "No plan yet.": "还没有计划。",
 };

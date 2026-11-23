@@ -251,6 +251,8 @@ const RPC_AGGREGATES = {
   [WS_METHODS.subscribePreviewEvents]: "preview",
   [WS_METHODS.subscribeDiscoveredLocalServers]: "preview",
   [WS_METHODS.subscribeSubSessionProposals]: "orchestration",
+  [WS_METHODS.subscribeThreadPlan]: "orchestration",
+  [WS_METHODS.writeThreadPlan]: "orchestration",
   [WS_METHODS.respondSubSessionProposal]: "orchestration",
   [WS_METHODS.previewStopLocalServer]: "preview",
   [WS_METHODS.deviceConfigure]: "device",

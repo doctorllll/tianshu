@@ -658,6 +658,10 @@
     "./state/sub-session-proposals": {
       "types": "./src/state/subSessionProposals.ts",
       "import": "./src/state/subSessionProposals.ts"
+    },
+    "./state/thread-plans": {
+      "types": "./src/state/threadPlans.ts",
+      "import": "./src/state/threadPlans.ts"
     }
   },
   "scripts": {

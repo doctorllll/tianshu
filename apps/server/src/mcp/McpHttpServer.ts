@@ -1,6 +1,8 @@
 import * as Cache from "effect/Cache";
 import { ArtifactToolkit } from "./toolkits/artifact/tools.ts";
 import * as ArtifactHandlers from "./toolkits/artifact/handlers.ts";
+import { PlanToolkit } from "./toolkits/plan/tools.ts";
+import * as PlanHandlers from "./toolkits/plan/handlers.ts";
 import * as ArtifactWall from "../artifacts/ArtifactWall.ts";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
@@ -1325,6 +1327,7 @@ const layerThemeToolkit = toolkitRegistration(ThemeToolkit, ThemeHandlers.layer)
 );
 
 export const layerArtifactToolkit = toolkitRegistration(ArtifactToolkit, ArtifactHandlers.layer);
+export const layerPlanToolkit = toolkitRegistration(PlanToolkit, PlanHandlers.layer);
 
 export const layerProjectRegistration = toolkitRegistration(ProjectToolkit, ProjectHandlers.layer);
 
@@ -1391,6 +1394,7 @@ export const layerTools = Layer.mergeAll(
   layerThreadToolkit,
   layerAttachmentToolkit,
   layerArtifactToolkit,
+  layerPlanToolkit,
   layerProjectRegistration,
   layerEnvironmentToolkit,
   layerThemeToolkit,

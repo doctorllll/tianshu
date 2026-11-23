@@ -17,6 +17,7 @@ import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as PeerClientPairing from "./peer/PeerClientPairing.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
 import * as SubSessionProposals from "./mcp/SubSessionProposals.ts";
+import * as ThreadPlans from "./plans/ThreadPlans.ts";
 import * as PeerLinks from "./peer/PeerLinks.ts";
 import * as PeerThreadRelay from "./peer/PeerThreadRelay.ts";
 
@@ -1584,6 +1585,9 @@ export const layerWsRpc = (
         Option.getOrUndefined(
           yield* Effect.serviceOption(SubSessionProposals.SubSessionProposals),
         ) ?? (yield* SubSessionProposals.make);
+      const threadPlans =
+        Option.getOrUndefined(yield* Effect.serviceOption(ThreadPlans.ThreadPlans)) ??
+        ThreadPlans.unavailable;
       const peerThreadRelay = yield* PeerThreadRelay.PeerThreadRelay;
       const peerClientPairing = yield* PeerClientPairing.PeerClientPairing;
       const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
@@ -2781,6 +2785,8 @@ export const layerWsRpc = (
           peerClientPairing.requestForLink(input, currentSession),
         [WS_METHODS.subscribeSubSessionProposals]: (_input) => subSessionProposals.changes,
         [WS_METHODS.respondSubSessionProposal]: (input) => subSessionProposals.respond(input),
+        [WS_METHODS.subscribeThreadPlan]: (input) => threadPlans.changes(input.threadId),
+        [WS_METHODS.writeThreadPlan]: (input) => threadPlans.write({ ...input, updatedBy: "user" }),
         [WS_METHODS.peerLinksAnswerRequest]: (input) =>
           Effect.annotateCurrentSpan({ "orchestration_v2.thread_id": input.threadId }).pipe(
             Effect.andThen(peerLinkRequests.answer(input)),
@@ -3757,6 +3763,9 @@ export const layer = Layer.unwrap(
     const subSessionProposals =
       Option.getOrUndefined(yield* Effect.serviceOption(SubSessionProposals.SubSessionProposals)) ??
       (yield* SubSessionProposals.make);
+    const threadPlans =
+      Option.getOrUndefined(yield* Effect.serviceOption(ThreadPlans.ThreadPlans)) ??
+      ThreadPlans.unavailable;
     const peerThreadRelay = yield* PeerThreadRelay.PeerThreadRelay;
     const peerClientPairing = yield* PeerClientPairing.PeerClientPairing;
     const sql = yield* SqlClient.SqlClient;
@@ -3862,6 +3871,7 @@ export const layer = Layer.unwrap(
               Layer.provide(
                 Layer.succeed(SubSessionProposals.SubSessionProposals, subSessionProposals),
               ),
+              Layer.provide(Layer.succeed(ThreadPlans.ThreadPlans, threadPlans)),
               Layer.provide(Layer.succeed(PeerThreadRelay.PeerThreadRelay, peerThreadRelay)),
               Layer.provide(Layer.succeed(PeerClientPairing.PeerClientPairing, peerClientPairing)),
               Layer.provide(

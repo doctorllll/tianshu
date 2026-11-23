@@ -17,6 +17,13 @@ import {
   SubSessionProposalError,
   SubSessionProposalList,
 } from "./subSessionProposal.ts";
+import {
+  SubscribeThreadPlanInput,
+  ThreadPlan,
+  ThreadPlanError,
+  WriteThreadPlanInput,
+  WriteThreadPlanResult,
+} from "./threadPlan.ts";
 import { UserMemoryMutation } from "./memory.ts";
 import {
   OrchestrationV2SearchThreadError,
@@ -741,6 +748,8 @@ export const WS_METHODS = {
   subscribeResourceTelemetry: "subscribeResourceTelemetry",
   subscribeSubSessionProposals: "subscribeSubSessionProposals",
   respondSubSessionProposal: "subSessionProposal.respond",
+  subscribeThreadPlan: "subscribeThreadPlan",
+  writeThreadPlan: "threadPlan.write",
 } as const;
 
 const WsServerUpsertKeybindingRpc = Rpc.make(WS_METHODS.serverUpsertKeybinding, {
@@ -2088,6 +2097,19 @@ const WsRespondSubSessionProposalRpc = Rpc.make(WS_METHODS.respondSubSessionProp
   error: Schema.Union([SubSessionProposalError, EnvironmentAuthorizationError]),
 });
 
+const WsSubscribeThreadPlanRpc = Rpc.make(WS_METHODS.subscribeThreadPlan, {
+  payload: SubscribeThreadPlanInput,
+  success: ThreadPlan,
+  error: Schema.Union([ThreadPlanError, EnvironmentAuthorizationError]),
+  stream: true,
+});
+
+const WsWriteThreadPlanRpc = Rpc.make(WS_METHODS.writeThreadPlan, {
+  payload: WriteThreadPlanInput,
+  success: WriteThreadPlanResult,
+  error: Schema.Union([ThreadPlanError, EnvironmentAuthorizationError]),
+});
+
 const WsDeviceTestHostRpc = Rpc.make(WS_METHODS.deviceTestHost, {
   payload: SshDeviceHostConfig,
   success: DeviceHostSummary,
@@ -2673,6 +2695,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsSubscribeDiscoveredLocalServersRpc,
   WsSubscribeSubSessionProposalsRpc,
   WsRespondSubSessionProposalRpc,
+  WsSubscribeThreadPlanRpc,
+  WsWriteThreadPlanRpc,
   WsDeviceConfigureRpc,
   WsDeviceListRpc,
   WsDeviceTestHostRpc,

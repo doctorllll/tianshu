@@ -49,6 +49,7 @@ import {
   FileDiff,
   Files,
   Globe2,
+  ClipboardList,
   ListTodo,
   MessagesSquare,
   Plus,
@@ -155,6 +156,8 @@ export interface RightPanelTabsProps {
   onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
+  /** Absent where a thread has no plan, such as a draft. */
+  onAddPlan?: (() => void) | undefined;
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
   onAddDevice: () => void;
@@ -341,6 +344,7 @@ function RightPanelEmptyState(props: {
   onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
+  onAddPlan?: (() => void) | undefined;
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
   onAddDevice: () => void;
@@ -393,6 +397,21 @@ function RightPanelEmptyState(props: {
       disabledReason: messages(SURFACE_UNAVAILABLE_HINTS.diff),
       onClick: props.onAddDiff,
     },
+    ...(props.onAddPlan
+      ? [
+          {
+            label: msg("Living plan"),
+            description: msg(
+              "The plan this thread's agent keeps, for you and other agents to align on.",
+            ),
+            icon: ClipboardList,
+            shortcut: "N",
+            available: true,
+            disabledReason: "",
+            onClick: props.onAddPlan,
+          },
+        ]
+      : []),
     {
       label: msg("Pull request"),
       icon: PullRequestGlyph.pullRequest,
@@ -603,6 +622,8 @@ function surfaceTitle(
   switch (surface.kind) {
     case "tasks":
       return resolve(msg("Tasks"));
+    case "plan":
+      return resolve(msg("Living plan"));
     case "diff":
       return resolve(msg("Diff"));
     case "files":
@@ -698,6 +719,8 @@ function SurfaceIcon({
       return <PreviewFavicon capturedUrl={previewCapturedUrl} url={previewUrl} />;
     case "tasks":
       return <ListTodo className="size-3 shrink-0" />;
+    case "plan":
+      return <ClipboardList className="size-3 shrink-0" />;
     case "diff":
       return <FileDiff className="size-3 shrink-0" />;
     case "files":
@@ -1240,6 +1263,18 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       disabledReason: messages(SURFACE_DISABLED_REASONS.diff),
       onClick: props.onAddDiff,
     },
+    ...(props.onAddPlan
+      ? [
+          {
+            label: msg("Living plan"),
+            icon: ClipboardList,
+            shortcut: "N",
+            available: true,
+            disabledReason: "",
+            onClick: props.onAddPlan,
+          },
+        ]
+      : []),
     {
       label: msg("Pull request"),
       icon: PullRequestGlyph.pullRequest,
@@ -1694,6 +1729,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddTerminal={props.onAddTerminal}
             onAddDiff={props.onAddDiff}
             onAddFiles={props.onAddFiles}
+            onAddPlan={props.onAddPlan}
             onAddPullRequest={props.onAddPullRequest}
             onAddPullRequests={props.onAddPullRequests}
             onAddDevice={props.onAddDevice}

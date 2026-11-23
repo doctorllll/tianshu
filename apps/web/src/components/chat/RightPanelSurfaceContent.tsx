@@ -14,6 +14,7 @@ import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { lazy, Suspense } from "react";
 import { LinkedThreadPane } from "./LinkedThreadPane";
 import SideThreadPane from "./SideThreadPane";
+import { ThreadPlanPanel } from "./ThreadPlanPanel";
 import type { ComposerImageAttachment, DraftId } from "../../composerDraftStore";
 import type { ShortcutMatchContext } from "../../keybindings";
 import type { SideChatParentPanel } from "../../lib/sideChatPane";
@@ -99,6 +100,14 @@ export function RightPanelSurfaceContent(props: {
         <Suspense fallback={null}>
           <TaskBoardPanel cwd={props.files.workspaceRoot ?? null} threadRef={threadRef} />
         </Suspense>
+      ) : null;
+    case "plan":
+      return visible ? (
+        <ThreadPlanPanel
+          environmentId={props.environmentId}
+          threadId={threadRef.threadId}
+          cwd={props.files.workspaceRoot}
+        />
       ) : null;
     case "preview":
       return (

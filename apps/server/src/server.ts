@@ -109,6 +109,7 @@ import * as McpSessionRegistry from "./mcp/McpSessionRegistry.ts";
 import * as PreviewAutomationBroker from "./mcp/PreviewAutomationBroker.ts";
 import * as DeviceService from "./device/DeviceService.ts";
 import * as SubSessionProposals from "./mcp/SubSessionProposals.ts";
+import * as ThreadPlans from "./plans/ThreadPlans.ts";
 import * as DeviceHubProxy from "./device/DeviceHubProxy.ts";
 import * as PreviewManager from "./preview/Manager.ts";
 import * as PortScanner from "./preview/PortScanner.ts";
@@ -936,6 +937,8 @@ const layerMakeRoutes = Layer.mergeAll(
   Layer.provide(PeerLinkRequests.layer),
   // Sub-sessions agents ask for: held from /mcp until the user answers over WebSocket.
   Layer.provide(SubSessionProposals.layer),
+  // Each thread's plan: shown in the side panel, read and written by agents over /mcp.
+  Layer.provide(ThreadPlans.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
   // Share the service so HTTP/WS clients single-flight reads and invalidate each other's cached patches.
   Layer.provide(layerPullRequestService),
   Layer.provide(layerThreadIssueService),
