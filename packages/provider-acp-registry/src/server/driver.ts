@@ -77,6 +77,12 @@ import * as AcpRegistryAuth from "./auth.ts";
 import * as AcpRegistryAuthenticationState from "./authenticationState.ts";
 import { acpPlanUsageReader } from "./planUsage.ts";
 import {
+  appBinaryFromCommand,
+  appUpdateMaintenance,
+  inspectAppUpdate,
+  type AppUpdateInstall,
+} from "./appUpdate.ts";
+import {
   isZcodeAcpCommand,
   presentZcodeModels,
   readZcodeModelPreferences,
@@ -753,9 +759,33 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
       zcodeHome === undefined
         ? undefined
         : zcodeBridgePath(effectiveConfig.commandPath, effectiveConfig.commandArgs);
+    const latestVersions = yield* Effect.serviceOption(
+      ProviderLatestVersions.ProviderLatestVersions,
+    );
+    const httpClient = yield* Effect.serviceOption(HttpClient.HttpClient);
+    // An agent inside a self-updating app is announced only, at the app's version.
+    const appBinary =
+      effectiveConfig.source === "local" && zcodeHome === undefined
+        ? appBinaryFromCommand(effectiveConfig.commandPath, effectiveConfig.commandArgs)
+        : undefined;
+    const readAppUpdate: Effect.Effect<AppUpdateInstall | undefined> =
+      appBinary === undefined
+        ? Effect.undefined
+        : inspectAppUpdate(appBinary).pipe(
+            Effect.provideService(FileSystem.FileSystem, fileSystem),
+            Effect.provideService(Path.Path, path),
+            Effect.orElseSucceed(() => undefined),
+          );
     const resolveMaintenance =
       zcodeBridge === undefined
-        ? () => Effect.succeed(MAINTENANCE)
+        ? () =>
+            readAppUpdate.pipe(
+              Effect.map((install) =>
+                install === undefined
+                  ? MAINTENANCE
+                  : appUpdateMaintenance(DRIVER_KIND, install, httpClient),
+              ),
+            )
         : yield* makeCachedProviderMaintenanceResolution(
             resolveProviderMaintenanceCapabilitiesEffect(ZCODE_BRIDGE_MAINTENANCE, {
               binaryPath: zcodeBridge,
@@ -766,19 +796,29 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
               Effect.provideService(Path.Path, path),
             ),
           );
-    const latestVersions = yield* Effect.serviceOption(
-      ProviderLatestVersions.ProviderLatestVersions,
-    );
-    const httpClient = yield* Effect.serviceOption(HttpClient.HttpClient);
     const withVersionAdvisory = (provider: ServerProvider, enableProviderUpdateChecks: boolean) =>
-      zcodeBridge === undefined || Option.isNone(latestVersions) || Option.isNone(httpClient)
+      Option.isNone(latestVersions) || Option.isNone(httpClient)
         ? Effect.succeed(provider)
-        : resolveMaintenance().pipe(
-            Effect.flatMap((maintenance) =>
-              enrichProviderSnapshotWithVersionAdvisory(provider, maintenance, {
-                enableProviderUpdateChecks,
-              }),
-            ),
+        : (zcodeBridge === undefined
+            ? readAppUpdate.pipe(
+                Effect.flatMap((install) =>
+                  install === undefined
+                    ? Effect.succeed(provider)
+                    : enrichProviderSnapshotWithVersionAdvisory(
+                        { ...provider, installedVersion: install.version },
+                        appUpdateMaintenance(DRIVER_KIND, install, httpClient),
+                        { enableProviderUpdateChecks },
+                      ),
+                ),
+              )
+            : resolveMaintenance().pipe(
+                Effect.flatMap((maintenance) =>
+                  enrichProviderSnapshotWithVersionAdvisory(provider, maintenance, {
+                    enableProviderUpdateChecks,
+                  }),
+                ),
+              )
+          ).pipe(
             Effect.provideService(HttpClient.HttpClient, httpClient.value),
             Effect.provideService(
               ProviderLatestVersions.ProviderLatestVersions,
