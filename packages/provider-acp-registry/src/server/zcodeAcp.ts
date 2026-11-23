@@ -21,6 +21,16 @@ export function isZcodeAcpCommand(
   );
 }
 
+/** The bridge executable: the command itself, or the argument naming it after `env`. */
+export function zcodeBridgePath(
+  commandPath: string,
+  commandArgs: ReadonlyArray<string>,
+): string | undefined {
+  return [commandPath, ...commandArgs].find((part) =>
+    ZCODE_ACP_EXECUTABLE.test(part.split(/[\\/]/).pop() ?? ""),
+  );
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 

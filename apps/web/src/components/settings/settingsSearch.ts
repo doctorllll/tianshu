@@ -888,6 +888,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     scope: "environment-defaults",
   },
   {
+    id: "provider-auto-update",
+    title: msg("Update agents automatically"),
+    to: "/settings/maintenance",
+    searchTerms: [msg("auto update agents install new versions automatically")],
+    scope: "environment-defaults",
+  },
+  {
     id: "continue-threads-after-server-update",
     title: msg("Continue threads after restarts"),
     to: "/settings/maintenance",

@@ -44,7 +44,15 @@ import {
   providerModelsFromSettings,
   providerProbeEnvironment,
 } from "@t3tools/provider-core/server/snapshotProbe";
-import { makeManualOnlyProviderMaintenanceCapabilities } from "@t3tools/provider-core/server/maintenanceResolver";
+import {
+  enrichProviderSnapshotWithVersionAdvisory,
+  makeCachedProviderMaintenanceResolution,
+  makeManualOnlyProviderMaintenanceCapabilities,
+  makePackageManagedProviderMaintenanceResolver,
+  resolveProviderMaintenanceCapabilitiesEffect,
+} from "@t3tools/provider-core/server/maintenanceResolver";
+import * as ProviderLatestVersions from "@t3tools/provider-core/server/ProviderLatestVersions";
+import * as HttpClient from "effect/http/HttpClient";
 import {
   haveProviderSnapshotSettingsChanged,
   makeProviderSnapshotSettingsSource,
@@ -68,7 +76,12 @@ import * as AcpRegistryRuntimeCoordinator from "./AcpRegistryRuntimeCoordinator.
 import * as AcpRegistryAuth from "./auth.ts";
 import * as AcpRegistryAuthenticationState from "./authenticationState.ts";
 import { acpPlanUsageReader } from "./planUsage.ts";
-import { isZcodeAcpCommand, presentZcodeModels, readZcodeModelPreferences } from "./zcodeAcp.ts";
+import {
+  isZcodeAcpCommand,
+  presentZcodeModels,
+  readZcodeModelPreferences,
+  zcodeBridgePath,
+} from "./zcodeAcp.ts";
 import {
   inspectZcodeEngine,
   zcodeEnginePath,
@@ -144,6 +157,13 @@ const EMPTY_CAPABILITIES = createModelCapabilities({ optionDescriptors: [] });
 const MAINTENANCE = makeManualOnlyProviderMaintenanceCapabilities({
   provider: DRIVER_KIND,
   packageName: null,
+});
+// The ZCode bridge is an npm CLI, so its global install updates like one. The ZCode app updates
+// itself; the reported version is the bridge's.
+const ZCODE_BRIDGE_MAINTENANCE = makePackageManagedProviderMaintenanceResolver({
+  provider: DRIVER_KIND,
+  npmPackageName: "zcode-acp-server",
+  nativeUpdate: null,
 });
 
 const makeUnsupportedTextGeneration = (): ProviderTextGeneration => {
@@ -729,6 +749,42 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
             ),
             Effect.orElseSucceed(() => new Map<string, ReadonlyArray<string>>()),
           );
+    const zcodeBridge =
+      zcodeHome === undefined
+        ? undefined
+        : zcodeBridgePath(effectiveConfig.commandPath, effectiveConfig.commandArgs);
+    const resolveMaintenance =
+      zcodeBridge === undefined
+        ? () => Effect.succeed(MAINTENANCE)
+        : yield* makeCachedProviderMaintenanceResolution(
+            resolveProviderMaintenanceCapabilitiesEffect(ZCODE_BRIDGE_MAINTENANCE, {
+              binaryPath: zcodeBridge,
+              env: processEnvironment,
+            }).pipe(
+              Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+              Effect.provideService(FileSystem.FileSystem, fileSystem),
+              Effect.provideService(Path.Path, path),
+            ),
+          );
+    const latestVersions = yield* Effect.serviceOption(
+      ProviderLatestVersions.ProviderLatestVersions,
+    );
+    const httpClient = yield* Effect.serviceOption(HttpClient.HttpClient);
+    const withVersionAdvisory = (provider: ServerProvider, enableProviderUpdateChecks: boolean) =>
+      zcodeBridge === undefined || Option.isNone(latestVersions) || Option.isNone(httpClient)
+        ? Effect.succeed(provider)
+        : resolveMaintenance().pipe(
+            Effect.flatMap((maintenance) =>
+              enrichProviderSnapshotWithVersionAdvisory(provider, maintenance, {
+                enableProviderUpdateChecks,
+              }),
+            ),
+            Effect.provideService(HttpClient.HttpClient, httpClient.value),
+            Effect.provideService(
+              ProviderLatestVersions.ProviderLatestVersions,
+              latestVersions.value,
+            ),
+          );
     const presentModels = (provider: ServerProvider) =>
       zcodeHome === undefined || provider.models.length === 0
         ? Effect.succeed(provider)
@@ -891,7 +947,7 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
     const snapshot = yield* makeManagedServerProvider<
       ProviderSnapshotSettings<AcpRegistrySettings>
     >({
-      resolveMaintenance: () => Effect.succeed(MAINTENANCE),
+      resolveMaintenance,
       getSettings: snapshotSettings.getSettings,
       streamSettings: snapshotSettings.streamSettings,
       haveSettingsChanged: haveProviderSnapshotSettingsChanged,
@@ -899,6 +955,7 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
       initialSnapshot: () => buildInitialAcpRegistrySnapshot(readinessInput),
       checkProvider,
       enrichSnapshot: Effect.fn("enrichSnapshot")(function ({
+        settings,
         snapshot,
         getSnapshot,
         publishSnapshot,
@@ -922,7 +979,12 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
                   Ref.get(enrichmentCache).pipe(
                     Effect.flatMap((current) =>
                       current.generation === generation
-                        ? withLiveRuntimeState(provider).pipe(Effect.flatMap(publishSnapshot))
+                        ? withLiveRuntimeState(provider).pipe(
+                            Effect.flatMap((live) =>
+                              withVersionAdvisory(live, settings.enableProviderUpdateChecks),
+                            ),
+                            Effect.flatMap(publishSnapshot),
+                          )
                         : Effect.void,
                     ),
                   ),

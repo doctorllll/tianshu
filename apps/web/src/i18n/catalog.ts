@@ -9739,4 +9739,9 @@ export const zhCN: Readonly<Record<string, string>> = {
     "天枢基于开源项目 T3 Code（pingdotgg/t3code，MIT 许可）修改而来。",
   "T3 Code open source fork credits license": "T3 Code 开源 分支 来源 致谢 许可",
   "No task board is connected.": "没有接入任务板。",
+  "Update agents automatically": "自动更新 Agent",
+  "auto update agents install new versions automatically": "自动 更新 Agent 安装 新版本",
+  "Install the updates found above by itself, for agents that support one-click updates, while they have nothing running. Agents that update themselves or need manual steps are left alone.":
+    "对支持一键更新的 Agent，在它没有任务运行时自动安装上面检查到的更新。会自行更新或需要手动更新的 Agent 不受影响。",
+  "Reset automatic agent updates to default": "将自动更新 Agent 恢复默认",
 };

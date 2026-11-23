@@ -603,6 +603,9 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.enableProviderUpdateChecks !== DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks
       ? [gt("Provider update checks")]
       : []),
+    ...(settings.autoUpdateProviders !== DEFAULT_UNIFIED_SETTINGS.autoUpdateProviders
+      ? [gt("Update agents automatically")]
+      : []),
     ...(settings.continueThreadsAfterServerUpdate !==
     DEFAULT_UNIFIED_SETTINGS.continueThreadsAfterServerUpdate
       ? [gt("Continue threads after restarts")]
@@ -737,6 +740,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       snoozePresets: DEFAULT_UNIFIED_SETTINGS.snoozePresets,
       responseStreamingMode: DEFAULT_UNIFIED_SETTINGS.responseStreamingMode,
       enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,
+      autoUpdateProviders: DEFAULT_UNIFIED_SETTINGS.autoUpdateProviders,
       continueThreadsAfterServerUpdate: DEFAULT_UNIFIED_SETTINGS.continueThreadsAfterServerUpdate,
       backgroundActivity: DEFAULT_UNIFIED_SETTINGS.backgroundActivity,
       keepAwakeWhileAgentsWork: DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork,
@@ -2408,6 +2412,37 @@ export function MaintenanceSettingsPanel() {
                 updateSettings({ enableProviderUpdateChecks: Boolean(checked) })
               }
               aria-label={gt("Check provider versions")}
+            />
+          }
+        />
+        <SettingsRow
+          serverScoped
+          settingKeys={["autoUpdateProviders"]}
+          {...setting("provider-auto-update")}
+          description={gt(
+            "Install the updates found above by itself, for agents that support one-click updates, while they have nothing running. Agents that update themselves or need manual steps are left alone.",
+          )}
+          resetAction={
+            settings.autoUpdateProviders !== DEFAULT_UNIFIED_SETTINGS.autoUpdateProviders ? (
+              <SettingResetButton
+                ariaLabel={gt("Reset automatic agent updates to default")}
+                onClick={() =>
+                  updateSettings({
+                    autoUpdateProviders: DEFAULT_UNIFIED_SETTINGS.autoUpdateProviders,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <ScopedSwitch
+              settingKeys={["autoUpdateProviders"]}
+              checked={settings.autoUpdateProviders}
+              disabled={!settings.enableProviderUpdateChecks}
+              onCheckedChange={(checked) =>
+                updateSettings({ autoUpdateProviders: Boolean(checked) })
+              }
+              aria-label={gt("Update agents automatically")}
             />
           }
         />
