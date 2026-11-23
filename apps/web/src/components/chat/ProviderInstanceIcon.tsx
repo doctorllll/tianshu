@@ -86,6 +86,9 @@ export function resolveProviderInstanceAcpRegistryIconUrl(input: {
   );
 }
 
+/** A local ACP bridge's app icon, shipped with the app (see providerInstances). */
+const LOCAL_AGENT_ICON_PATH = /^\/agents\/[a-z0-9-]+\.png$/;
+
 export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
   driverKind: ProviderDriverKind;
   displayName: string;
@@ -115,11 +118,23 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
   const isAcpRegistry = props.driverKind === "acpRegistry";
   // A custom OpenAI-compatible endpoint has no brand: show its name, marked with the protocol.
   const isCustomEndpoint = props.driverKind === "openaiCompatible";
-  const acpRegistryIconUrl = resolveProviderInstanceAcpRegistryIconUrl({
-    driverKind: props.driverKind,
-    agentId: props.acpRegistryAgentId,
-    iconUrl: props.acpRegistryIconUrl,
-  });
+  const localIconUrl =
+    isAcpRegistry &&
+    props.acpRegistryIconUrl &&
+    LOCAL_AGENT_ICON_PATH.test(props.acpRegistryIconUrl)
+      ? props.acpRegistryIconUrl
+      : null;
+  const acpRegistryIconUrl = localIconUrl
+    ? null
+    : resolveProviderInstanceAcpRegistryIconUrl({
+        driverKind: props.driverKind,
+        agentId: props.acpRegistryAgentId,
+        iconUrl: props.acpRegistryIconUrl,
+      });
+  // An ACP agent with no icon anywhere gets its initials rather than the generic ACP mark,
+  // so several local agents do not all look the same.
+  const acpLetterTile = isAcpRegistry && !localIconUrl && !acpRegistryIconUrl;
+  const initials = Array.from(providerInstanceInitials(props.displayName));
 
   return (
     <span
@@ -130,7 +145,26 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
       style={accentStyle}
       data-provider-accent-color={accentColor}
     >
-      {isAcpRegistry ? (
+      {localIconUrl ? (
+        <img
+          src={localIconUrl}
+          alt=""
+          aria-hidden
+          draggable={false}
+          className={cn("size-5 shrink-0 object-contain", iconClassName)}
+        />
+      ) : acpLetterTile ? (
+        <span
+          className={cn(
+            "@container flex size-5 shrink-0 items-center justify-center rounded-md border bg-card text-4xs font-semibold leading-none text-foreground",
+            iconClassName,
+          )}
+          aria-hidden
+        >
+          {initials[0]}
+          <span className="@max-[1.1rem]:hidden">{initials.slice(1).join("")}</span>
+        </span>
+      ) : isAcpRegistry ? (
         <AcpRegistryAgentIcon
           className={cn("size-5 rounded-none bg-transparent", iconClassName)}
           fallbackClassName="size-full"

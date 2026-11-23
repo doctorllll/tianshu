@@ -57,6 +57,13 @@ describe("shouldShowInstanceBadge", () => {
     expect(shouldShowInstanceBadge(devin, [mistral, devin])).toBe(false);
   });
 
+  it("tells local ACP agents apart by the command that starts them", () => {
+    const zcode = { driverKind: acpRegistry, acpLocalAgentKey: "zcode-acp-server", enabled: true };
+    const dsh = { driverKind: acpRegistry, acpLocalAgentKey: "python3 dsh-acp", enabled: true };
+    expect(shouldShowInstanceBadge(zcode, [zcode, dsh])).toBe(false);
+    expect(shouldShowInstanceBadge(zcode, [zcode, dsh, { ...zcode }])).toBe(true);
+  });
+
   it("distinguishes registry instances whose agent identity is unavailable", () => {
     const entry = { driverKind: acpRegistry, enabled: true };
     expect(shouldShowInstanceBadge(entry, [entry, { ...entry }])).toBe(true);

@@ -64,16 +64,24 @@ export function providerAccentForegroundColor(accentColor: string) {
   return blackContrast >= whiteContrast ? "#000000" : "#ffffff";
 }
 
+/** Which ACP agent an instance runs: its registry id, or for a local agent the command starting it. */
+const acpAgentIdentity = (entry: {
+  readonly acpRegistryAgentId?: string | undefined;
+  readonly acpLocalAgentKey?: string | undefined;
+}) => entry.acpRegistryAgentId ?? entry.acpLocalAgentKey;
+
 export function shouldShowInstanceBadge(
   entry: {
     readonly driverKind: ProviderDriverKind;
     readonly accentColor?: string | undefined;
     readonly acpRegistryAgentId?: string | undefined;
+    readonly acpLocalAgentKey?: string | undefined;
     readonly enabled: boolean;
   },
   entries: Iterable<{
     readonly driverKind: ProviderDriverKind;
     readonly acpRegistryAgentId?: string | undefined;
+    readonly acpLocalAgentKey?: string | undefined;
     readonly enabled: boolean;
   }>,
 ): boolean {
@@ -85,7 +93,7 @@ export function shouldShowInstanceBadge(
     if (entry.enabled && !candidate.enabled) continue;
     if (
       entry.driverKind === "acpRegistry" &&
-      candidate.acpRegistryAgentId !== entry.acpRegistryAgentId
+      acpAgentIdentity(candidate) !== acpAgentIdentity(entry)
     ) {
       continue;
     }

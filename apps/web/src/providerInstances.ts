@@ -33,6 +33,8 @@ export interface ProviderInstanceEntry {
   readonly accentColor?: string | undefined;
   readonly acpRegistryAgentId?: string | undefined;
   readonly acpRegistryIconUrl?: string | undefined;
+  /** A local ACP agent's identity: the command that starts it. */
+  readonly acpLocalAgentKey?: string | undefined;
   readonly continuationGroupKey?: string | undefined;
   readonly enabled: boolean;
   readonly installed: boolean;
@@ -158,6 +160,25 @@ export function applyProviderInstanceSettings(
   });
 }
 
+function localAgentCommand(config: Readonly<Record<string, unknown>>): string {
+  const args = Array.isArray(config.commandArgs) ? config.commandArgs : [];
+  return [config.commandPath, ...args]
+    .filter((part): part is string => typeof part === "string" && part.length > 0)
+    .join(" ");
+}
+
+/** The app icons of the local ACP bridges Tianshu ships, known by the command that starts them. */
+const LOCAL_AGENT_ICONS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/zcode-acp-server|ZCODE_BIN=/, "/agents/zcode.png"],
+  [/dsh-acp|DSH_BIN=/, "/agents/deepseek.png"],
+  [/fastctx-acp/, "/agents/fastctx.png"],
+  [/antigravity-acp/, "/agents/antigravity.png"],
+];
+
+function localAgentIconUrl(command: string): string | undefined {
+  return LOCAL_AGENT_ICONS.find(([pattern]) => pattern.test(command))?.[1];
+}
+
 function applyProviderInstanceBranding(
   entry: ProviderInstanceEntry,
   settings: Pick<ServerSettings, "providerInstances">,
@@ -171,12 +192,19 @@ function applyProviderInstanceBranding(
       ? (explicitInstance.config as Readonly<Record<string, unknown>>)
       : null;
   if (config?.source === "local") {
-    return { ...entry, acpRegistryAgentId: undefined, acpRegistryIconUrl: undefined };
+    const command = localAgentCommand(config);
+    return {
+      ...entry,
+      acpRegistryAgentId: undefined,
+      acpRegistryIconUrl: localAgentIconUrl(command),
+      acpLocalAgentKey: command || undefined,
+    };
   }
   const agentId = config?.agentId;
   const iconUrl = config?.registryIconUrl;
   return {
     ...entry,
+    acpLocalAgentKey: undefined,
     ...(typeof agentId === "string" && agentId.trim()
       ? { acpRegistryAgentId: agentId.trim() }
       : {}),
