@@ -36,6 +36,7 @@ import {
   groupSidebarThreadsByProject,
   resolveSidebarFolderDot,
   sidebarFolderExpansionKeys,
+  threadProjectNames,
 } from "./LegacySidebar.logic";
 import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
 import {
@@ -1554,5 +1555,19 @@ describe("shouldCreateNewThreadInCurrentProject", () => {
     expect(shouldCreateNewThreadInCurrentProject(false, 1, 3)).toBe(true);
     expect(shouldCreateNewThreadInCurrentProject(false, 0, 0)).toBe(true);
     expect(shouldCreateNewThreadInCurrentProject(true, 2, 2)).toBe(true);
+  });
+});
+
+describe("threadProjectNames", () => {
+  it("names a thread by its own project, also when two environments share a project id", () => {
+    const remote = EnvironmentId.make("environment-remote");
+    const id = ProjectId.make("project-1");
+    const nameOf = threadProjectNames([
+      { environmentId: localEnvironmentId, id, title: "phone-tools" },
+      { environmentId: remote, id, title: "media-server" },
+    ]);
+    expect(nameOf({ environmentId: localEnvironmentId, projectId: id })).toBe("phone-tools");
+    expect(nameOf({ environmentId: remote, projectId: id })).toBe("media-server");
+    expect(nameOf({ environmentId: remote, projectId: ProjectId.make("gone") })).toBeUndefined();
   });
 });

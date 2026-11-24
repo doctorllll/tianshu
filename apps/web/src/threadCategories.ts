@@ -117,7 +117,13 @@ export function isUntitledThreadTitle(title: string) {
 }
 
 export function classifyThread(
-  input: { readonly title: string; readonly projectName?: string | null | undefined },
+  input: {
+    readonly title: string;
+    /** The sidebar row's label, which can gather several projects; legacy rules match it. */
+    readonly projectName?: string | null | undefined;
+    /** The name of the project the thread runs in. */
+    readonly folderName?: string | null | undefined;
+  },
   settings: SidebarCategorySettings,
 ): string {
   if (!settings.automatic || settings.preset === "project" || isUntitledThreadTitle(input.title)) {
@@ -133,7 +139,7 @@ export function classifyThread(
   // The title decides; a folder is usually named after what its threads work on.
   const category =
     categoryWithKeywordIn(categories, input.title) ??
-    (input.projectName ? categoryWithKeywordIn(categories, input.projectName) : undefined);
+    (input.folderName ? categoryWithKeywordIn(categories, input.folderName) : undefined);
   return category?.id ?? UNSORTED_CATEGORY_ID;
 }
 

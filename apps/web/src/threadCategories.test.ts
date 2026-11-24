@@ -97,14 +97,18 @@ describe("filing by the model", () => {
       resolveThreadCategory(
         {},
         "k",
-        { title: "Commit the changes", projectName: "phone-tools" },
+        { title: "Commit the changes", projectName: "Code", folderName: "phone-tools" },
         filing,
         categoryDefinitions(filing),
         auto,
       ),
     ).toBe("devices");
-    expect(classifyThread({ title: "Root the phone", projectName: "phones" }, filing)).toBe(
+    expect(classifyThread({ title: "Root the phone", folderName: "phones" }, filing)).toBe(
       "devices",
+    );
+    // A row label gathering several projects says nothing about one thread.
+    expect(classifyThread({ title: "Commit", projectName: "phone" }, filing)).toBe(
+      UNSORTED_CATEGORY_ID,
     );
     expect(resolve("k", "Commit the changes", {}, { ...filing, suggestions: false })).toBe(
       UNSORTED_CATEGORY_ID,

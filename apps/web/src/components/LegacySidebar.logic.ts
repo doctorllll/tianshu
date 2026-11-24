@@ -1,6 +1,11 @@
 import { uiText } from "~/i18n";
 import type { EnvironmentServerConfig } from "@t3tools/client-runtime/connection";
-import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
+import {
+  scopeProjectRef,
+  scopeThreadRef,
+  scopedProjectKey,
+  scopedThreadKey,
+} from "@t3tools/client-runtime/environment";
 import { resolveThreadWorkingStartedAt } from "@t3tools/client-runtime/state/models";
 import { isShownUnderParent } from "@t3tools/client-runtime/state/threads";
 import { backgroundWorkHoldsCompletion } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
@@ -37,7 +42,7 @@ import {
   toSortableTimestamp,
   type ThreadSortInput,
 } from "@t3tools/client-runtime/state/thread-sort";
-import type { SidebarThreadSummary, Thread } from "../types";
+import type { Project, SidebarThreadSummary, Thread } from "../types";
 import { normalizeSearchText } from "../lib/utils";
 import { isLatestRunSettled } from "../session-logic";
 import { observeIntersection } from "../lib/observeIntersection";
@@ -59,6 +64,20 @@ export function shouldNavigateAfterThreadPark(input: {
       ? input.thread.settledOverride === "settled"
       : effectiveSnoozed(input.thread, { now: input.now }))
   );
+}
+
+/**
+ * Finds the name of the project a thread runs in. A sidebar row can gather several projects
+ * under one label, which says nothing about what a single thread works on.
+ */
+export function threadProjectNames(
+  projects: ReadonlyArray<Pick<Project, "environmentId" | "id" | "title">>,
+): (thread: Pick<SidebarThreadSummary, "environmentId" | "projectId">) => string | undefined {
+  const names = new Map<string, string>();
+  for (const project of projects)
+    names.set(scopedProjectKey(scopeProjectRef(project.environmentId, project.id)), project.title);
+  return (thread) =>
+    names.get(scopedProjectKey(scopeProjectRef(thread.environmentId, thread.projectId)));
 }
 
 const THREAD_JUMP_HINT_SHOW_DELAY_MS = 200;

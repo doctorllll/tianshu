@@ -236,6 +236,7 @@ import {
   useSidebarRowSubscriptionLease,
   useThreadJumpHintsVisible,
   ThreadStatusPill,
+  threadProjectNames,
 } from "./LegacySidebar.logic";
 import { sortThreads, getThreadSortTimestamp } from "@t3tools/client-runtime/state/thread-sort";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
@@ -3478,6 +3479,7 @@ function buildCategorySections(
   categories: readonly ThreadCategory[],
   groups: readonly string[],
   auto: AutoCategoryAssignments,
+  projectNameOf: (thread: SidebarThreadSummary) => string | undefined,
 ): CategorySection[] {
   const threadByKey = new Map(
     threads.map(
@@ -3520,6 +3522,7 @@ function buildCategorySections(
         {
           title: root.title,
           projectName: projectNameByThreadKey.get(rootKey) ?? project.displayName,
+          folderName: projectNameOf(root),
         },
         settings,
         categories,
@@ -4277,6 +4280,7 @@ export default function LegacySidebar(props: { routeReveal: SidebarRouteReveal }
       sortByActivity: !isManualProjectSorting,
     });
   })();
+  const threadProjectName = threadProjectNames(orderedProjects);
   const categoryVisits = useUiStateStore((state) => state.threadLastVisitedAtById);
   const categoryAcknowledged = useWorkbenchInboxStore((state) => state.acknowledgedErrors);
   const unsortedCategorySections: readonly CategorySection[] | null =
@@ -4290,6 +4294,7 @@ export default function LegacySidebar(props: { routeReveal: SidebarRouteReveal }
           categories,
           groups,
           categoryAuto,
+          threadProjectName,
         )
       : null;
   const categoryOrder = useStableCategoryOrder(
@@ -4322,15 +4327,6 @@ export default function LegacySidebar(props: { routeReveal: SidebarRouteReveal }
     )?.providerThreadKeys;
   // Unsorted conversations, without their subtasks, which follow them. Each goes to the model
   // with the folder it runs in and its agent.
-  const unsortedProjectNames = new Map<string, string>();
-  if (unsortedKeys && projectSections)
-    for (const project of [
-      ...projectSections.pinned,
-      ...projectSections.recent,
-      ...projectSections.more,
-    ])
-      for (const key of project.providerThreadKeys ?? [])
-        unsortedProjectNames.set(key, project.displayName);
   const unsortedCandidates: AutoFileCandidate[] = visibleThreads.flatMap((thread) => {
     const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
     if (
@@ -4340,7 +4336,7 @@ export default function LegacySidebar(props: { routeReveal: SidebarRouteReveal }
       subtaskTree.parentByKey.has(subtaskThreadKey(thread))
     )
       return [];
-    const project = unsortedProjectNames.get(key);
+    const project = threadProjectName(thread);
     return [
       {
         key,
