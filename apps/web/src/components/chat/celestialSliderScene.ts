@@ -183,6 +183,100 @@ export function celestialAccentAt(
 const rgba = ([r, g, b]: Rgb, alpha: number) =>
   `rgba(${r},${g},${b},${Math.max(0, Math.min(1, alpha)).toFixed(3)})`;
 
+/** Side of the canvases gradients are baked into; the gradients are soft, so they scale up cleanly. */
+const BAKED_PX = 256;
+const bakedGradients = new Map<string, HTMLCanvasElement | null>();
+
+function bakedCanvas(w: number, h: number): HTMLCanvasElement | null {
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(w));
+  canvas.height = Math.max(1, Math.round(h));
+  return canvas;
+}
+
+/**
+ * A radial gradient (from `inner` of the radius out) drawn once into a small canvas. Frames stamp
+ * it and set its strength with globalAlpha instead of building the same gradient every frame.
+ */
+function bakedGradient(
+  key: string,
+  inner: number,
+  stops: ReadonlyArray<readonly [offset: number, rgb: Rgb, alpha: number]>,
+): HTMLCanvasElement | null {
+  const cached = bakedGradients.get(key);
+  if (cached !== undefined) return cached;
+  const canvas = bakedCanvas(BAKED_PX, BAKED_PX);
+  const c = canvas?.getContext("2d");
+  if (canvas && c) {
+    const half = BAKED_PX / 2;
+    const fill = c.createRadialGradient(half, half, inner * half, half, half, half);
+    for (const [offset, rgb, alpha] of stops) fill.addColorStop(offset, rgba(rgb, alpha));
+    c.fillStyle = fill;
+    c.fillRect(0, 0, BAKED_PX, BAKED_PX);
+  }
+  const sprite = canvas && c ? canvas : null;
+  bakedGradients.set(key, sprite);
+  return sprite;
+}
+
+/** Stamps a baked gradient centred on (x, y) out to `radius`, at `alpha` of its baked strength. */
+function stamp(
+  ctx: CanvasRenderingContext2D,
+  sprite: HTMLCanvasElement | null,
+  x: number,
+  y: number,
+  radius: number,
+  alpha: number,
+) {
+  if (!sprite || alpha <= 0.001 || radius <= 0) return;
+  const base = ctx.globalAlpha;
+  ctx.globalAlpha = base * Math.min(1, alpha);
+  ctx.drawImage(sprite, x - radius, y - radius, radius * 2, radius * 2);
+  ctx.globalAlpha = base;
+}
+
+const featherMasks = new Map<string, HTMLCanvasElement | null>();
+
+/**
+ * The page-level canvas's edge fade as one mask, drawn once per size. Applied with destination-in
+ * it fades all four edges in one pass, where two full-canvas gradient fills a frame did before.
+ */
+export function celestialFeatherMask(
+  w: number,
+  h: number,
+  scale: number,
+  feather: number,
+): HTMLCanvasElement | null {
+  const key = `${w}x${h}@${scale}/${feather}`;
+  const cached = featherMasks.get(key);
+  if (cached !== undefined) return cached;
+  if (featherMasks.size > 4) featherMasks.clear();
+  const canvas = bakedCanvas(w * scale, h * scale);
+  const c = canvas?.getContext("2d");
+  if (canvas && c) {
+    c.setTransform(scale, 0, 0, scale, 0, 0);
+    const across = c.createLinearGradient(0, 0, w, 0);
+    across.addColorStop(0, "rgba(0,0,0,0)");
+    across.addColorStop(feather / w, "rgba(0,0,0,1)");
+    across.addColorStop(1 - feather / w, "rgba(0,0,0,1)");
+    across.addColorStop(1, "rgba(0,0,0,0)");
+    c.fillStyle = across;
+    c.fillRect(0, 0, w, h);
+    c.globalCompositeOperation = "destination-in";
+    const down = c.createLinearGradient(0, 0, 0, h);
+    down.addColorStop(0, "rgba(0,0,0,0)");
+    down.addColorStop(feather / h, "rgba(0,0,0,1)");
+    down.addColorStop(1 - feather / h, "rgba(0,0,0,1)");
+    down.addColorStop(1, "rgba(0,0,0,0)");
+    c.fillStyle = down;
+    c.fillRect(0, 0, w, h);
+  }
+  const mask = canvas && c ? canvas : null;
+  featherMasks.set(key, mask);
+  return mask;
+}
+
 /** Public path of a body's render; the composer chip uses it too. */
 export const celestialSpriteUrl = (id: CelestialStageId) => `/celestial/${id}.webp?v=2`;
 
@@ -283,11 +377,38 @@ function drawStars(
     const twinkle = 0.5 + 0.5 * Math.sin(t * star.speed + star.phase);
     const x = (((star.x * w + shift) % w) + w) % w;
     const y = 3 + star.y * (h - 6);
-    ctx.fillStyle = `rgba(222,232,255,${((0.18 + 0.6 * twinkle) * bright).toFixed(3)})`;
-    ctx.beginPath();
-    ctx.arc(x, y, star.size, 0, Math.PI * 2);
-    ctx.fill();
+    dot(ctx, x, y, star.size, "rgb(222,232,255)", (0.18 + 0.6 * twinkle) * bright);
   }
+}
+
+function fillHorizonBody(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const radius = w * 3;
+  const body = ctx.createLinearGradient(0, h * 0.78, 0, h);
+  body.addColorStop(0, "rgba(10,14,30,0.92)");
+  body.addColorStop(1, "rgba(2,3,8,1)");
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.arc(w / 2, h * 0.8 + radius, radius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+const horizonBodies = new Map<string, HTMLCanvasElement | null>();
+
+/** The planet's dark body is the same for a track size, so it is drawn once per size. */
+function horizonBody(w: number, h: number, scale: number): HTMLCanvasElement | null {
+  const key = `${w}x${h}@${scale}`;
+  const cached = horizonBodies.get(key);
+  if (cached !== undefined) return cached;
+  if (horizonBodies.size > 4) horizonBodies.clear();
+  const canvas = bakedCanvas(w * scale, h * scale);
+  const c = canvas?.getContext("2d");
+  if (canvas && c) {
+    c.setTransform(scale, 0, 0, scale, 0, 0);
+    fillHorizonBody(c, w, h);
+  }
+  const layer = canvas && c ? canvas : null;
+  horizonBodies.set(key, layer);
+  return layer;
 }
 
 /** A giant planet's limb low across the track, lit where the knob's body hangs over it. */
@@ -296,13 +417,10 @@ function drawHorizon(ctx: CanvasRenderingContext2D, w: number, h: number, kx: nu
   const cx = w / 2;
   const cy = h * 0.8 + radius;
   ctx.save();
-  const body = ctx.createLinearGradient(0, h * 0.78, 0, h);
-  body.addColorStop(0, "rgba(10,14,30,0.92)");
-  body.addColorStop(1, "rgba(2,3,8,1)");
-  ctx.fillStyle = body;
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  ctx.fill();
+  const scale = ctx.getTransform().a;
+  const body = horizonBody(w, h, scale);
+  if (body) ctx.drawImage(body, 0, 0, body.width / scale, body.height / scale);
+  else fillHorizonBody(ctx, w, h);
 
   const lit = ctx.createLinearGradient(0, 0, w, 0);
   const at = clamp01(kx / w);
@@ -326,6 +444,18 @@ function drawHorizon(ctx: CanvasRenderingContext2D, w: number, h: number, kx: nu
   ctx.restore();
 }
 
+const CLEAR: Rgb = [0, 0, 0];
+const NEBULA_VIOLET = () =>
+  bakedGradient("nebula-violet", 0, [
+    [0, [118, 84, 255], 0.07],
+    [1, CLEAR, 0],
+  ]);
+const NEBULA_BLUE = () =>
+  bakedGradient("nebula-blue", 0, [
+    [0, [40, 130, 255], 0.06],
+    [1, CLEAR, 0],
+  ]);
+
 /** Everything behind the body: deep sky with parallax stars, nebula light, horizon, Dipper, marks. */
 export function drawCelestialSky(ctx: CanvasRenderingContext2D, frame: CelestialFrame) {
   const { w, h, ratio, t, stages, detents, selected, kx } = frame;
@@ -339,17 +469,8 @@ export function drawCelestialSky(ctx: CanvasRenderingContext2D, frame: Celestial
 
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-  const nebulae: ReadonlyArray<readonly [number, number, number, string]> = [
-    [w * 0.84 + Math.sin(t * 0.07) * 8, h * 0.15, h * 2.4, "rgba(118,84,255,0.07)"],
-    [w * 0.18 + Math.cos(t * 0.05) * 8, h * 0.95, h * 2.1, "rgba(40,130,255,0.06)"],
-  ];
-  for (const [x, y, r, color] of nebulae) {
-    const cloud = ctx.createRadialGradient(x, y, 0, x, y, r);
-    cloud.addColorStop(0, color);
-    cloud.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = cloud;
-    ctx.fillRect(0, 0, w, h);
-  }
+  stamp(ctx, NEBULA_VIOLET(), w * 0.84 + Math.sin(t * 0.07) * 8, h * 0.15, h * 2.4, 1);
+  stamp(ctx, NEBULA_BLUE(), w * 0.18 + Math.cos(t * 0.05) * 8, h * 0.95, h * 2.1, 1);
   const near = ctx.createRadialGradient(kx, h * 0.45, 0, kx, h * 0.45, h * 2.8);
   near.addColorStop(0, rgba(tint, 0.16 + ratio * 0.1));
   near.addColorStop(1, rgba(tint, 0));
@@ -481,6 +602,22 @@ const ARMS = orbiters(0x6a1a, 120, (random) => {
   };
 });
 
+// Each grain's colour and thinning depend only on its radius: hotter inside, thinner outside.
+const DISK_LOOK = DISK.map((grain) => {
+  const hot = Math.max(0, 1 - (grain.r - 0.17) / 0.3);
+  return {
+    fill: `rgb(255,${Math.round(150 + hot * 80)},${Math.round(70 + hot * 90)})`,
+    thin: grain.r > 0.45 ? 1 - ((grain.r - 0.45) / 0.17) * 0.75 : 1,
+  };
+});
+
+const armLook = (star: Orbiter) =>
+  star.r < 0.11
+    ? { fill: "rgb(255,226,186)", strength: 0.5 }
+    : star.phase < 0.16
+      ? { fill: "rgb(255,140,226)", strength: 0.5 }
+      : { fill: "rgb(176,196,255)", strength: 0.42 };
+
 const MOTES = orbiters(0x57a2d, 30, (random) => ({
   a: random() * Math.PI * 2,
   r: Math.pow(random(), 0.6) * 0.3,
@@ -508,11 +645,23 @@ function onEllipse(angle: number, rx: number, ry: number, tilt: number) {
   return { x: ex * c - ey * s, y: ex * s + ey * c, front: Math.sin(angle) > 0 };
 }
 
-function dot(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string) {
+/** A dot in an opaque colour at `alpha`, so no colour string is built for every dot of a frame. */
+function dot(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  fill: string,
+  alpha: number,
+) {
+  if (alpha <= 0.001) return;
+  const base = ctx.globalAlpha;
+  ctx.globalAlpha = base * Math.min(1, alpha);
   ctx.fillStyle = fill;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
+  ctx.globalAlpha = base;
 }
 
 /** Motion layered over a body's render: debris, a moon, corona, accretion, arms, motes. */
@@ -536,7 +685,7 @@ function drawBodyMotion(
         const px = x + Math.cos(angle) * mote.r * size;
         const py = y + Math.sin(angle) * mote.r * size * 0.7;
         const twinkle = Math.pow(0.5 + 0.5 * Math.sin(t * (1.2 + mote.w * 5) + mote.phase), 3);
-        dot(ctx, px, py, mote.s, `rgba(200,235,255,${(twinkle * 0.9 * weight).toFixed(3)})`);
+        dot(ctx, px, py, mote.s, "rgb(200,235,255)", twinkle * 0.9 * weight);
         if (twinkle > 0.85) {
           ctx.strokeStyle = `rgba(200,235,255,${(0.5 * weight).toFixed(3)})`;
           ctx.lineWidth = 0.5;
@@ -556,13 +705,14 @@ function drawBodyMotion(
         const p = onEllipse(rock.a + t * rock.w, rock.r * size, rock.r * size * 0.26, -0.35);
         if (p.front !== (layer === "front")) continue;
         const shade = p.front ? 1 : 0.55;
-        dot(ctx, x + p.x, y + p.y, rock.s, `rgba(70,76,88,${(0.9 * weight).toFixed(3)})`);
+        dot(ctx, x + p.x, y + p.y, rock.s, "rgb(70,76,88)", 0.9 * weight);
         dot(
           ctx,
           x + p.x - rock.s * 0.3,
           y + p.y - rock.s * 0.3,
           rock.s * 0.6,
-          `rgba(214,222,236,${(0.85 * shade * weight).toFixed(3)})`,
+          "rgb(214,222,236)",
+          0.85 * shade * weight,
         );
       }
       break;
@@ -595,12 +745,7 @@ function drawBodyMotion(
     case "star": {
       if (layer === "back") {
         const breathe = 0.3 + 0.1 * Math.sin(t * 2.1) + 0.05 * Math.sin(t * 5.3);
-        const corona = ctx.createRadialGradient(x, y, size * 0.3, x, y, size * 0.95);
-        corona.addColorStop(0, `rgba(255,170,70,${(breathe * weight).toFixed(3)})`);
-        corona.addColorStop(0.45, `rgba(255,130,50,${(breathe * 0.35 * weight).toFixed(3)})`);
-        corona.addColorStop(1, "rgba(255,120,40,0)");
-        ctx.fillStyle = corona;
-        ctx.fillRect(x - size, y - size, size * 2, size * 2);
+        stamp(ctx, CORONA(), x, y, size * 0.95, breathe * weight);
         break;
       }
       const flicker = 0.75 + 0.25 * Math.sin(t * 3.7) * Math.sin(t * 1.9);
@@ -615,7 +760,7 @@ function drawBodyMotion(
         const reach = size * (0.36 + phase * 0.6);
         const px = x + Math.cos(spark.a) * reach;
         const py = y + Math.sin(spark.a) * reach;
-        dot(ctx, px, py, spark.s, `rgba(255,190,110,${((1 - phase) * 0.8 * weight).toFixed(3)})`);
+        dot(ctx, px, py, spark.s, "rgb(255,190,110)", (1 - phase) * 0.8 * weight);
       }
       break;
     }
@@ -645,42 +790,23 @@ function drawBodyMotion(
           for (let k = 0; k < 3; k++) {
             const phase = frac(t * 1.5 + k / 3 + (dir > 0 ? 0.17 : 0));
             const fade = (1 - phase) * Math.min(1, phase * 6) * 0.85 * weight;
-            dot(
-              ctx,
-              x,
-              y + dir * jet * phase,
-              1.4 * (1 - phase * 0.5),
-              `rgba(225,238,255,${fade.toFixed(3)})`,
-            );
+            dot(ctx, x, y + dir * jet * phase, 1.4 * (1 - phase * 0.5), "rgb(225,238,255)", fade);
           }
         }
         ctx.globalCompositeOperation = "source-over";
-        const pull = ctx.createRadialGradient(x, y, size * 0.1, x, y, size * 0.55);
-        pull.addColorStop(0, `rgba(0,0,0,${(0.7 * weight).toFixed(3)})`);
-        pull.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.fillStyle = pull;
-        ctx.fillRect(x - size, y - size, size * 2, size * 2);
+        stamp(ctx, PULL(), x, y, size * 0.55, weight);
         ctx.globalCompositeOperation = "lighter";
       }
       const grit = Math.sqrt(size / 76);
-      for (const grain of DISK) {
+      DISK.forEach((grain, index) => {
         const angle = grain.a + t * grain.w;
         const p = onEllipse(angle, grain.r * size, grain.r * size * 0.085, 0);
-        if (p.front !== (layer === "front")) continue;
-        // The side turning toward us burns brighter; the outer disc thins out.
+        if (p.front !== (layer === "front")) return;
+        // The side turning toward us burns brighter.
         const doppler = 0.55 + 0.45 * -Math.cos(angle);
-        const hot = Math.max(0, 1 - (grain.r - 0.17) / 0.3);
-        const thin = grain.r > 0.45 ? 1 - ((grain.r - 0.45) / 0.17) * 0.75 : 1;
-        const g = Math.round(150 + hot * 80);
-        const b = Math.round(70 + hot * 90);
-        dot(
-          ctx,
-          x + p.x,
-          y + p.y,
-          grain.s * grit,
-          `rgba(255,${g},${b},${(0.75 * doppler * thin * weight).toFixed(3)})`,
-        );
-      }
+        const look = DISK_LOOK[index]!;
+        dot(ctx, x + p.x, y + p.y, grain.s * grit, look.fill, 0.75 * doppler * look.thin * weight);
+      });
       if (layer === "front") {
         for (let i = 0; i < 6; i++) {
           const phase = frac(t * 0.3 + i / 6);
@@ -689,7 +815,7 @@ function drawBodyMotion(
           const px = x + Math.cos(angle) * reach;
           const py = y + Math.sin(angle) * reach * 0.12;
           const fade = Math.sin(phase * Math.PI) * 0.7 * weight;
-          dot(ctx, px, py, 0.7, `rgba(255,220,170,${fade.toFixed(3)})`);
+          dot(ctx, px, py, 0.7, "rgb(255,220,170)", fade);
         }
         const shimmer = 0.26 + 0.16 * Math.sin(t * 2.6);
         ctx.strokeStyle = `rgba(255,228,190,${(shimmer * weight).toFixed(3)})`;
@@ -708,13 +834,8 @@ function drawBodyMotion(
         ctx.translate(x, y);
         ctx.rotate(GALAXY_TILT);
         ctx.scale(1, GALAXY_SQUASH);
-        const halo = ctx.createRadialGradient(0, 0, size * 0.2, 0, 0, size * 0.78);
         const breathe = 0.16 + 0.04 * Math.sin(t * 0.9);
-        halo.addColorStop(0, `rgba(150,128,255,${(breathe * weight).toFixed(3)})`);
-        halo.addColorStop(0.5, `rgba(90,110,255,${(breathe * 0.4 * weight).toFixed(3)})`);
-        halo.addColorStop(1, "rgba(90,110,255,0)");
-        ctx.fillStyle = halo;
-        ctx.fillRect(-size, -size, size * 2, size * 2);
+        stamp(ctx, GALAXY_HALO(), 0, 0, size * 0.78, breathe * weight);
         ctx.restore();
         break;
       }
@@ -726,27 +847,50 @@ function drawBodyMotion(
           GALAXY_TILT,
         );
         const twinkle = 0.45 + 0.55 * Math.sin(t * (1 + star.phase * 3) + star.phase * 9);
-        const fill =
-          star.r < 0.11
-            ? `rgba(255,226,186,${(0.5 * twinkle * weight).toFixed(3)})`
-            : star.phase < 0.16
-              ? `rgba(255,140,226,${(0.5 * twinkle * weight).toFixed(3)})`
-              : `rgba(176,196,255,${(0.42 * twinkle * weight).toFixed(3)})`;
-        dot(ctx, x + p.x, y + p.y, star.s, fill);
+        const look = armLook(star);
+        dot(ctx, x + p.x, y + p.y, star.s, look.fill, look.strength * twinkle * weight);
       }
-      const core = ctx.createRadialGradient(x, y, 0, x, y, size * 0.16);
-      core.addColorStop(
-        0,
-        `rgba(255,232,196,${((0.3 + 0.1 * Math.sin(t * 1.7)) * weight).toFixed(3)})`,
-      );
-      core.addColorStop(1, "rgba(255,232,196,0)");
-      ctx.fillStyle = core;
-      ctx.fillRect(x - size * 0.2, y - size * 0.2, size * 0.4, size * 0.4);
+      stamp(ctx, GALAXY_CORE(), x, y, size * 0.16, (0.3 + 0.1 * Math.sin(t * 1.7)) * weight);
       break;
     }
   }
   ctx.restore();
 }
+
+// Gradients that change only in strength from frame to frame, baked once at full strength.
+const CORONA = () =>
+  bakedGradient("corona", 0.3 / 0.95, [
+    [0, [255, 170, 70], 1],
+    [0.45, [255, 130, 50], 0.35],
+    [1, [255, 120, 40], 0],
+  ]);
+const PULL = () =>
+  bakedGradient("pull", 0.1 / 0.55, [
+    [0, CLEAR, 0.7],
+    [1, CLEAR, 0],
+  ]);
+const GALAXY_HALO = () =>
+  bakedGradient("galaxy-halo", 0.2 / 0.78, [
+    [0, [150, 128, 255], 1],
+    [0.5, [90, 110, 255], 0.4],
+    [1, [90, 110, 255], 0],
+  ]);
+const GALAXY_CORE = () =>
+  bakedGradient("galaxy-core", 0, [
+    [0, [255, 232, 196], 1],
+    [1, [255, 232, 196], 0],
+  ]);
+const VOID = () =>
+  bakedGradient("void", 0, [
+    [0, [3, 4, 12], 0.82],
+    [0.6, [3, 4, 12], 0.5],
+    [1, [3, 4, 12], 0],
+  ]);
+const SHADE = () =>
+  bakedGradient("shade", 0.8, [
+    [0, [2, 3, 9], 0.96],
+    [1, [2, 3, 9], 0],
+  ]);
 
 /** A pocket of deep space the big bodies carry with them, so they read on any panel behind. */
 function drawVoid(
@@ -766,13 +910,7 @@ function drawVoid(
   } else {
     ctx.scale(1, 0.62);
   }
-  const r = size * 0.6;
-  const space = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
-  space.addColorStop(0, `rgba(3,4,12,${(0.82 * weight).toFixed(3)})`);
-  space.addColorStop(0.6, `rgba(3,4,12,${(0.5 * weight).toFixed(3)})`);
-  space.addColorStop(1, "rgba(3,4,12,0)");
-  ctx.fillStyle = space;
-  ctx.fillRect(-r, -r, r * 2, r * 2);
+  stamp(ctx, VOID(), 0, 0, size * 0.6, weight);
   ctx.restore();
 }
 
@@ -793,11 +931,11 @@ function drawOne(
 
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-  const halo = ctx.createRadialGradient(x, y, 0, x, y, size * 0.62);
-  halo.addColorStop(0, rgba(tint, 0.2 * weight));
-  halo.addColorStop(1, rgba(tint, 0));
-  ctx.fillStyle = halo;
-  ctx.fillRect(x - size, y - size, size * 2, size * 2);
+  const halo = bakedGradient(`halo:${stage.id}`, 0, [
+    [0, tint, 0.2],
+    [1, tint, 0],
+  ]);
+  stamp(ctx, halo, x, y, size * 0.62, weight);
   ctx.restore();
 
   drawBodyMotion(ctx, stage.id, x, y, size, t, weight, "back");
@@ -806,14 +944,7 @@ function drawOne(
   if (occlude) {
     const ox = x + (occlude.x - 0.5) * size;
     const oy = y + (occlude.y - 0.5) * size;
-    const r = occlude.r * size;
-    const shade = ctx.createRadialGradient(ox, oy, r * 0.8, ox, oy, r);
-    shade.addColorStop(0, `rgba(2,3,9,${(0.96 * weight).toFixed(3)})`);
-    shade.addColorStop(1, "rgba(2,3,9,0)");
-    ctx.fillStyle = shade;
-    ctx.beginPath();
-    ctx.arc(ox, oy, r, 0, Math.PI * 2);
-    ctx.fill();
+    stamp(ctx, SHADE(), ox, oy, occlude.r * size, weight);
   }
 
   if (image && image.complete && image.naturalWidth > 0) {

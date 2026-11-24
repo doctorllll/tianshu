@@ -8,6 +8,7 @@ import { CelestialParticles } from "./celestialParticles";
 import {
   type CelestialStage,
   celestialAccentAt,
+  celestialFeatherMask,
   celestialLayersAt,
   celestialPowerAt,
   celestialRgbAt,
@@ -456,24 +457,12 @@ export function CosmicEffortSlider(props: {
       if (!octx && !reducedMotion && st.shockFree) {
         drawCelestialShock(bodyCtx, kx, ky, st.shock, tint, st.shockPower);
       }
-      if (octx) {
+      const featherMask = octx ? celestialFeatherMask(ow, oh, dpr, FEATHER) : null;
+      if (octx && featherMask) {
         // Fade the canvas's own edges so nothing that leaves the track ends on a hard line.
-        octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        octx.setTransform(1, 0, 0, 1, 0, 0);
         octx.globalCompositeOperation = "destination-in";
-        const across = octx.createLinearGradient(0, 0, ow, 0);
-        across.addColorStop(0, "rgba(0,0,0,0)");
-        across.addColorStop(FEATHER / ow, "rgba(0,0,0,1)");
-        across.addColorStop(1 - FEATHER / ow, "rgba(0,0,0,1)");
-        across.addColorStop(1, "rgba(0,0,0,0)");
-        octx.fillStyle = across;
-        octx.fillRect(0, 0, ow, oh);
-        const down = octx.createLinearGradient(0, 0, 0, oh);
-        down.addColorStop(0, "rgba(0,0,0,0)");
-        down.addColorStop(FEATHER / oh, "rgba(0,0,0,1)");
-        down.addColorStop(1 - FEATHER / oh, "rgba(0,0,0,1)");
-        down.addColorStop(1, "rgba(0,0,0,0)");
-        octx.fillStyle = down;
-        octx.fillRect(0, 0, ow, oh);
+        octx.drawImage(featherMask, 0, 0);
         octx.globalCompositeOperation = "source-over";
       }
 
