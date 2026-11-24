@@ -261,7 +261,7 @@
       dpr = ratio;
       canvas.width = Math.round(w * ratio);
       canvas.height = Math.round(h * ratio);
-      const logoH = Math.min(H * 0.62, (W * 0.52 * VIEW_H) / VIEW_W, 700);
+      const logoH = Math.min(H * 0.42, (W * 0.36 * VIEW_H) / VIEW_W, 480);
       const s = logoH / VIEW_H;
       L = {
         s,
@@ -892,10 +892,10 @@
       const burst = tau < 110 ? tau / 110 : Math.exp(-(tau - 110) / 420);
       const twinkle = 0.2 + 0.06 * Math.sin(t / 150) + (exitAt === null ? 0 : 0.2);
       const I = Math.max(burst, twinkle);
-      const glow = (60 + 260 * I) * L.px;
+      const glow = (50 + 210 * I) * L.px;
       ctx.drawImage(gold, sx - glow / 2, sy - glow / 2, glow, glow);
       // Anamorphic lens streak.
-      const len = 40 + W * 0.45 * I;
+      const len = 40 + W * 0.36 * I;
       const streak = ctx.createLinearGradient(sx - len, 0, sx + len, 0);
       streak.addColorStop(0, "rgba(110,180,255,0)");
       streak.addColorStop(0.5, rgba([230, 244, 255], 0.95 * I));
