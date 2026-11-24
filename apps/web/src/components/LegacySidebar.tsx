@@ -1,5 +1,6 @@
 import { inboxLabel } from "~/i18n/inboxLabel";
 import { ThreadCategorySuggestions } from "./sidebar/ThreadCategorySuggestions";
+import { useAutoThreadCategories } from "./sidebar/useAutoThreadCategories";
 import * as Schema from "effect/Schema";
 import { useLocalStorage } from "~/hooks/useLocalStorage";
 import { useSidebarCategories } from "~/hooks/useSidebarCategories";
@@ -308,6 +309,8 @@ import { useWorkbenchInboxStore } from "../workbenchInboxStore";
 import { WorkbenchInbox } from "./sidebar/WorkbenchInbox";
 import { activeWorkStatus } from "../sidebarActiveWork";
 import {
+  type AutoCategoryAssignments,
+  type AutoFileCandidate,
   CATEGORY_PROJECT_KEY_PREFIX,
   isCategoryProjectKey,
   openThreadCategoryPicker,
@@ -3474,6 +3477,7 @@ function buildCategorySections(
   settings: SidebarCategorySettings,
   categories: readonly ThreadCategory[],
   groups: readonly string[],
+  auto: AutoCategoryAssignments,
 ): CategorySection[] {
   const threadByKey = new Map(
     threads.map(
@@ -3519,6 +3523,7 @@ function buildCategorySections(
         },
         settings,
         categories,
+        auto,
       );
       let bucket = buckets.get(category);
       if (!bucket) {
@@ -3949,6 +3954,7 @@ export default function LegacySidebar(props: { routeReveal: SidebarRouteReveal }
   const {
     settings: categorySettings,
     overrides: categoryOverrides,
+    auto: categoryAuto,
     categories,
     groups,
   } = useSidebarCategories();
@@ -4283,6 +4289,7 @@ export default function LegacySidebar(props: { routeReveal: SidebarRouteReveal }
           categorySettings,
           categories,
           groups,
+          categoryAuto,
         )
       : null;
   const categoryOrder = useStableCategoryOrder(
@@ -4313,16 +4320,51 @@ export default function LegacySidebar(props: { routeReveal: SidebarRouteReveal }
     .find(
       (project) => project.projectKey === `${CATEGORY_PROJECT_KEY_PREFIX}${UNSORTED_CATEGORY_ID}`,
     )?.providerThreadKeys;
+  // Unsorted conversations, without their subtasks, which follow them. Each goes to the model
+  // with the folder it runs in and its agent.
+  const unsortedProjectNames = new Map<string, string>();
+  if (unsortedKeys && projectSections)
+    for (const project of [
+      ...projectSections.pinned,
+      ...projectSections.recent,
+      ...projectSections.more,
+    ])
+      for (const key of project.providerThreadKeys ?? [])
+        unsortedProjectNames.set(key, project.displayName);
+  const unsortedCandidates: AutoFileCandidate[] = visibleThreads.flatMap((thread) => {
+    const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
+    if (
+      thread.archivedAt ||
+      thread.deletedAt ||
+      !unsortedKeys?.has(key) ||
+      subtaskTree.parentByKey.has(subtaskThreadKey(thread))
+    )
+      return [];
+    const project = unsortedProjectNames.get(key);
+    return [
+      {
+        key,
+        title: thread.title,
+        agent: thread.providerInstanceId,
+        ...(project ? { project } : {}),
+      },
+    ];
+  });
+  const filingCategories = categories.filter((category) => category.id !== UNSORTED_CATEGORY_ID);
+  useAutoThreadCategories({
+    enabled:
+      categorySettings.suggestions &&
+      categorySettings.preset !== "project" &&
+      categorySections !== null,
+    candidates: unsortedCandidates,
+    categories: filingCategories,
+    modelSelection: categorySettings.suggestionModel,
+  });
   const categorySuggestions =
     categorySettings.suggestions && categorySections ? (
       <ThreadCategorySuggestions
-        candidates={visibleThreads.flatMap((thread) => {
-          const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
-          return !thread.archivedAt && !thread.deletedAt && unsortedKeys?.has(key)
-            ? [{ key, title: thread.title }]
-            : [];
-        })}
-        categories={categories.filter((category) => category.id !== UNSORTED_CATEGORY_ID)}
+        candidates={unsortedCandidates}
+        categories={filingCategories}
         modelSelection={categorySettings.suggestionModel}
       />
     ) : null;

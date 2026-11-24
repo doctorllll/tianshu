@@ -1,3 +1,4 @@
+import type { ModelSelection, SidebarCategorySuggestionInput } from "@t3tools/contracts";
 import type { SidebarCategoryPreset, SidebarCategorySettings } from "@t3tools/contracts/settings";
 import { uiText } from "./i18n";
 import { useSyncExternalStore } from "react";
@@ -10,6 +11,8 @@ export interface ThreadCategory {
   readonly id: string;
   readonly label: string;
   readonly group?: string;
+  /** One line on what belongs here, for the model that files threads. */
+  readonly description?: string;
   readonly keywords: readonly string[];
 }
 export type ThreadCategoryGroup = string;
@@ -108,7 +111,7 @@ export function matchLocalCategoryRule(rule: Rule, text: string): boolean {
   return compiledPatterns.get(rule)?.test(text) ?? false;
 }
 
-function untitled(title: string) {
+export function isUntitledThreadTitle(title: string) {
   const value = title.trim();
   return !value || /^(<image|\[external unsupported|Call your built-in)/.test(value);
 }
@@ -117,7 +120,7 @@ export function classifyThread(
   input: { readonly title: string; readonly projectName?: string | null | undefined },
   settings: SidebarCategorySettings,
 ): string {
-  if (!settings.automatic || settings.preset === "project" || untitled(input.title)) {
+  if (!settings.automatic || settings.preset === "project" || isUntitledThreadTitle(input.title)) {
     return UNSORTED_CATEGORY_ID;
   }
   const categories = categoryDefinitions(settings);
@@ -139,12 +142,58 @@ export function classifyThread(
   return category?.id ?? UNSORTED_CATEGORY_ID;
 }
 
-const STORAGE_KEY = "t3code:thread-categories:v1";
+/** A JSON value in local storage that components follow; a missing or broken value reads as `empty`. */
+function localStore<T>(key: string, parse: (raw: string | null) => T, empty: T) {
+  let cachedRaw: string | null | undefined;
+  let cached = empty;
+  const listeners = new Set<() => void>();
+  const read = (): T => {
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(key);
+    } catch {
+      /* Storage unavailable: automatic categories still apply. */
+    }
+    if (raw !== cachedRaw) {
+      cachedRaw = raw;
+      cached = parse(raw);
+    }
+    return cached;
+  };
+  const subscribe = (listener: () => void) => {
+    listeners.add(listener);
+    window.addEventListener("storage", listener);
+    return () => {
+      listeners.delete(listener);
+      window.removeEventListener("storage", listener);
+    };
+  };
+  const write = (value: T): boolean => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      return false;
+    }
+    listeners.forEach((listener) => listener());
+    return true;
+  };
+  const use = () => useSyncExternalStore(subscribe, read, () => empty);
+  return { read, write, use };
+}
+
+const parseJson = (raw: string | null): unknown => {
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+};
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
 type Overrides = Readonly<Record<string, string>>;
 const EMPTY: Overrides = {};
-let cachedRaw: string | null | undefined;
-let cached: Overrides = EMPTY;
-const listeners = new Set<() => void>();
 
 export function parseCategoryOverrides(raw: string | null): Overrides {
   if (!raw) return EMPTY;
@@ -160,59 +209,262 @@ export function parseCategoryOverrides(raw: string | null): Overrides {
     return EMPTY;
   }
 }
-function read(): Overrides {
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(STORAGE_KEY);
-  } catch {
-    /* Storage unavailable: automatic categories still apply. */
-  }
-  if (raw !== cachedRaw) {
-    cachedRaw = raw;
-    cached = parseCategoryOverrides(raw);
-  }
-  return cached;
-}
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  window.addEventListener("storage", listener);
-  return () => {
-    listeners.delete(listener);
-    window.removeEventListener("storage", listener);
-  };
-}
+const overridesStore = localStore("t3code:thread-categories:v1", parseCategoryOverrides, EMPTY);
 export function useThreadCategoryOverrides(): Overrides {
-  return useSyncExternalStore(subscribe, read, () => EMPTY);
+  return overridesStore.use();
 }
 /** A manual choice is final: automatic rules never move that thread again. */
 export function setThreadCategories(changes: Readonly<Record<string, string | null>>): boolean {
-  const next: Record<string, string> = { ...read() };
+  const next: Record<string, string> = { ...overridesStore.read() };
   for (const [key, categoryId] of Object.entries(changes)) {
     if (categoryId === null) delete next[key];
     else next[key] = categoryId;
   }
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    return false;
-  }
-  listeners.forEach((listener) => listener());
-  return true;
+  return overridesStore.write(next);
 }
 export function setThreadCategory(threadKey: string, categoryId: string | null): boolean {
   return setThreadCategories({ [threadKey]: categoryId });
 }
+
+/**
+ * What the model made of a thread no keyword matched: a category, or null for no fit. The
+ * categories and title it saw tell whether a no-fit answer is still current.
+ */
+export interface AutoCategoryEntry {
+  readonly category: string | null;
+  readonly scheme: string;
+  readonly title: string;
+}
+export type AutoCategoryAssignments = Readonly<Record<string, AutoCategoryEntry>>;
+const EMPTY_AUTO: AutoCategoryAssignments = {};
+const AUTO_ENTRY_LIMIT = 2000;
+export function parseAutoAssignments(raw: string | null): AutoCategoryAssignments {
+  const value = parseJson(raw);
+  if (!isRecord(value)) return EMPTY_AUTO;
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, entry]) =>
+      isRecord(entry) &&
+      (entry.category === null || (typeof entry.category === "string" && entry.category)) &&
+      typeof entry.scheme === "string" &&
+      typeof entry.title === "string"
+        ? [[key, { category: entry.category, scheme: entry.scheme, title: entry.title }]]
+        : [],
+    ),
+  );
+}
+const autoStore = localStore("t3code:thread-categories-auto:v1", parseAutoAssignments, EMPTY_AUTO);
+export function useThreadCategoryAutoAssignments(): AutoCategoryAssignments {
+  return autoStore.use();
+}
+/** Newest answers last; the oldest go once there are more than the limit. */
+export function setAutoThreadCategories(changes: AutoCategoryAssignments): boolean {
+  const next: Record<string, AutoCategoryEntry> = { ...autoStore.read() };
+  for (const [key, entry] of Object.entries(changes)) {
+    delete next[key];
+    next[key] = entry;
+  }
+  const keys = Object.keys(next);
+  for (const key of keys.slice(0, Math.max(0, keys.length - AUTO_ENTRY_LIMIT))) delete next[key];
+  return autoStore.write(next);
+}
+
+/** Changes when a category is added, renamed or redescribed, so no-fit threads are tried again. */
+export function categoryScheme(categories: readonly ThreadCategory[]): string {
+  const text = JSON.stringify(
+    categories
+      .filter((category) => category.id !== UNSORTED_CATEGORY_ID)
+      .map((category) => [category.id, category.label, category.description ?? ""]),
+  );
+  let hash = 5381;
+  for (let index = 0; index < text.length; index++)
+    hash = ((hash << 5) + hash + text.charCodeAt(index)) | 0;
+  return (hash >>> 0).toString(36);
+}
+
+export interface AutoFileCandidate {
+  readonly key: string;
+  readonly title: string;
+  readonly project?: string;
+  readonly agent?: string;
+}
+/** Unsorted threads the model has not yet seen with these categories and this title. */
+export function threadsToAutoFile(
+  candidates: readonly AutoFileCandidate[],
+  auto: AutoCategoryAssignments,
+  categories: readonly ThreadCategory[],
+): AutoFileCandidate[] {
+  const scheme = categoryScheme(categories);
+  const ids = new Set(categories.map((category) => category.id));
+  return candidates.filter((candidate) => {
+    if (isUntitledThreadTitle(candidate.title)) return false;
+    const entry = auto[candidate.key];
+    if (!entry) return true;
+    if (entry.category) return !ids.has(entry.category);
+    return entry.scheme !== scheme || entry.title !== candidate.title;
+  });
+}
+
+/**
+ * The model request for up to 30 threads, with the categories it may answer by index. Each
+ * title goes with its folder and agent, and each category with the line on what belongs there.
+ */
+export function categorySuggestionRequest(input: {
+  readonly candidates: readonly AutoFileCandidate[];
+  readonly categories: readonly ThreadCategory[];
+  readonly modelSelection: ModelSelection | null;
+  readonly language: "en" | "zh";
+  readonly proposeNew: boolean;
+}): {
+  readonly input: SidebarCategorySuggestionInput;
+  readonly candidates: readonly AutoFileCandidate[];
+  readonly categories: readonly ThreadCategory[];
+} {
+  const candidates = input.candidates.slice(0, 30);
+  const categories = input.categories
+    .filter((category) => category.id !== UNSORTED_CATEGORY_ID)
+    .slice(0, 40);
+  return {
+    candidates,
+    categories,
+    input: {
+      titles: candidates.map((candidate) => candidate.title.slice(0, 500)),
+      categories: categories.map((category) => category.label.slice(0, 120)),
+      modelSelection: input.modelSelection,
+      language: input.language,
+      contexts: candidates.map((candidate) => ({
+        ...(candidate.project ? { project: candidate.project.slice(0, 120) } : {}),
+        ...(candidate.agent ? { agent: candidate.agent.slice(0, 60) } : {}),
+      })),
+      descriptions: categories.map((category) => (category.description ?? "").slice(0, 240)),
+      ...(input.proposeNew ? { proposeNew: true } : {}),
+    },
+  };
+}
+
+/** Manual choice first, then keywords, then what the model made of the thread. */
 export function resolveThreadCategory(
   overrides: Overrides,
   threadKey: string,
   input: Parameters<typeof classifyThread>[0],
   settings: SidebarCategorySettings,
   categories = visibleCategoryDefinitions(settings, overrides),
+  auto: AutoCategoryAssignments = EMPTY_AUTO,
 ): string {
   const manual = overrides[threadKey];
-  return manual && categories.some((category) => category.id === manual)
-    ? manual
-    : classifyThread(input, settings);
+  if (manual && categories.some((category) => category.id === manual)) return manual;
+  const filed = classifyThread(input, settings);
+  if (filed !== UNSORTED_CATEGORY_ID || !settings.suggestions || settings.preset === "project")
+    return filed;
+  const chosen = auto[threadKey]?.category;
+  return chosen && categories.some((category) => category.id === chosen)
+    ? chosen
+    : UNSORTED_CATEGORY_ID;
+}
+
+/** A category the model suggests for threads none fit, waiting for the user's answer. */
+export interface PendingCategoryProposal {
+  readonly label: string;
+  readonly description: string;
+  readonly keywords: readonly string[];
+  readonly threadKeys: readonly string[];
+}
+interface ProposalState {
+  readonly pending: readonly PendingCategoryProposal[];
+  /** Labels the user turned down, never suggested again. */
+  readonly dismissed: readonly string[];
+}
+const EMPTY_PROPOSALS: ProposalState = { pending: [], dismissed: [] };
+const MAX_PENDING_PROPOSALS = 3;
+const strings = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+export function parseCategoryProposals(raw: string | null): ProposalState {
+  const value = parseJson(raw);
+  if (!isRecord(value)) return EMPTY_PROPOSALS;
+  return {
+    pending: (Array.isArray(value.pending) ? value.pending : []).flatMap((entry) =>
+      isRecord(entry) && typeof entry.label === "string" && entry.label
+        ? [
+            {
+              label: entry.label,
+              description: typeof entry.description === "string" ? entry.description : "",
+              keywords: strings(entry.keywords),
+              threadKeys: strings(entry.threadKeys),
+            },
+          ]
+        : [],
+    ),
+    dismissed: strings(value.dismissed),
+  };
+}
+const proposalStore = localStore(
+  "t3code:sidebar-category-proposals:v1",
+  parseCategoryProposals,
+  EMPTY_PROPOSALS,
+);
+export function sameCategoryLabel(label: string) {
+  return label.normalize("NFKC").toLowerCase().replace(/\s+/g, "");
+}
+export function useCategoryProposals(): readonly PendingCategoryProposal[] {
+  return proposalStore.use().pending;
+}
+/** Adds new suggestions, merging one with a waiting suggestion of the same name. */
+export function addCategoryProposals(
+  incoming: readonly PendingCategoryProposal[],
+  categories: readonly ThreadCategory[],
+): boolean {
+  const state = proposalStore.read();
+  const taken = new Set([
+    ...state.dismissed,
+    ...categories.map((category) => sameCategoryLabel(category.label)),
+  ]);
+  const pending = [...state.pending];
+  for (const proposal of incoming) {
+    const label = sameCategoryLabel(proposal.label);
+    if (!label || taken.has(label)) continue;
+    const index = pending.findIndex((entry) => sameCategoryLabel(entry.label) === label);
+    if (index >= 0) {
+      const current = pending[index]!;
+      pending[index] = {
+        ...current,
+        threadKeys: [...new Set([...current.threadKeys, ...proposal.threadKeys])],
+      };
+    } else if (pending.length < MAX_PENDING_PROPOSALS) pending.push(proposal);
+  }
+  return proposalStore.write({ ...state, pending });
+}
+/** Removes a waiting suggestion; a turned-down one is never suggested again. */
+export function settleCategoryProposal(label: string, dismissed: boolean): boolean {
+  const state = proposalStore.read();
+  const key = sameCategoryLabel(label);
+  return proposalStore.write({
+    pending: state.pending.filter((entry) => sameCategoryLabel(entry.label) !== key),
+    dismissed: dismissed ? [...new Set([...state.dismissed, key])] : state.dismissed,
+  });
+}
+/** The settings with one more category, under the group of the last one. */
+export function withAddedCategory(
+  settings: SidebarCategorySettings,
+  category: Omit<ThreadCategory, "group">,
+): SidebarCategorySettings {
+  if (settings.preset === "project") return settings;
+  const rows = categoryDefinitions(settings).filter((entry) => entry.id !== UNSORTED_CATEGORY_ID);
+  const group = rows.at(-1)?.group;
+  return {
+    ...settings,
+    editedCategories: {
+      ...settings.editedCategories,
+      [settings.preset]: [
+        ...rows,
+        {
+          id: category.id,
+          label: category.label,
+          keywords: [...category.keywords],
+          ...(category.description ? { description: category.description } : {}),
+          ...(group ? { group } : {}),
+        },
+      ],
+    },
+  };
 }
 
 export const CATEGORY_PROJECT_KEY_PREFIX = "thread-category:";

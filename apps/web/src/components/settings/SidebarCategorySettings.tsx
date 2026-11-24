@@ -27,9 +27,26 @@ import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
 import { SettingsSection } from "./settingsLayout";
 
+/** The row with an optional line set, or left out when cleared. */
+function withText(
+  entry: ThreadCategory,
+  field: "group" | "description",
+  value: string,
+): ThreadCategory {
+  const group = field === "group" ? value : (entry.group ?? "");
+  const description = field === "description" ? value : (entry.description ?? "");
+  return {
+    id: entry.id,
+    label: entry.label,
+    keywords: entry.keywords,
+    ...(group ? { group } : {}),
+    ...(description ? { description } : {}),
+  };
+}
+
 export function SidebarCategorySettingsSection() {
   const text = useUiText();
-  const { settings, overrides, categories } = useSidebarCategories();
+  const { settings, overrides, auto, categories } = useSidebarCategories();
   const threads = useThreadShells();
   const projects = useProjects();
   const { models } = useSidebarSuggestionModels();
@@ -58,6 +75,7 @@ export function SidebarCategorySettingsSection() {
       },
       settings,
       categories,
+      auto,
     );
     counts.set(id, (counts.get(id) ?? 0) + 1);
   }
@@ -69,6 +87,11 @@ export function SidebarCategorySettingsSection() {
   };
   const editRow = (id: string, patch: Partial<ThreadCategory>) =>
     saveRows(editable.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry)));
+  const editText = (entry: ThreadCategory, field: "group" | "description", value: string) => {
+    if (value === (entry[field] ?? "")) return;
+    const row = withText(entry, field, value);
+    saveRows(editable.map((item) => (item.id === entry.id ? row : item)));
+  };
   const move = (id: string, position: number) => {
     const item = editable.find((entry) => entry.id === id);
     if (!item || position < 0 || position >= editable.length) return;
@@ -124,11 +147,11 @@ export function SidebarCategorySettingsSection() {
         <div className="flex flex-wrap items-center justify-between gap-4 p-4">
           <div>
             <label htmlFor="sidebar-category-suggest" className="text-stardust-body font-semibold">
-              {text("Ask a model for suggestions")}
+              {text("Let a model file threads")}
             </label>
             <p className="text-xs text-muted-foreground">
               {text(
-                "At five unsorted threads, a prompt offers to send their titles for suggestions.",
+                "Threads no keyword matches go to the model with their title, folder and agent. It can also suggest new categories.",
               )}
             </p>
           </div>
@@ -191,7 +214,9 @@ export function SidebarCategorySettingsSection() {
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">
-              {text("Drag to reorder. Edit a name or add keywords to match titles.")}
+              {text(
+                "Drag to reorder. Keywords file a thread at once; the line on what belongs here guides the model.",
+              )}
             </p>
             <Button
               variant="outline"
@@ -245,6 +270,17 @@ export function SidebarCategorySettingsSection() {
                   >
                     <GripVerticalIcon className="size-4" />
                   </button>
+                  <Input
+                    key={`group:${entry.group ?? ""}`}
+                    aria-label={text("Category group")}
+                    placeholder={text("Category group")}
+                    className="w-24"
+                    defaultValue={entry.group ?? ""}
+                    onBlur={(event) => editText(entry, "group", event.currentTarget.value.trim())}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") event.currentTarget.blur();
+                    }}
+                  />
                   <Input
                     key={categoryLabel(entry, text)}
                     aria-label={text("Category name")}
@@ -326,6 +362,21 @@ export function SidebarCategorySettingsSection() {
                   >
                     <XIcon />
                   </Button>
+                  <Input
+                    key={`description:${entry.description ?? ""}`}
+                    aria-label={text("What belongs in {category}", {
+                      category: categoryLabel(entry, text),
+                    })}
+                    placeholder={text("What belongs here, in one line")}
+                    className="basis-full"
+                    defaultValue={entry.description ?? ""}
+                    onBlur={(event) =>
+                      editText(entry, "description", event.currentTarget.value.trim())
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") event.currentTarget.blur();
+                    }}
+                  />
                 </div>
               ),
             )}

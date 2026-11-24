@@ -7731,6 +7731,23 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Give a topic and start with an outline": "给主题和读者，先出提纲",
   "Group by": "分组方式",
   "Help me categorize": "帮我分类",
+  "Let a model file threads": "让模型归类",
+  "Threads no keyword matches go to the model with their title, folder and agent. It can also suggest new categories.":
+    "关键词没对上的会话，会把标题、所在文件夹和 agent 交给模型归类；模型也会建议新分类。",
+  "Drag to reorder. Keywords file a thread at once; the line on what belongs here guides the model.":
+    "拖动排序。命中关键词的会话直接归入；「放什么」那一句给模型参考。",
+  "Category group": "所属大类",
+  "What belongs in {category}": "{category}放什么",
+  "What belongs here, in one line": "放什么（一句话，给模型看）",
+  "Suggested new category: {label}": "建议新建分类：{label}",
+  "{count} threads fit it": "可放进 {count} 个会话",
+  "No thanks": "不要",
+  "Create category": "新建分类",
+  "Titles, folder names and agents are shared. Checked threads move when you confirm.":
+    "只发送标题、文件夹名和 agent。勾选的会话在你确认后移动。",
+  "Suggested new categories": "建议新建的分类",
+  "Create {label}": "新建「{label}」",
+  "Create {label} and move {count} threads": "新建「{label}」并移入 {count} 个会话",
   "Help me find the cause of this error:": "帮我定位这条报错：",
   "Help me outline an article for this audience:": "请帮我为这类读者拟一篇文章的提纲：",
   "How should the sidebar be organized?": "左侧边栏想怎么整理？",

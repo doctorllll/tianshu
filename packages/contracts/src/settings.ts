@@ -438,6 +438,8 @@ const EditableSidebarCategories = Schema.Array(
     id: Schema.String,
     label: Schema.String,
     group: Schema.optionalKey(Schema.String),
+    /** One line on what belongs here, for the model that files threads. */
+    description: Schema.optionalKey(Schema.String),
     keywords: Schema.Array(Schema.String),
   }),
 );

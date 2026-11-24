@@ -1,40 +1,52 @@
 import { useAtomValue } from "@effect/atom-react";
 import { useEffect, useRef, useState } from "react";
-import * as Schema from "effect/Schema";
 import { useUiText } from "~/i18n/useUiText";
-import { useLocalStorage } from "~/hooks/useLocalStorage";
+import { useSidebarCategories } from "~/hooks/useSidebarCategories";
 import { useSidebarSuggestionModels } from "~/hooks/useSidebarSuggestionModels";
+import { updateClientSettings } from "~/hooks/useSettings";
 import { readUiLocale } from "~/i18n";
+import { randomUUID } from "~/lib/utils";
 import { serverEnvironment } from "~/state/server";
 import { useAtomCommand } from "~/state/use-atom-command";
-import { setThreadCategories, type ThreadCategory } from "~/threadCategories";
+import {
+  categorySuggestionRequest,
+  setAutoThreadCategories,
+  setThreadCategories,
+  settleCategoryProposal,
+  useCategoryProposals,
+  withAddedCategory,
+  type AutoFileCandidate,
+  type PendingCategoryProposal,
+  type ThreadCategory,
+} from "~/threadCategories";
 import type { ModelSelection } from "@t3tools/contracts";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Dialog, DialogDescription, DialogPopup, DialogTitle } from "../ui/dialog";
 
-type Candidate = { readonly key: string; readonly title: string };
-type Row = Candidate & {
+type Row = AutoFileCandidate & {
   readonly categoryId: string;
   readonly reason: string;
   readonly checked: boolean;
 };
+type ProposalRow = PendingCategoryProposal & { readonly checked: boolean };
 
+/**
+ * Unsorted threads and the categories the model suggests for threads none fit. "Help me
+ * categorize" asks again for every unsorted thread and moves only what the user checks.
+ */
 export function ThreadCategorySuggestions({
   candidates,
   categories,
   modelSelection,
 }: {
-  readonly candidates: readonly Candidate[];
+  readonly candidates: readonly AutoFileCandidate[];
   readonly categories: readonly ThreadCategory[];
   readonly modelSelection: ModelSelection | null;
 }) {
   const text = useUiText();
-  const [seen, setSeen] = useLocalStorage(
-    "t3code:sidebar-category-suggestions-seen:v1",
-    false,
-    Schema.Boolean,
-  );
+  const { settings } = useSidebarCategories();
+  const waitingProposals = useCategoryProposals();
   const run = useAtomCommand(serverEnvironment.suggestSidebarCategories, { reportFailure: false });
   const { environmentId, models } = useSidebarSuggestionModels();
   const canSuggest = useAtomValue(
@@ -42,6 +54,8 @@ export function ThreadCategorySuggestions({
   );
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<readonly Row[]>([]);
+  const [proposals, setProposals] = useState<readonly ProposalRow[]>([]);
+  const [allowed, setAllowed] = useState<readonly ThreadCategory[]>([]);
   const [model, setModel] = useState("");
   const [failure, setFailure] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(false);
@@ -54,8 +68,10 @@ export function ThreadCategorySuggestions({
     return () => window.clearTimeout(timer);
   }, [waiting]);
   const selected = rows.filter(
-    (row) => row.checked && categories.some((category) => category.id === row.categoryId),
+    (row) => row.checked && allowed.some((category) => category.id === row.categoryId),
   );
+  const chosenProposals = proposals.filter((proposal) => proposal.checked);
+  const moving = selected.length + chosenProposals.reduce((sum, p) => sum + p.threadKeys.length, 0);
   const close = () => {
     ++generation.current;
     setOpen(false);
@@ -70,17 +86,15 @@ export function ThreadCategorySuggestions({
     setTakingLonger(false);
     setFailure(null);
     setRows([]);
-    const proposed = candidates.slice(0, 30);
-    const allowed = categories.slice(0, 40);
-    const result = await run({
-      environmentId,
-      input: {
-        titles: proposed.map((item) => item.title.slice(0, 500)),
-        categories: allowed.map((item) => item.label.slice(0, 120)),
-        modelSelection,
-        language: readUiLocale() === "zh-CN" ? "zh" : "en",
-      },
+    setProposals([]);
+    const sent = categorySuggestionRequest({
+      candidates,
+      categories,
+      modelSelection,
+      language: readUiLocale() === "zh-CN" ? "zh" : "en",
+      proposeNew: true,
     });
+    const result = await run({ environmentId, input: sent.input });
     if (version !== generation.current) return;
     setWaiting(false);
     if (result._tag !== "Success") {
@@ -89,44 +103,110 @@ export function ThreadCategorySuggestions({
       );
       return;
     }
-    setSeen(true);
     setModel(result.value.model);
+    setAllowed(sent.categories);
     setRows(
       result.value.suggestions.flatMap((row) => {
-        const item = proposed[row.titleIndex];
-        const category = allowed[row.categoryIndex];
+        const item = sent.candidates[row.titleIndex];
+        const category = sent.categories[row.categoryIndex];
         return item && category
           ? [{ ...item, categoryId: category.id, reason: row.reason, checked: true }]
           : [];
       }),
     );
+    setProposals(
+      (result.value.proposals ?? []).map((proposal) => ({
+        label: proposal.label,
+        description: proposal.description,
+        keywords: proposal.keywords,
+        threadKeys: proposal.titleIndexes.flatMap((index) => {
+          const item = sent.candidates[index];
+          return item ? [item.key] : [];
+        }),
+        checked: false,
+      })),
+    );
   };
-  if (
-    !open &&
-    (seen || candidates.length < 5 || models.length === 0 || !canSuggest || categories.length === 0)
-  )
-    return null;
+  /** Adds the categories and returns their ids, by label. */
+  const createCategories = (chosen: readonly PendingCategoryProposal[]) => {
+    let next = settings;
+    const ids = new Map<string, string>();
+    for (const proposal of chosen) {
+      const id = randomUUID();
+      next = withAddedCategory(next, {
+        id,
+        label: proposal.label,
+        description: proposal.description,
+        keywords: proposal.keywords,
+      });
+      ids.set(proposal.label, id);
+      settleCategoryProposal(proposal.label, false);
+    }
+    if (next !== settings) void updateClientSettings({ sidebarCategories: next });
+    return ids;
+  };
+  const acceptWaiting = (proposal: PendingCategoryProposal) => {
+    const id = createCategories([proposal]).get(proposal.label);
+    if (!id) return;
+    // Filed as the model's choice: a thread the user moves by hand stays where they put it.
+    setAutoThreadCategories(
+      Object.fromEntries(
+        proposal.threadKeys.map((key) => [key, { category: id, scheme: "", title: "" }]),
+      ),
+    );
+  };
+  const confirm = () => {
+    const ids = createCategories(chosenProposals);
+    const moves: Record<string, string> = Object.fromEntries(
+      selected.map((row) => [row.key, row.categoryId]),
+    );
+    for (const proposal of chosenProposals) {
+      const id = ids.get(proposal.label);
+      if (id) for (const key of proposal.threadKeys) moves[key] = id;
+    }
+    if (setThreadCategories(moves)) close();
+    else setFailure("Could not save the category. Check available local storage.");
+  };
+  if (!open && (models.length === 0 || !canSuggest || categories.length === 0)) return null;
   const update = (key: string, patch: Partial<Row>) =>
     setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
   return (
     <>
-      {!seen && candidates.length >= 5 ? (
-        <aside className="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs">
+      {waitingProposals.map((proposal) => (
+        <aside
+          key={proposal.label}
+          className="mb-2 space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs"
+        >
           <p className="font-semibold">
-            {text("{count} threads are still unsorted", { count: candidates.length })}
+            {text("Suggested new category: {label}", { label: proposal.label })}
           </p>
           <p className="text-muted-foreground">
-            {text("Get suggestions from titles and review them before moving threads.")}
+            {proposal.description ? `${proposal.description} · ` : ""}
+            {text("{count} threads fit it", { count: proposal.threadKeys.length })}
           </p>
           <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="ghost" size="xs" onClick={() => setSeen(true)}>
-              {text("Later")}
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => settleCategoryProposal(proposal.label, true)}
+            >
+              {text("No thanks")}
             </Button>
-            <Button size="xs" onClick={() => void request()}>
-              {text("Help me categorize")}
+            <Button size="xs" onClick={() => acceptWaiting(proposal)}>
+              {text("Create category")}
             </Button>
           </div>
         </aside>
+      ))}
+      {candidates.length > 0 ? (
+        <div className="flex items-center justify-between gap-2 px-2 py-1 text-xs text-muted-foreground">
+          <span className="min-w-0 truncate">
+            {text("{count} threads are still unsorted", { count: candidates.length })}
+          </span>
+          <Button variant="ghost" size="xs" onClick={() => void request()}>
+            {text("Help me categorize")}
+          </Button>
+        </div>
       ) : null}
       <Dialog
         open={open}
@@ -138,7 +218,9 @@ export function ThreadCategorySuggestions({
           <div className="min-w-0 space-y-4 p-6">
             <DialogTitle>{text("Suggested categories")}</DialogTitle>
             <DialogDescription>
-              {text("Only thread titles are shared. Checked threads move when you confirm.")}
+              {text(
+                "Titles, folder names and agents are shared. Checked threads move when you confirm.",
+              )}
             </DialogDescription>
             {waiting ? (
               <p role="status" className="text-sm text-muted-foreground">
@@ -154,13 +236,13 @@ export function ThreadCategorySuggestions({
                 {text(failure)}
               </p>
             ) : null}
-            {!waiting && !failure && rows.length === 0 ? (
+            {!waiting && !failure && rows.length === 0 && proposals.length === 0 ? (
               <p role="status" className="text-sm">
                 {text("No matching categories were suggested.")}
               </p>
             ) : null}
             {rows.length ? (
-              <div className="max-h-[50vh] divide-y overflow-y-auto rounded-xl border">
+              <div className="max-h-[40vh] divide-y overflow-y-auto rounded-xl border">
                 {rows.map((row) => (
                   <div
                     key={row.key}
@@ -181,7 +263,7 @@ export function ThreadCategorySuggestions({
                       value={row.categoryId}
                       onChange={(event) => update(row.key, { categoryId: event.target.value })}
                     >
-                      {categories.map((category) => (
+                      {allowed.map((category) => (
                         <option key={category.id} value={category.id}>
                           {category.label}
                         </option>
@@ -190,6 +272,44 @@ export function ThreadCategorySuggestions({
                   </div>
                 ))}
               </div>
+            ) : null}
+            {proposals.length ? (
+              <section className="space-y-2" aria-label={text("Suggested new categories")}>
+                <p className="text-xs font-medium text-muted-foreground">
+                  {text("Suggested new categories")}
+                </p>
+                {proposals.map((proposal) => (
+                  <div
+                    key={proposal.label}
+                    className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 rounded-xl border p-3"
+                  >
+                    <Checkbox
+                      checked={proposal.checked}
+                      aria-label={text("Create {label}", { label: proposal.label })}
+                      onCheckedChange={(checked) =>
+                        setProposals((current) =>
+                          current.map((entry) =>
+                            entry.label === proposal.label ? { ...entry, checked } : entry,
+                          ),
+                        )
+                      }
+                    />
+                    <div className="min-w-0 text-stardust-body">
+                      <p className="break-words">
+                        {text("Create {label} and move {count} threads", {
+                          label: proposal.label,
+                          count: proposal.threadKeys.length,
+                        })}
+                      </p>
+                      {proposal.description ? (
+                        <p className="break-words text-xs text-muted-foreground">
+                          {proposal.description}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </section>
             ) : null}
             <div className="flex flex-wrap items-center justify-end gap-2">
               {model && !waiting ? (
@@ -201,19 +321,8 @@ export function ThreadCategorySuggestions({
               {failure && rows.length === 0 ? (
                 <Button onClick={() => void request()}>{text("Retry")}</Button>
               ) : (
-                <Button
-                  disabled={waiting || selected.length === 0}
-                  onClick={() => {
-                    if (
-                      setThreadCategories(
-                        Object.fromEntries(selected.map((row) => [row.key, row.categoryId])),
-                      )
-                    )
-                      close();
-                    else setFailure("Could not save the category. Check available local storage.");
-                  }}
-                >
-                  {text("Move {count} threads", { count: selected.length })}
+                <Button disabled={waiting || moving === 0} onClick={confirm}>
+                  {text("Move {count} threads", { count: moving })}
                 </Button>
               )}
             </div>
