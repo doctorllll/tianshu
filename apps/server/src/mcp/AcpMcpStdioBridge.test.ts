@@ -472,6 +472,46 @@ describe("AcpMcpStdioBridge", () => {
     }),
   );
 
+  it.effect("lists every page of the tools a session is offered, once", () =>
+    Effect.gen(function* () {
+      const cursors: Array<unknown> = [];
+      const names = yield* mcpToolSession({
+        endpoint: "http://127.0.0.1:1/mcp",
+        authorization: "Bearer bridge-test",
+        clientName: "t3-thread-cli",
+        fetchImplementation: async (_url, init) => {
+          if (init?.method === "DELETE") return new Response(null, { status: 204 });
+          const message = JSON.parse(String(init?.body)) as {
+            readonly id?: unknown;
+            readonly method?: string;
+            readonly params?: { readonly cursor?: unknown };
+          };
+          if (message.method === "initialize") {
+            return Response.json({
+              jsonrpc: "2.0",
+              id: message.id,
+              result: { protocolVersion: "2025-06-18" },
+            });
+          }
+          if (message.method !== "tools/list") return new Response(null, { status: 202 });
+          cursors.push(message.params?.cursor);
+          // The second page names the cursor it came from again.
+          const page =
+            message.params?.cursor === undefined
+              ? { tools: [{ name: "t3_project_list" }, { name: 3 }], nextCursor: "page-2" }
+              : { tools: [{ name: "t3_thread_launch" }], nextCursor: "page-2" };
+          return Response.json({ jsonrpc: "2.0", id: message.id, result: page });
+        },
+      }).pipe(
+        Effect.flatMap((session) => session.listTools()),
+        Effect.scoped,
+      );
+
+      expect(names).toEqual(["t3_project_list", "t3_thread_launch"]);
+      expect(cursors).toEqual([undefined, "page-2"]);
+    }),
+  );
+
   it.effect("aborts the pending fetch when the stdio bridge is interrupted", () =>
     Effect.gen(function* () {
       const started = yield* Deferred.make<AbortSignal | undefined>();

@@ -929,7 +929,7 @@ const layerMakeRoutes = Layer.mergeAll(
     Layer.provide(McpOAuth.layerMcpClientAuthenticator),
     Layer.provide(ProjectionStoreV2.layer),
     // `t3` run by a thread's agent acts as that agent, e.g. to ask for a sub-session.
-    Layer.provide(ActingThreads.layer),
+    Layer.provide(ActingThreads.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
   ),
   // Follows delegated tasks running in linked environments, including after a restart.
   Layer.effectDiscard(

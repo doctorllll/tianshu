@@ -79,7 +79,25 @@ export interface McpToolSession {
     tool: string,
     args: Readonly<Record<string, unknown>>,
   ) => Effect.Effect<unknown, AcpMcpBridgeError>;
+  /** Names of the tools `tools/list` offers this session, every page of them. */
+  readonly listTools: () => Effect.Effect<ReadonlyArray<string>, AcpMcpBridgeError>;
 }
+
+interface ToolListPage {
+  readonly tools?: unknown;
+  readonly nextCursor?: unknown;
+}
+
+const toolNames = (page: ToolListPage): ReadonlyArray<string> =>
+  Array.isArray(page.tools)
+    ? page.tools.flatMap((tool: unknown) => {
+        const name =
+          typeof tool === "object" && tool !== null
+            ? (tool as { readonly name?: unknown }).name
+            : undefined;
+        return typeof name === "string" ? [name] : [];
+      })
+    : [];
 
 /**
  * One initialized MCP session over T3 Code's HTTP endpoint, terminated when
@@ -149,6 +167,27 @@ export const mcpToolSession = (
     return envelope;
   });
 
+  const listTools = Effect.fn("AcpMcpStdioBridge.listTools")(function* (): Effect.fn.Return<
+    ReadonlyArray<string>,
+    AcpMcpBridgeError
+  > {
+    const names: Array<string> = [];
+    const seen = new Set<string>();
+    let cursor: string | undefined;
+    do {
+      const { result } = yield* request("tools/list", cursor === undefined ? {} : { cursor });
+      const page: ToolListPage = typeof result === "object" && result !== null ? result : {};
+      names.push(...toolNames(page));
+      // A server that repeats a cursor would page forever.
+      cursor =
+        typeof page.nextCursor === "string" && !seen.has(page.nextCursor)
+          ? page.nextCursor
+          : undefined;
+      if (cursor !== undefined) seen.add(cursor);
+    } while (cursor !== undefined);
+    return names;
+  });
+
   const terminate = Effect.suspend(() =>
     sessionId === null
       ? Effect.void
@@ -174,6 +213,7 @@ export const mcpToolSession = (
         request("tools/call", { name: tool, arguments: args }).pipe(
           Effect.map((envelope) => envelope.result),
         ),
+      listTools,
     } satisfies McpToolSession;
   });
 };

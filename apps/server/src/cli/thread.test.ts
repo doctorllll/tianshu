@@ -97,6 +97,7 @@ it.effect(
                 return Effect.die(`unexpected ${tool} call`);
             }
           },
+          listTools: () => Effect.die("only a thread's agent asks what the server offers"),
         }),
       );
 
@@ -168,20 +169,33 @@ it.effect("start, run by a thread's agent, asks for a sub-session of that thread
           },
         ],
       });
+    const asThread = ["t3_project_list", "delegate_task", "t3_thread_launch"];
     const cases = [
       {
         env: { FASTCTX_RESIDENT: "claude-1@machine-1" },
         header: "fastctx=claude-1%40machine-1",
+        offered: asThread,
         delegated: failure("awaiting_user_confirmation"),
-        tools: ["t3_project_list", "delegate_task"],
+        tools: ["t3_project_list", "tools/list", "delegate_task"],
         printed: "awaiting_user_confirmation",
       },
       {
-        // The server knows no thread for that conversation: an outside agent starts a thread.
+        // The server knows no thread for that conversation, so it offers no delegate_task:
+        // an outside agent starts a thread.
+        env: { FASTCTX_RESIDENT: "someone@machine-2" },
+        header: "fastctx=someone%40machine-2",
+        offered: ["t3_project_list", "t3_thread_launch"],
+        delegated: Effect.die("delegate_task is not offered"),
+        tools: ["t3_project_list", "tools/list", "t3_thread_launch"],
+        printed: threadId,
+      },
+      {
+        // Should delegate_task refuse a caller that is no thread's agent, a thread starts too.
         env: { T3CODE_THREAD_ID: "thread-elsewhere" },
         header: "thread=thread-elsewhere",
+        offered: asThread,
         delegated: failure("thread_credential_required"),
-        tools: ["t3_project_list", "delegate_task", "t3_thread_launch"],
+        tools: ["t3_project_list", "tools/list", "delegate_task", "t3_thread_launch"],
         printed: threadId,
       },
     ];
@@ -189,6 +203,10 @@ it.effect("start, run by a thread's agent, asks for a sub-session of that thread
       const calls: Array<{ tool: string; args: Readonly<Record<string, unknown>> }> = [];
       using session = vi.spyOn(McpBridge, "mcpToolSession").mockReturnValue(
         Effect.succeed({
+          listTools: () => {
+            calls.push({ tool: "tools/list", args: {} });
+            return Effect.succeed(testCase.offered);
+          },
           call: (tool, args) => {
             calls.push({ tool, args });
             switch (tool) {
@@ -226,11 +244,14 @@ it.effect("start, run by a thread's agent, asks for a sub-session of that thread
         calls.map((call) => call.tool),
         testCase.tools,
       );
-      assert.deepStrictEqual(calls[1]?.args, {
-        task: "Write the draft",
-        title: "Write the draft",
-        target: { projectId, providerInstanceId: "zcode", model: "glm" },
-      });
+      const delegated = calls.find((call) => call.tool === "delegate_task");
+      if (delegated !== undefined) {
+        assert.deepStrictEqual(delegated.args, {
+          task: "Write the draft",
+          title: "Write the draft",
+          target: { projectId, providerInstanceId: "zcode", model: "glm" },
+        });
+      }
       assert.include((yield* TestConsole.logLines).at(-1), testCase.printed);
     }
   }).pipe(
@@ -293,7 +314,8 @@ const scriptedTools = (script: Record<string, Array<unknown>>) => {
     const next = script[tool]?.shift();
     return next === undefined ? Effect.die(`unscripted ${tool} call`) : Effect.succeed(next);
   }) as ThreadTools["call"];
-  return { tools: { call } satisfies ThreadTools, calls };
+  const offers = () => Effect.die("unscripted tools/list");
+  return { tools: { call, offers } satisfies ThreadTools, calls };
 };
 
 it.effect("--wait follows the sent run to its continuation's terminal status", () =>
@@ -561,7 +583,8 @@ const timelineTools = (types: ReadonlyArray<string>) => {
       .filter((item) => item.type === "user_message" || item.type === "assistant_message")
       .slice(-count)
       .map((item) => item.itemId);
-  return { tools: { call } satisfies ThreadTools, served, latest };
+  const offers = () => Effect.die("unscripted tools/list");
+  return { tools: { call, offers } satisfies ThreadTools, served, latest };
 };
 
 const tail = (tools: number) => [...Array<string>(tools).fill("tool_call"), "assistant_message"];

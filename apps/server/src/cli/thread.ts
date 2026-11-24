@@ -216,6 +216,12 @@ const makeThreadTools = (session: McpToolSession, origin: string) => {
         Effect.mapError(() => unexpected(tool)),
       );
     }),
+    /** Whether the server offers this tool to this session. */
+    offers: (tool: string) =>
+      session.listTools().pipe(
+        Effect.map((names) => names.includes(tool)),
+        Effect.mapError((cause) => new ThreadServerUnreachableError({ origin, cause })),
+      ),
   };
 };
 export type ThreadTools = ReturnType<typeof makeThreadTools>;
@@ -895,6 +901,9 @@ const startAsSubSession = Effect.fn("cli.thread.startAsSubSession")(function* (
     readonly wait: boolean;
   },
 ) {
+  // The server offers delegate_task only to a thread's agent. When T3-Acting-For names
+  // no thread it knows, this session is an outside client's, which starts a thread.
+  if (!(yield* tools.offers("delegate_task"))) return false;
   const selection = input.modelSelection;
   const failedWith =
     (code: string) => (error: ThreadServerUnreachableError | ThreadToolFailedError) =>

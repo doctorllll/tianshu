@@ -12,9 +12,11 @@ import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as SqlClient from "effect/sql/SqlClient";
 
+import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import { fastctxOwner } from "../plans/ThreadPlans.ts";
 import type { ActingFor } from "./actingFor.ts";
 import type * as McpInvocationContext from "./McpInvocationContext.ts";
+import { isLiveCallerShell } from "./threadAccess.ts";
 
 export interface ActingThread {
   readonly threadId: ThreadId;
@@ -69,6 +71,7 @@ export const layer = Layer.effect(
   ActingThreads,
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const fastctxSessions = Effect.gen(function* () {
@@ -111,10 +114,14 @@ export const layer = Layer.effect(
               );
         const row = rows[0];
         if (row === undefined || row.provider_instance_id === null) return undefined;
-        return {
+        const thread = {
           threadId: ThreadId.make(row.thread_id),
           providerInstanceId: ProviderInstanceId.make(row.provider_instance_id),
         } satisfies ActingThread;
+        // Its agent speaks for it only while it runs there, as delegate_task's caller check asks:
+        // a command run after that, or in an archived thread, is an outside client's.
+        const shell = yield* projections.getThreadShell(thread.threadId);
+        return isLiveCallerShell(shell, thread.providerInstanceId) ? thread : undefined;
       },
       Effect.catch((error) =>
         Effect.logWarning("Could not find the thread a local client acts for", error).pipe(
