@@ -52,11 +52,11 @@ export function healthSentence(
 }
 
 /**
- * V9 / V4 creative A: the stardust orbit energy meter, a liquid-glass 3D flip card that flips
+ * V9 / V4 creative A: the orbit energy meter, a liquid-glass 3D flip card that flips
  * 180° to routing suggestions. Every figure is a live reading: the ring is the mean of each
  * subscription's lowest remaining quota, and the nodes on the orbit are the subscriptions.
  */
-export function StardustOrbitMeter({
+export function PoolOrbitMeter({
   pools,
   onFocusPool,
 }: {

@@ -91,7 +91,7 @@ export function NoProjectsHero() {
                   className="grid content-start gap-1 rounded-xl border bg-card p-3 text-left outline-primary hover:border-primary/50"
                   onClick={() => void navigate({ to: "/new", search: { prompt: text(prompt!) } })}
                 >
-                  <b className="text-stardust-body">{text(title!)}</b>
+                  <b className="text-ui-body">{text(title!)}</b>
                   <span className="text-xs text-muted-foreground">{text(description!)}</span>
                 </button>
               ))}

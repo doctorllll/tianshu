@@ -11,7 +11,7 @@ export function isChineseLocale(locale: string): boolean {
   return /^zh(?:[-_]|$)/i.test(locale.trim());
 }
 
-export function resolveStardustLocale(
+export function resolveAppLocale(
   preference: string,
   systemLanguage: string,
   supported: readonly string[],

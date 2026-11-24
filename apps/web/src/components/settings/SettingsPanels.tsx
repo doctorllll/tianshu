@@ -168,7 +168,7 @@ const QUIT_CONFIRMATION_MODE_LABELS: Record<QuitConfirmationMode, string> = {
 };
 
 const DEFAULT_DRIVER_KIND = ProviderDriverKind.make("codex");
-// Tianshu has no release feed of its own: the Stardust community updater and its usage ping stay off.
+// Tianshu has no release feed of its own: the inherited community updater and its usage ping stay off.
 function AboutVersionSection() {
   return <UpstreamAboutVersionSection />;
 }

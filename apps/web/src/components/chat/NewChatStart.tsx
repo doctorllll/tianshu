@@ -30,7 +30,7 @@ import {
   startThreadStatus,
   startThreadBoard,
   startRelativeTime,
-} from "./stardustStartModel";
+} from "./newChatStartModel";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 const recentMessages = Atom.family((key: string) =>
   Atom.make((get) => {
@@ -79,7 +79,7 @@ function ResumeTile({
     <button
       type="button"
       onClick={onOpen}
-      className="stardust-resume-tile min-w-0 rounded-xl bg-card p-3 text-left shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      className="new-chat-resume-tile min-w-0 rounded-xl bg-card p-3 text-left shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
     >
       <strong className="block truncate text-xs font-semibold">
         {board?.title ?? thread.title}
@@ -125,7 +125,7 @@ function ResumeTile({
     </button>
   );
 }
-export function StardustStart({
+export function NewChatStart({
   project,
   target,
 }: {
@@ -217,7 +217,7 @@ export function StardustStart({
   }, []);
   if (!project || (!candidates.length && !frequent.length)) return null;
   return (
-    <div className="mt-5 flex flex-col gap-4" data-stardust-start>
+    <div className="mt-5 flex flex-col gap-4" data-new-chat-start>
       {candidates.length ? (
         <section>
           <h2 className="mb-2 text-xs font-medium text-muted-foreground">
@@ -256,7 +256,7 @@ export function StardustStart({
                   key={name}
                   type="button"
                   aria-description={uiText("Used {count} times", { count })}
-                  className="stardust-resume-tile flex min-w-0 items-center gap-2 rounded-xl bg-card p-3 text-left shadow-sm"
+                  className="new-chat-resume-tile flex min-w-0 items-center gap-2 rounded-xl bg-card p-3 text-left shadow-sm"
                   onClick={() => {
                     const store = useComposerDraftStore.getState();
                     const existing = store.getComposerDraft(target)?.prompt ?? "";
@@ -293,18 +293,18 @@ export function StardustStart({
     </div>
   );
 }
-export function StardustSky() {
+export function NewChatSky() {
   return (
     <div
-      data-stardust-sky
+      data-new-chat-sky
       aria-hidden
       className="pointer-events-none absolute inset-0 overflow-hidden"
     >
-      <div className="stardust-nebula absolute inset-0" />
+      <div className="new-chat-nebula absolute inset-0" />
       {Array.from({ length: 28 }, (_, i) => (
         <span
           key={i}
-          className="stardust-star absolute size-0.5 rounded-full bg-primary"
+          className="new-chat-star absolute size-0.5 rounded-full bg-primary"
           style={{
             left: `${12 + ((i * 31) % 77)}%`,
             top: `${15 + ((i * 17) % 65)}%`,

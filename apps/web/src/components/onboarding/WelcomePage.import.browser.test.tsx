@@ -314,9 +314,6 @@ async function click(label: string) {
   const target = button(label);
   expect(target.disabled).toBe(false);
   await act(async () => target.click());
-  if (document.querySelector("[data-stardust-organize]")) {
-    await act(async () => button("Continue").click());
-  }
 }
 
 async function mountWelcome() {

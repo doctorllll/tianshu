@@ -3,7 +3,7 @@ import { useUiText } from "~/i18n/useUiText";
 import { TianshuWordmark } from "../TianshuWordmark";
 import { useTaskBoard } from "~/taskBoard";
 import { useVisibleThreadShells } from "~/state/entities";
-import { recentProjectThreads, startThreadStatus } from "./stardustStartModel";
+import { recentProjectThreads, startThreadStatus } from "./newChatStartModel";
 import type { DraftId } from "~/composerDraftStore";
 import { composerDraftHasUserContent, useComposerDraftStore } from "~/composerDraftStore";
 import { resolveEnvironmentMachineKind, type ScopedProjectRef } from "@t3tools/contracts";
@@ -374,13 +374,13 @@ export function DraftHeroHeadline({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col items-center" data-stardust-heading>
+    <div className="mx-auto flex w-full max-w-5xl flex-col items-center" data-new-chat-heading>
       <TianshuWordmark className="mb-4 h-20" />
       <h1 className="text-center text-2xl font-semibold tracking-tight">
         {hasResolvedProject && !isScratchDraft ? (
           <>
             {uiText("{greeting}, what would you like to do in", { greeting: uiText(greeting) })}{" "}
-            <span className="stardust-project-name">{projectSelector}</span> {uiText("today?")}
+            <span className="new-chat-project-name">{projectSelector}</span> {uiText("today?")}
           </>
         ) : (
           uiText("{greeting}, what would you like to do today?", { greeting: uiText(greeting) })

@@ -1,5 +1,5 @@
 /*
- * V9 "限额 · 重置卡 · 泳道 · 星尘轨道能量仪" page, copied value-for-value from
+ * V9 "限额 · 重置卡 · 泳道 · 轨道能量仪" page, copied value-for-value from
  * design-studio/v9-limits-reset-cards-preview.html (TAB 5 + the shared .badge/.seg/.chip-btn/.logo-slot rules).
  * Every rule is scoped under `.lv9` so nothing leaks into other pages; the V9 tokens are declared on `.lv9` too.
  */
@@ -872,7 +872,7 @@ html:root[data-theme-id="apple"]
   font-size: 11.5px;
 }
 
-/* ---------- V9 card #4: stardust compass ---------- */
+/* ---------- V9 card #4: compass ---------- */
 [data-lv9-root] [data-lv9~="compass-stage"] {
   display: flex;
   align-items: center;
@@ -1309,7 +1309,7 @@ html:root[data-theme-id="apple"]
   font-family: inherit;
 }
 
-/* ---------- V4 stardust orbit energy gauge ---------- */
+/* ---------- V4 orbit energy gauge ---------- */
 [data-lv9-root] [data-lv9~="v4-orbit-compare-box"] {
   background: var(--surface);
   border-radius: 20px;

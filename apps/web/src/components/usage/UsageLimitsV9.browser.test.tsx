@@ -315,7 +315,7 @@ it("renders V11 sorted cards, health hero chip flash, V13 pace meters, tray live
   await userEvent.click(orbitCard);
   expect(orbitCard.hasAttribute("data-flipped")).toBe(true);
 
-  // 6. Card #4 in the 2x2 grid is the V9 stardust compass (no empty slots or slot toggle).
+  // 6. Card #4 in the 2x2 grid is the V9 compass (no empty slots or slot toggle).
   expect(screen.container.querySelector("[data-limit-slot]")).toBeNull();
   expect(screen.container.querySelector(".usage-slots-toggle")).toBeNull();
   const compass = screen.container.querySelector<HTMLElement>('[data-vid="compass"]')!;

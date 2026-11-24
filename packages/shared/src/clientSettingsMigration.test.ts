@@ -21,7 +21,7 @@ it("does not mask invalid settings", () => {
     expect(migrateLegacyClientSettings(value)).toBe(value);
 });
 
-it("preserves the implicit Chinese default of an existing Stardust install", () => {
+it("preserves the implicit Chinese default of an install from an earlier build", () => {
   expect(migrateLegacyClientSettings({ interfaceStyle: "clawd", fontSizeSidebar: 14 })).toEqual({
     interfaceStyle: "clawd",
     fontSizeSidebar: 14,

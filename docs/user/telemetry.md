@@ -1,6 +1,6 @@
 # Product usage data
 
-**In the Stardust fork, product usage data is opt-in and off by default.** The server records,
+**In Tianshu, product usage data is opt-in and off by default.** The server records,
 buffers and sends nothing, and makes no request to the endpoint below, until you turn on
 **Settings > About > Share anonymous usage data** (the `telemetryEnabled` server setting). Settings
 saved before this option existed count as off. Turning it off stops sending at once and discards

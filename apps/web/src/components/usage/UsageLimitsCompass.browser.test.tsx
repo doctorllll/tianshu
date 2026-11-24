@@ -205,7 +205,7 @@ function makePresentations(options?: { readonly allAmple?: boolean }) {
   ]);
 }
 
-it("replaces empty slots with the V9 stardust compass card driven by live health data", async () => {
+it("replaces empty slots with the V9 compass card driven by live health data", async () => {
   using _locale = testUiLocale("zh-CN");
   using _theme = appleTheme("light");
   mock.returnTarget = null;

@@ -27,7 +27,7 @@ export function useUiText() {
     // The source is application copy; user strings are only interpolation variables.
     return gt(customMessageSource(source), {
       ...variables,
-      $context: "stardust-custom",
+      $context: "tianshu-custom",
       $locale: locale,
     });
   };

@@ -1,5 +1,5 @@
 import { expect, it } from "vite-plus/test";
-import { readCustomLocale, resolveStardustLocale, syncCustomLocale } from "./customLocale";
+import { readCustomLocale, resolveAppLocale, syncCustomLocale } from "./customLocale";
 
 it("uses Chinese for bare, regional, and script-specific Chinese locale IDs", () => {
   try {
@@ -16,10 +16,10 @@ it("uses Chinese for bare, regional, and script-specific Chinese locale IDs", ()
 
 it("chooses the primary system language for a new installation", () => {
   const supported = ["en", "zh", "fr"];
-  expect(resolveStardustLocale("system", "zh-CN", supported)).toBe("zh");
-  expect(resolveStardustLocale("system", "zh-Hant-TW", supported)).toBe("zh");
-  expect(resolveStardustLocale("system", "en-US", supported)).toBe("en");
-  expect(resolveStardustLocale("system", "fr-FR", supported)).toBe("en");
-  expect(resolveStardustLocale("fr", "zh-CN", supported)).toBe("fr");
-  expect(resolveStardustLocale("en", "zh-CN", supported)).toBe("en");
+  expect(resolveAppLocale("system", "zh-CN", supported)).toBe("zh");
+  expect(resolveAppLocale("system", "zh-Hant-TW", supported)).toBe("zh");
+  expect(resolveAppLocale("system", "en-US", supported)).toBe("en");
+  expect(resolveAppLocale("system", "fr-FR", supported)).toBe("en");
+  expect(resolveAppLocale("fr", "zh-CN", supported)).toBe("fr");
+  expect(resolveAppLocale("en", "zh-CN", supported)).toBe("en");
 });

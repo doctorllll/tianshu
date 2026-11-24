@@ -7,7 +7,7 @@ import { DraftWorkspaceNotice } from "./chat/DraftWorkspaceNotice";
 import { BranchToolbarEnvironmentSelector } from "./BranchToolbarEnvironmentSelector";
 import { SimilarThreadsHint } from "./chat/SimilarThreadsHint";
 import { useWorkbenchMode } from "../workbenchMode";
-import { StardustStart, StardustSky } from "./chat/StardustStart";
+import { NewChatStart, NewChatSky } from "./chat/NewChatStart";
 import { ContextHandoffNotice } from "./chat/ContextHandoffNotice";
 import { SessionStatsBar } from "./chat/SessionStatsBar";
 import { TaskTrailHost } from "./chat/TaskTrailHost";
@@ -3860,7 +3860,7 @@ export default function ChatView(props: ChatViewProps) {
               }}
               inert={isRevertingCheckpoint}
               data-chat-composer-overlay="true"
-              data-stardust-newchat={isDraftHeroState || undefined}
+              data-new-chat={isDraftHeroState || undefined}
               className={cn(
                 "scrollbar-gutter-both",
                 isDraftHeroState
@@ -3868,7 +3868,7 @@ export default function ChatView(props: ChatViewProps) {
                   : "pointer-events-none absolute inset-x-0 bottom-0 z-20 pt-1.5 sm:pt-2",
               )}
             >
-              {isDraftHeroState ? <StardustSky /> : null}
+              {isDraftHeroState ? <NewChatSky /> : null}
               <div ref={draftHeroTransitionGroupRef} className="chat-composer-lane my-auto w-full">
                 <div
                   data-chat-composer-stack="true"
@@ -4221,7 +4221,7 @@ export default function ChatView(props: ChatViewProps) {
                         <div data-v10-home-chips>{draftWorkspaceNotice}</div>
                       ) : null}
                       {isDraftHeroState ? (
-                        <StardustStart project={activeProjectRef} target={composerDraftTarget} />
+                        <NewChatStart project={activeProjectRef} target={composerDraftTarget} />
                       ) : null}
                       {isDraftHeroState && composerBannerItems.length > 0 ? (
                         // Out of flow, like the headline, so a notice never moves the centered composer.

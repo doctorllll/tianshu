@@ -63,7 +63,7 @@ import { Command, Flag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 const LINUX_ICON_SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512] as const;
-// 天枢 (Tianshu): its own bundle id, so it never shares a profile or keychain item with T3 Code or Stardust.
+// 天枢 (Tianshu): its own bundle id, so it never shares a profile or keychain item with T3 Code or other builds of it.
 const DESKTOP_APP_ID = "io.github.doctorllll.tianshu";
 const APPLE_TEAM_ID_PATTERN = /^[A-Z0-9]{10}$/u;
 
@@ -3820,7 +3820,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
     });
   }
 
-  // Stardust: keep the production web brand under the nightly-named native shell.
+  // Keep the production web brand under the nightly-named native shell.
   const webAssetBrandOverride = yield* Config.String("T3CODE_DESKTOP_WEB_ASSET_BRAND").pipe(
     Config.withDefault(""),
   );

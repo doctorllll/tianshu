@@ -3483,7 +3483,7 @@ html:root[data-theme-id="apple"] .usage-limit-windows button .usage-limit-group-
   background: color-mix(in srgb, var(--foreground) 34%, var(--card));
 }
 
-/* ---------- V9 limits: health hero, reset-card pool, stardust orbit meter ---------- */
+/* ---------- V9 limits: health hero, reset-card pool, orbit meter ---------- */
 [data-usage-health-headline] em[data-tone="bad"] {
   font-style: normal;
   color: var(--destructive);

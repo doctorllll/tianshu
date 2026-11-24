@@ -105,7 +105,7 @@ export function SidebarCategorySettingsSection() {
       <div className="divide-y rounded-xl border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-4 p-4">
           <div>
-            <label htmlFor="sidebar-category-preset" className="text-stardust-body font-semibold">
+            <label htmlFor="sidebar-category-preset" className="text-ui-body font-semibold">
               {text("Preset")}
             </label>
             <p className="text-xs text-muted-foreground">
@@ -131,7 +131,7 @@ export function SidebarCategorySettingsSection() {
         </div>
         <div className="flex flex-wrap items-center justify-between gap-4 p-4">
           <div>
-            <label htmlFor="sidebar-category-auto" className="text-stardust-body font-semibold">
+            <label htmlFor="sidebar-category-auto" className="text-ui-body font-semibold">
               {text("File by title automatically")}
             </label>
             <p className="text-xs text-muted-foreground">
@@ -148,7 +148,7 @@ export function SidebarCategorySettingsSection() {
         </div>
         <div className="flex flex-wrap items-center justify-between gap-4 p-4">
           <div>
-            <label htmlFor="sidebar-category-suggest" className="text-stardust-body font-semibold">
+            <label htmlFor="sidebar-category-suggest" className="text-ui-body font-semibold">
               {text("Let a model file threads")}
             </label>
             <p className="text-xs text-muted-foreground">
@@ -239,7 +239,7 @@ export function SidebarCategorySettingsSection() {
               entry.id === UNSORTED_CATEGORY_ID ? (
                 <div
                   key={entry.id}
-                  className="flex items-center justify-between gap-4 p-4 text-stardust-body"
+                  className="flex items-center justify-between gap-4 p-4 text-ui-body"
                 >
                   {categoryLabel(entry, text)}
                   <span className="tabular-nums text-muted-foreground">

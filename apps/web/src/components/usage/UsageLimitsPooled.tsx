@@ -29,7 +29,7 @@ import {
 import { t3LimitWindows } from "./usageQuotaPresentation";
 import { uiText as copy } from "~/i18n";
 import { UsageResetTimeline } from "./UsageResetTimeline";
-import { StardustOrbitMeter, gapText, healthSentence } from "./UsageLimitsHealth";
+import { PoolOrbitMeter, gapText, healthSentence } from "./UsageLimitsHealth";
 import {
   poolHealth,
   resetAdvice,
@@ -54,7 +54,22 @@ import { CursorUsageHint } from "./CursorUsageHint";
 import { useUiText } from "~/i18n/useUiText";
 import { UsageCount } from "./UsageMotion";
 import { readUiLocale } from "~/i18n";
-import { CHATGPT_USAGE_URL, collectLimitAccounts, collectExternalUsageLinks, collectLimitPools, limitPoolId, cursorUsageWindowDetails, displayLimitWindows, type LimitAccount, type LimitPool, type LimitPoolMember, type LimitPoolWindow, paceRemainingPercent, remainingPercent, type ResetCreditChoice } from "@t3tools/shared/usageLimits";
+import {
+  CHATGPT_USAGE_URL,
+  collectLimitAccounts,
+  collectExternalUsageLinks,
+  collectLimitPools,
+  limitPoolId,
+  cursorUsageWindowDetails,
+  displayLimitWindows,
+  type LimitAccount,
+  type LimitPool,
+  type LimitPoolMember,
+  type LimitPoolWindow,
+  paceRemainingPercent,
+  remainingPercent,
+  type ResetCreditChoice,
+} from "@t3tools/shared/usageLimits";
 import { collectLimitNotices, formatResetsIn } from "@t3tools/shared/usageLimitsCopy";
 import type { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { normalizeProviderAccentColor } from "@t3tools/client-runtime/state/provider-instance-display";
@@ -1745,7 +1760,7 @@ export function UsageLimitsPooled({
           }}
         />
 
-        {pools.length > 0 ? <StardustOrbitMeter pools={health} onFocusPool={focusPool} /> : null}
+        {pools.length > 0 ? <PoolOrbitMeter pools={health} onFocusPool={focusPool} /> : null}
         {missing.some((driver) => driver === "cursor") ? (
           <div data-usage-cursor-notice>
             <CursorUsageHint />

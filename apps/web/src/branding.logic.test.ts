@@ -12,7 +12,7 @@ import {
   resolveSidebarStageBackdropVariant,
 } from "./components/SidebarStageBackdrop";
 
-// The Stardust stable build ships with the upstream base version stamp, which matches the
+// Tianshu's stable build ships with the upstream base version stamp, which matches the
 // Nightly pattern. The build flag (VITE_RELEASE_CHANNEL=stable) is what hides the badge.
 const NIGHTLY_STAMP = "0.1.10-nightly.20261115.4749";
 

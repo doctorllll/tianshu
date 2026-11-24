@@ -64,7 +64,7 @@ function pointOnCircle(radius: number, deg: number): { readonly cx: number; read
 }
 
 /**
- * Maps live pool health readings onto the 130×130 V9 stardust compass rings.
+ * Maps live pool health readings onto the 130×130 V9 compass rings.
  * For 3 pools this reproduces V9's exact three-orbit layout (outer dashed r=54,
  * middle arc r=39, inner arc r=24) while scaling cleanly to any number of pools.
  */

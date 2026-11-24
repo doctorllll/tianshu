@@ -4,7 +4,7 @@ import {
   recentProjectThreads,
   startThreadStatus,
   startRelativeTime,
-} from "./stardustStartModel";
+} from "./newChatStartModel";
 describe("recent project starters", () => {
   it("counts only explicit user skill mentions and excludes unknown skills and assistant examples", () => {
     expect(

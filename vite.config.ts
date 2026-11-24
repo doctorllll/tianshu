@@ -597,7 +597,7 @@ export default defineConfig({
           "apps/mobile/src/features/development/**",
           "packages/client-runtime/src/rpc/**",
         ],
-        // Stardust: custom copy goes through uiText/catalog.ts, which this rule does not recognise,
+        // Custom copy goes through uiText/catalog.ts, which this rule does not recognise,
         // so it reports instead of failing the lint gate.
         rules: { "t3code/no-untranslated-copy": "warn" },
       },

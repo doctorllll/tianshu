@@ -1,4 +1,4 @@
-import { resolveStardustLocale, syncCustomLocale } from "./customLocale";
+import { resolveAppLocale, syncCustomLocale } from "./customLocale";
 import { getTranslationsSnapshot } from "gt-react";
 
 import {
@@ -55,7 +55,7 @@ function activateLocale(locale: string): void {
 
 function applyLanguageSetting(): void {
   // Not desktopBridge.getSystemLocale(): that is the regional/time locale, not the UI language.
-  requestedLocale = resolveStardustLocale(
+  requestedLocale = resolveAppLocale(
     getClientSettings().language,
     navigator.languages[0] ?? navigator.language,
     SUPPORTED_LOCALES,

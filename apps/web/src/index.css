@@ -185,14 +185,14 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 }
 
 @theme inline {
-  --text-stardust-title: 1.75rem;
-  --text-stardust-title--line-height: 1.2;
-  --text-stardust-section: 1.0625rem;
-  --text-stardust-section--line-height: 1.4;
-  --text-stardust-card: 0.9375rem;
-  --text-stardust-card--line-height: 1.4;
-  --text-stardust-body: 0.8125rem;
-  --text-stardust-body--line-height: 1.5;
+  --text-ui-title: 1.75rem;
+  --text-ui-title--line-height: 1.2;
+  --text-ui-section: 1.0625rem;
+  --text-ui-section--line-height: 1.4;
+  --text-ui-card: 0.9375rem;
+  --text-ui-card--line-height: 1.4;
+  --text-ui-body: 0.8125rem;
+  --text-ui-body--line-height: 1.5;
   --radius-composer-control: 0.4375rem;
   /* Two steps below Tailwind's text-xs (12px) for dense UI: metadata rows,
      badges, counters, keyboard hints and diagnostics tables. 2xs is 11px,
@@ -2902,16 +2902,16 @@ html[data-sidebar-font-size] [data-app-sidebar] .text-2xs {
   outline: none;
 }
 
-.stardust-nebula {
+.new-chat-nebula {
   background:
     radial-gradient(ellipse at 35% 40%, rgba(91, 140, 255, 0.1), transparent 48%),
     radial-gradient(ellipse at 65% 45%, rgba(155, 123, 255, 0.09), transparent 48%);
 }
-.stardust-star {
+.new-chat-star {
   opacity: 0.3;
-  animation: stardust-arrival 1.3s cubic-bezier(0.3, 0.7, 0.2, 1) both;
+  animation: new-chat-star-arrival 1.3s cubic-bezier(0.3, 0.7, 0.2, 1) both;
 }
-@keyframes stardust-arrival {
+@keyframes new-chat-star-arrival {
   0% {
     opacity: 0;
     transform: scale(0.2);
@@ -2925,35 +2925,35 @@ html[data-sidebar-font-size] [data-app-sidebar] .text-2xs {
     transform: scale(1);
   }
 }
-.stardust-project-name {
+.new-chat-project-name {
   background: linear-gradient(90deg, #4d7dff, #8b6bff, #d86fb4);
   background-clip: text;
   color: transparent;
 }
-.stardust-project-name [data-draft-project-trigger] {
+.new-chat-project-name [data-draft-project-trigger] {
   color: inherit;
   border: 0;
 }
-[data-stardust-newchat] [data-testid="composer-editor"] {
+[data-new-chat] [data-testid="composer-editor"] {
   min-height: 64px;
 }
-[data-stardust-heading] svg {
+[data-new-chat-heading] svg {
   stroke-width: 1.6;
 }
-.stardust-resume-tile {
+.new-chat-resume-tile {
   transition: transform 0.2s cubic-bezier(0.3, 0.7, 0.2, 1);
 }
-.stardust-resume-tile:hover {
+.new-chat-resume-tile:hover {
   transform: translateY(-2px);
 }
-[data-theme-id="apple"] .stardust-resume-tile {
+[data-theme-id="apple"] .new-chat-resume-tile {
   box-shadow: var(--apple-card-shadow);
 }
 @media (prefers-reduced-motion: reduce) {
-  .stardust-star {
+  .new-chat-star {
     animation: none;
   }
-  .stardust-resume-tile {
+  .new-chat-resume-tile {
     transition: none;
   }
 }

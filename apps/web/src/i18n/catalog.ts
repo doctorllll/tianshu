@@ -8015,7 +8015,7 @@ export const zhCN: Readonly<Record<string, string>> = {
   "View {count} command": "查看命令（{count} 条）",
   "View {count} commands": "查看命令（{count} 条）",
 
-  // Stardust application copy.
+  // Tianshu application copy.
   "Wants to write outside the workspace": "想写入工作区以外的文件夹",
   "Wants to modify files": "想修改文件",
   "Wants to read files": "想读取文件",

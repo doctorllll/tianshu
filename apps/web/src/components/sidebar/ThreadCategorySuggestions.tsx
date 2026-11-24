@@ -259,7 +259,7 @@ export function ThreadCategorySuggestions({
                       aria-label={text("Include {title}", { title: row.title })}
                       onCheckedChange={(checked) => update(row.key, { checked })}
                     />
-                    <div className="min-w-0 text-stardust-body">
+                    <div className="min-w-0 text-ui-body">
                       <p className="break-words">{row.title}</p>
                       <p className="break-words text-xs text-muted-foreground">{row.reason}</p>
                     </div>
@@ -300,7 +300,7 @@ export function ThreadCategorySuggestions({
                         )
                       }
                     />
-                    <div className="min-w-0 text-stardust-body">
+                    <div className="min-w-0 text-ui-body">
                       <p className="break-words">
                         {text("Create {label} and move {count} threads", {
                           label: proposal.label,

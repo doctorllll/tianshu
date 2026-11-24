@@ -29,7 +29,7 @@ export function resolveWebAppStageLabel(input: {
 }
 
 /**
- * Whether this client was built as the stable release (`VITE_RELEASE_CHANNEL=stable`). The Stardust
+ * Whether this client was built as the stable release (`VITE_RELEASE_CHANNEL=stable`). Tianshu's
  * stable build is stamped with the upstream base version string, which still matches the Nightly
  * pattern, so the version alone cannot tell a stable build from a nightly one.
  */

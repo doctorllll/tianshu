@@ -494,10 +494,9 @@ export const make = Effect.gen(function* () {
 
   const resolveDisabledReason = Effect.gen(function* () {
     const customBuild = yield* fileSystem
-      .exists(environment.path.join(environment.resourcesPath, "stardust-build.json"))
+      .exists(environment.path.join(environment.resourcesPath, "tianshu-build.json"))
       .pipe(Effect.orElseSucceed(() => false));
-    if (customBuild)
-      return Option.some("天枢没有自动更新：新版本在本机重新打包后安装。");
+    if (customBuild) return Option.some("天枢没有自动更新：新版本在本机重新打包后安装。");
     const bakedFeed = Option.getOrUndefined(yield* Ref.get(appUpdateYmlConfigRef));
     if (
       bakedFeed !== undefined &&

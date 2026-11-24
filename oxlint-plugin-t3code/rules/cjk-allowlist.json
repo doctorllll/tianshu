@@ -84,7 +84,7 @@
     "reason": "Stable inbox status used in comparisons, typed props or saved acknowledgements; presentation localizes at the render boundary."
   },
   {
-    "path": "apps/web/src/components/chat/StardustStart.tsx",
+    "path": "apps/web/src/components/chat/NewChatStart.tsx",
     "kind": "string",
     "text": "运行失败",
     "count": 1,
