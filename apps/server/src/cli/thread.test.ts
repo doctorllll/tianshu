@@ -121,6 +121,7 @@ it.effect(
         ]).pipe(
           Effect.provideService(HostProcess.HomeDirectory, home),
           Effect.provideService(HostProcess.WorkingDirectory, cwd),
+          Effect.provideService(HostProcess.Environment, {}),
         );
         assert.strictEqual(
           (yield* TestConsole.logLines).at(-1),
@@ -139,6 +140,110 @@ it.effect(
         ),
       ),
     ),
+);
+
+it.effect("start, run by a thread's agent, asks for a sub-session of that thread", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const root = yield* fs
+      .makeTempDirectoryScoped({ prefix: "t3-thread-acting-" })
+      .pipe(Effect.flatMap((directory) => fs.realPath(directory)));
+    const baseDir = path.join(root, "state");
+    const projectId = ProjectId.make("project-1");
+    yield* persistServerRuntimeState({
+      path: path.join(baseDir, "userdata", "server-runtime.json"),
+      state: yield* makePersistedServerRuntimeState({
+        config: { host: "127.0.0.1", devUrl: undefined },
+        port: 3_773,
+      }),
+    });
+    const failure = (code: string) =>
+      Effect.succeed({
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ _tag: "OrchestratorMcpFailure", code, message: code }),
+          },
+        ],
+      });
+    const cases = [
+      {
+        env: { FASTCTX_RESIDENT: "claude-1@machine-1" },
+        header: "fastctx=claude-1%40machine-1",
+        delegated: failure("awaiting_user_confirmation"),
+        tools: ["t3_project_list", "delegate_task"],
+        printed: "awaiting_user_confirmation",
+      },
+      {
+        // The server knows no thread for that conversation: an outside agent starts a thread.
+        env: { T3CODE_THREAD_ID: "thread-elsewhere" },
+        header: "thread=thread-elsewhere",
+        delegated: failure("thread_credential_required"),
+        tools: ["t3_project_list", "delegate_task", "t3_thread_launch"],
+        printed: threadId,
+      },
+    ];
+    for (const testCase of cases) {
+      const calls: Array<{ tool: string; args: Readonly<Record<string, unknown>> }> = [];
+      using session = vi.spyOn(McpBridge, "mcpToolSession").mockReturnValue(
+        Effect.succeed({
+          call: (tool, args) => {
+            calls.push({ tool, args });
+            switch (tool) {
+              case "t3_project_list":
+                return Effect.succeed({
+                  structuredContent: {
+                    projects: [{ id: projectId, title: "Project", workspaceRoot: root }],
+                    nextCursor: null,
+                  },
+                });
+              case "delegate_task":
+                return testCase.delegated;
+              case "t3_thread_launch":
+                return Effect.succeed({ structuredContent: { threadId, projectId, runId: null } });
+              default:
+                return Effect.die(`unexpected ${tool} call`);
+            }
+          },
+        }),
+      );
+      yield* Command.runWith(threadCommand, { version: "0.0.0" })([
+        "start",
+        projectId,
+        "Write the draft",
+        "--provider",
+        "zcode",
+        "--model",
+        "glm",
+        "--json",
+        "--base-dir",
+        baseDir,
+      ]).pipe(Effect.provideService(HostProcess.Environment, testCase.env));
+      assert.strictEqual(session.mock.calls[0]?.[0].headers?.["t3-acting-for"], testCase.header);
+      assert.deepStrictEqual(
+        calls.map((call) => call.tool),
+        testCase.tools,
+      );
+      assert.deepStrictEqual(calls[1]?.args, {
+        task: "Write the draft",
+        title: "Write the draft",
+        target: { projectId, providerInstanceId: "zcode", model: "glm" },
+      });
+      assert.include((yield* TestConsole.logLines).at(-1), testCase.printed);
+    }
+  }).pipe(
+    Effect.scoped,
+    Effect.provide(
+      Layer.mergeAll(
+        NodeServices.layer,
+        NodeCrypto.layer,
+        NetService.layer,
+        ConfigProvider.layer(ConfigProvider.fromEnv({ env: { T3CODE_PORT: "3773" } })),
+      ),
+    ),
+  ),
 );
 
 it.effect("does not sign in to whatever took over a dead server's port", () =>

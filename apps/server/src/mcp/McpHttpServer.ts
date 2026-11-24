@@ -53,6 +53,8 @@ import {
   MAX_REPORTED_DEPTH,
   toolOutcome,
 } from "../telemetry/ProviderDimensions.ts";
+import * as ActingThreads from "./ActingThreads.ts";
+import { ACTING_FOR_HEADER, parseActingFor } from "./actingFor.ts";
 import { advertisedJsonSchema } from "./advertisedJsonSchema.ts";
 import * as McpInvocationContext from "./McpInvocationContext.ts";
 import * as McpToolAccess from "./McpToolAccess.ts";
@@ -281,6 +283,7 @@ const linkedEnvironmentsOff = HttpServerResponse.jsonUnsafe(
 const makeMcpAuthMiddleware = Effect.gen(function* () {
   const registry = yield* McpSessionRegistry.McpSessionRegistry;
   const clients = yield* Effect.serviceOption(McpClientAuthenticator);
+  const actingThreads = yield* Effect.serviceOption(ActingThreads.ActingThreads);
   const serverSettings = yield* ServerSettings.ServerSettingsService;
   const runtimeModeCeiling = serverSettings.managedPolicy?.limits?.maxRuntimeMode;
   const linksEnabled = serverSettings.getSettings.pipe(
@@ -334,7 +337,24 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
     }
     const asked = withModeLimit(withSenderThread(invocation, request), request);
     if (asked === undefined) return invalidModeLimit;
-    const limited = McpInvocationContext.withRuntimeModeCeiling(asked, runtimeModeCeiling);
+    const actingHeader = request.headers[ACTING_FOR_HEADER];
+    const actingFor = actingHeader === undefined ? undefined : parseActingFor(actingHeader);
+    const actor = asked.client;
+    const acting =
+      actingFor === undefined ||
+      Option.isNone(actingThreads) ||
+      asked.thread !== undefined ||
+      actor === undefined ||
+      actor.linked === true ||
+      actor.access !== "full-access"
+        ? undefined
+        : yield* actingThreads.value.resolve(actingFor);
+    const limited = McpInvocationContext.withRuntimeModeCeiling(
+      acting === undefined || actor === undefined
+        ? asked
+        : ActingThreads.actAsThread({ ...asked, client: actor }, acting),
+      runtimeModeCeiling,
+    );
     const linkedEnvironments = yield* linksEnabled;
     if (limited.client?.linked === true && !linkedEnvironments) return linkedEnvironmentsOff;
     const origin = Option.getOrUndefined(Option.map(requestUrl(request), (url) => url.origin));

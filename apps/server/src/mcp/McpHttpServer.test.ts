@@ -54,6 +54,7 @@ import * as ServerConfig from "../config.ts";
 import * as ServerHttp from "../http.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { advertisedJsonSchema } from "./advertisedJsonSchema.ts";
+import * as ActingThreads from "./ActingThreads.ts";
 import * as McpHttpServer from "./McpHttpServer.ts";
 import * as McpToolAccess from "./McpToolAccess.ts";
 import * as McpToolAccessTestkit from "./McpToolAccess.testkit.ts";
@@ -1392,6 +1393,126 @@ it.effect("admits provider and OAuth client credentials and points only clients 
       expect((yield* foreignOrigin("POST", providerToken)).status).toBe(403);
       expect((yield* foreignOrigin("POST", undefined)).status).toBe(403);
       expect((yield* foreignOrigin("OPTIONS", undefined)).status).toBe(403);
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+it.effect("lets only a full-access client outside a thread act as the thread it names", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const fastctxThread = ThreadId.make("thread-fastctx");
+      const clientScope = (access: "full-access" | "auto", linked = false) =>
+        ({
+          environmentId,
+          requestNamespace: `client:${access}`,
+          thread: undefined,
+          client: { sessionId: `session-${access}`, label: "t3 thread cli", access, linked },
+          capabilities: new Set(["orchestration"]),
+          issuedAt: 1,
+        }) satisfies McpInvocationContext.McpInvocationScope;
+      const tokens: Record<string, McpInvocationContext.McpInvocationScope> = {
+        "full.token": clientScope("full-access"),
+        "auto.token": clientScope("auto"),
+        "linked.token": clientScope("full-access", true),
+      };
+      const seen: Array<McpInvocationContext.McpInvocationScope> = [];
+      const ProbeToolkit = Toolkit.make(
+        Tool.make("probe", {
+          description: "Reports the caller.",
+          success: Schema.Struct({ ok: Schema.Boolean }),
+          failure: OrchestratorMcpFailure,
+          failureMode: "return",
+          dependencies: [McpInvocationContext.McpInvocationContext],
+        }),
+      );
+      const serverLayer = McpHttpServer.layerMcpTransport(
+        McpHttpServer.toolkitRegistration(
+          ProbeToolkit,
+          McpToolAccess.toLayer(ProbeToolkit, {
+            probe: McpToolAccess.reads(() =>
+              McpInvocationContext.McpInvocationContext.pipe(
+                Effect.tap((scope) => Effect.sync(() => seen.push(scope))),
+                Effect.as({ ok: true }),
+              ),
+            ),
+          }),
+        ),
+      ).pipe(
+        Layer.provide(ServerSettings.layerTest({ linkedEnvironmentsEnabled: true })),
+        Layer.provide(
+          Layer.mock(McpSessionRegistry.McpSessionRegistry)({
+            resolve: () => Effect.undefined,
+          }),
+        ),
+        Layer.provide(
+          Layer.succeed(McpHttpServer.McpClientAuthenticator, {
+            authenticate: (request) =>
+              Effect.succeed(tokens[request.headers.authorization?.slice("Bearer ".length) ?? ""]),
+          }),
+        ),
+        Layer.provide(
+          Layer.succeed(ActingThreads.ActingThreads, {
+            resolve: (actingFor) =>
+              Effect.succeed(
+                actingFor.kind === "fastctx" && actingFor.resident === "claude-1"
+                  ? {
+                      threadId: fastctxThread,
+                      providerInstanceId: ProviderInstanceId.make("fastctx"),
+                    }
+                  : undefined,
+              ),
+          }),
+        ),
+        Layer.provide(ServerHttp.layerBrowserApiCors),
+        Layer.provide(
+          ServerConfig.layerTest(process.cwd(), { prefix: "t3-mcp-acting-test-" }).pipe(
+            Layer.provide(NodeServices.layer),
+          ),
+        ),
+      );
+      yield* HttpRouter.serve(serverLayer, { disableListenLog: true, disableLogger: true }).pipe(
+        Layer.build,
+      );
+      const httpClient = yield* HttpClient.HttpClient;
+      const callerOf = (token: string, actingFor: string) =>
+        Effect.gen(function* () {
+          const headers = {
+            accept: "application/json, text/event-stream",
+            authorization: `Bearer ${token}`,
+            "t3-acting-for": actingFor,
+          };
+          const initialize = yield* httpClient.post("/mcp", {
+            headers,
+            body: HttpBody.text(
+              `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1.0.0"}}}`,
+              "application/json",
+            ),
+          });
+          const called = yield* httpClient.post("/mcp", {
+            headers: {
+              ...headers,
+              "mcp-session-id": initialize.headers["mcp-session-id"]!,
+              "mcp-protocol-version": "2025-06-18",
+            },
+            body: HttpBody.text(
+              `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"probe","arguments":{}}}`,
+              "application/json",
+            ),
+          });
+          expect(called.status).toBe(200);
+          const scope = seen.at(-1)!;
+          return scope.thread === undefined
+            ? `client ${scope.client?.access}`
+            : `thread ${scope.thread.threadId} ${scope.thread.providerInstanceId}`;
+        });
+
+      expect(yield* callerOf("full.token", "fastctx=claude-1%40box")).toBe(
+        "thread thread-fastctx fastctx",
+      );
+      expect(yield* callerOf("full.token", "fastctx=claude-9%40box")).toBe("client full-access");
+      expect(yield* callerOf("full.token", "nonsense")).toBe("client full-access");
+      expect(yield* callerOf("auto.token", "fastctx=claude-1%40box")).toBe("client auto");
+      expect(yield* callerOf("linked.token", "fastctx=claude-1%40box")).toBe("client full-access");
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );

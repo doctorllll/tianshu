@@ -1,4 +1,6 @@
 import {
+  ORCHESTRATOR_MCP_RUNNING_TASK_NEXT,
+  OrchestratorMcpDelegateTaskResult,
   OrchestratorMcpFailure,
   OrchestratorMcpThreadListResult,
   OrchestratorMcpThreadReadResult,
@@ -31,6 +33,7 @@ import { Argument, Command, Flag, GlobalFlag } from "effect/cli";
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../config.ts";
 import { mcpToolSession, type McpToolSession } from "../mcp/AcpMcpStdioBridge.ts";
+import { ACTING_FOR_HEADER, actingForFromEnvironment } from "../mcp/actingFor.ts";
 import { expandHomePath } from "../os-jank.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import { readLiveServerRuntimeState } from "../serverRuntimeState.ts";
@@ -77,7 +80,7 @@ export class ThreadServerUnreachableError extends Schema.TaggedError<ThreadServe
 
 export class ThreadToolFailedError extends Schema.TaggedError<ThreadToolFailedError>()(
   "ThreadToolFailedError",
-  { tool: Schema.String, detail: Schema.String },
+  { tool: Schema.String, detail: Schema.String, code: Schema.optional(Schema.String) },
 ) {
   override readonly [Runtime.errorReported] = false;
   override get message(): string {
@@ -177,11 +180,11 @@ const ThreadLaunchResult = Schema.Struct({
   runId: Schema.NullOr(RunId),
 });
 
-const toolFailureDetail = (result: typeof ToolResult.Type) => {
+const toolFailure = (result: typeof ToolResult.Type) => {
   const text = result.content?.find((part) => part.text !== undefined)?.text ?? "";
   return Option.match(decodeFailureText(text), {
-    onNone: () => text || "The tool call failed.",
-    onSome: (failure) => failure.message,
+    onNone: () => ({ code: undefined, detail: text || "The tool call failed." }),
+    onSome: (failure) => ({ code: failure.code, detail: failure.message }),
   });
 };
 
@@ -202,7 +205,12 @@ const makeThreadTools = (session: McpToolSession, origin: string) => {
         .pipe(Effect.mapError((cause) => new ThreadServerUnreachableError({ origin, cause })));
       const result = yield* decodeToolResult(raw).pipe(Effect.mapError(() => unexpected(tool)));
       if (result.isError === true) {
-        return yield* new ThreadToolFailedError({ tool, detail: toolFailureDetail(result) });
+        const { code, detail } = toolFailure(result);
+        return yield* new ThreadToolFailedError({
+          tool,
+          detail,
+          ...(code === undefined ? {} : { code }),
+        });
       }
       return yield* Schema.decodeUnknownEffect(schema)(result.structuredContent).pipe(
         Effect.mapError(() => unexpected(tool)),
@@ -219,6 +227,7 @@ export type ThreadTools = ReturnType<typeof makeThreadTools>;
 const withThreadTools = Effect.fn("cli.thread.withThreadTools")(function* <A, E, R>(
   flags: { readonly baseDir: Option.Option<string>; readonly json: boolean },
   run: (tools: ThreadTools) => Effect.Effect<A, E, R>,
+  headers?: Readonly<Record<string, string>>,
 ) {
   const logLevel = yield* GlobalFlag.LogLevel;
   const config = yield* resolveCliAuthConfig(flags, logLevel, { quietLogs: flags.json });
@@ -246,6 +255,7 @@ const withThreadTools = Effect.fn("cli.thread.withThreadTools")(function* <A, E,
       endpoint: new URL("/mcp", origin).href,
       authorization: `Bearer ${issued.token}`,
       clientName: "t3-thread-cli",
+      ...(headers === undefined ? {} : { headers }),
     }).pipe(Effect.mapError((cause) => new ThreadServerUnreachableError({ origin, cause })));
     return yield* run(makeThreadTools(session, origin));
   }).pipe(
@@ -867,6 +877,83 @@ const threadListCommand = Command.make("list", {
   ),
 );
 
+const SUB_SESSION_AWAITING =
+  "Not started yet: run by a T3 thread's agent, this asks for a sub-session of that thread, and the user reviews sub-sessions before they start. Do not run it again or do the task yourself. The user may change its agent, model, options or task. Once confirmed it starts, and its completion wakes your thread with its reply; if declined, nothing starts. Continue other work, or end your turn.";
+
+/**
+ * Run by a thread's agent, `t3 thread start` asks for a sub-session of that thread as
+ * delegate_task does, so the user confirms it first. False when the server knows no such thread.
+ */
+const startAsSubSession = Effect.fn("cli.thread.startAsSubSession")(function* (
+  tools: ThreadTools,
+  input: {
+    readonly projectId: ProjectId;
+    readonly title: string;
+    readonly message: string;
+    readonly modelSelection: Effect.Success<ReturnType<typeof launchModelSelection>>;
+    readonly json: boolean;
+    readonly wait: boolean;
+  },
+) {
+  const selection = input.modelSelection;
+  const failedWith =
+    (code: string) => (error: ThreadServerUnreachableError | ThreadToolFailedError) =>
+      error._tag === "ThreadToolFailedError" && error.code === code;
+  const started = yield* tools
+    .call(
+      "delegate_task",
+      {
+        task: input.message,
+        title: input.title,
+        target: {
+          projectId: input.projectId,
+          ...(selection === undefined
+            ? {}
+            : {
+                providerInstanceId: selection.instanceId,
+                model: selection.model,
+                ...(selection.options === undefined ? {} : { options: selection.options }),
+              }),
+        },
+      },
+      OrchestratorMcpDelegateTaskResult,
+    )
+    .pipe(
+      Effect.map((task) => ({ task })),
+      Effect.catchIf(failedWith("thread_credential_required"), () => Effect.undefined),
+      Effect.catchIf(failedWith("awaiting_user_confirmation"), () =>
+        Effect.succeed({ task: undefined }),
+      ),
+      Effect.mapError((error) =>
+        error._tag === "ThreadToolFailedError"
+          ? new ThreadToolFailedError({
+              ...error,
+              detail: `Run by a T3 thread's agent, this starts a sub-session of that thread: ${error.detail}`,
+            })
+          : error,
+      ),
+    );
+  if (started === undefined) return false;
+  if (input.wait) {
+    yield* Console.error(
+      "--wait does not apply to a sub-session: its completion wakes your thread.",
+    );
+  }
+  const task = started.task;
+  if (task === undefined) {
+    yield* input.json
+      ? printJson({ status: "awaiting_user_confirmation", message: SUB_SESSION_AWAITING })
+      : Console.log(SUB_SESSION_AWAITING);
+    return true;
+  }
+  yield* input.json
+    ? printJson(task)
+    : Console.log(
+        `Sub-session ${task.childThreadId ?? task.taskId} started. ${task.next ?? ORCHESTRATOR_MCP_RUNNING_TASK_NEXT}`,
+      );
+  return true;
+});
+
 const threadStartCommand = Command.make("start", {
   ...projectLocationFlags,
   project: Argument.String("project").pipe(
@@ -921,10 +1008,33 @@ const threadStartCommand = Command.make("start", {
       const title = yield* decodeTitle(
         Option.getOrElse(flags.title, () => titleFromMessage(message)),
       ).pipe(Effect.mapError(() => new ThreadUsageError({ detail: "The title is empty." })));
+      const actingFor = actingForFromEnvironment(yield* HostProcess.Environment);
+      if (
+        actingFor !== undefined &&
+        (workspaceStrategy !== undefined || Option.isSome(flags.outputSchema))
+      ) {
+        return yield* new ThreadUsageError({
+          detail:
+            "Run by a T3 thread's agent (T3CODE_THREAD_ID or FASTCTX_RESIDENT is set), this asks for a sub-session of that thread, which takes no --worktree, --branch or --output-schema. Outside a T3 thread, unset that variable to start a top-level thread.",
+        });
+      }
       yield* withThreadTools(
         flags,
         Effect.fn("cli.thread.start")(function* (tools) {
           const project = yield* resolveProject(tools, flags.project);
+          if (
+            actingFor !== undefined &&
+            (yield* startAsSubSession(tools, {
+              projectId: project.id,
+              title,
+              message,
+              modelSelection,
+              json: flags.json,
+              wait: flags.wait,
+            }))
+          ) {
+            return;
+          }
           const launched = yield* tools.call(
             "t3_thread_launch",
             {
@@ -949,6 +1059,7 @@ const threadStartCommand = Command.make("start", {
           }
           yield* flags.json ? printJson(launched) : Console.log(launched.threadId);
         }),
+        actingFor === undefined ? undefined : { [ACTING_FOR_HEADER]: actingFor },
       );
     }).pipe(reportThreadErrors),
   ),
