@@ -250,7 +250,7 @@ function categoryWithKeywordIn(categories: readonly ThreadCategory[], text: stri
 }
 
 /** A JSON value in local storage that components follow; a missing or broken value reads as `empty`. */
-function localStore<T>(key: string, parse: (raw: string | null) => T, empty: T) {
+export function localStore<T>(key: string, parse: (raw: string | null) => T, empty: T) {
   let cachedRaw: string | null | undefined;
   let cached = empty;
   const listeners = new Set<() => void>();

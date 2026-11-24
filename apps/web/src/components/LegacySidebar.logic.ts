@@ -77,21 +77,31 @@ export function threadProjectNames(
     names.get(scopedProjectKey(scopeProjectRef(thread.environmentId, thread.projectId)));
 }
 
+export interface ThreadProjectLabel {
+  readonly label: string;
+  /** The project's own key, which tells two projects with the same name apart. */
+  readonly projectKey: string;
+}
+
 /**
- * Thread key to the name of the project the thread belongs to, so the by-category view can still
- * say where a thread comes from. Sidebar rows are merged collections ("Other projects"), so this
- * names the thread's own project. A thread whose project is unknown gets no entry.
+ * Thread key to the project the thread belongs to, so the by-category view can still say where a
+ * thread comes from. Sidebar rows are merged collections ("Other projects"), so this names the
+ * thread's own project. A thread whose project is unknown gets no entry.
  */
 export function threadProjectLabels(
   threads: ReadonlyArray<Pick<SidebarThreadSummary, "environmentId" | "id" | "projectId">>,
   projectNameOf: (
     thread: Pick<SidebarThreadSummary, "environmentId" | "projectId">,
   ) => string | undefined,
-): Map<string, string> {
-  const labels = new Map<string, string>();
+): Map<string, ThreadProjectLabel> {
+  const labels = new Map<string, ThreadProjectLabel>();
   for (const thread of threads) {
-    const name = projectNameOf(thread)?.trim();
-    if (name) labels.set(scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)), name);
+    const label = projectNameOf(thread)?.trim();
+    if (label)
+      labels.set(scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)), {
+        label,
+        projectKey: scopedProjectKey(scopeProjectRef(thread.environmentId, thread.projectId)),
+      });
   }
   return labels;
 }

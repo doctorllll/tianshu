@@ -239,6 +239,11 @@ import {
   threadProjectLabels,
   threadProjectNames,
 } from "./LegacySidebar.logic";
+import {
+  projectTagColors,
+  useProjectColorSlots,
+  type ProjectTagColors,
+} from "../sidebarProjectColors";
 import { sortThreads, getThreadSortTimestamp } from "@t3tools/client-runtime/state/thread-sort";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
@@ -506,8 +511,13 @@ type ThreadProviderDisplay = {
 const ThreadProviderLabelContext = createContext<ReadonlyMap<string, ThreadProviderDisplay> | null>(
   null,
 );
+/** The tag a by-category row wears: its project's name, in that project's colour. */
+type ThreadProjectTag = {
+  readonly label: string;
+  readonly colors: ProjectTagColors | null;
+};
 /** By-category rows name the project each thread comes from, by thread key; null elsewhere. */
-const ThreadProjectLabelContext = createContext<ReadonlyMap<string, string> | null>(null);
+const ThreadProjectTagContext = createContext<ReadonlyMap<string, ThreadProjectTag> | null>(null);
 const MORE_PROJECTS_EXPANSION_KEY = "project-first:more";
 const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowProps) {
   const uiText = useUiText();
@@ -543,9 +553,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   const threadRef = scopeThreadRef(thread.environmentId, thread.id);
   const threadKey = scopedThreadKey(threadRef);
   const providerChipLabel = useContext(ThreadProviderLabelContext)?.get(threadKey);
-  const projectLabelOfThread = useContext(ThreadProjectLabelContext)?.get(threadKey);
+  const projectTagOfThread = useContext(ThreadProjectTagContext)?.get(threadKey);
   // A subtask sits under its root conversation, which already names the project.
-  const projectLabel = props.indent ? undefined : projectLabelOfThread;
+  const projectTag = props.indent ? undefined : projectTagOfThread;
   const movedTo = useThreadPlacementStore((state) => state.placements[threadKey]);
   const originalWorkspace = useThreadMove().workspacePath(threadKey);
   const [isFileDragOver, setIsFileDragOver] = useState(false);
@@ -846,7 +856,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           event.dataTransfer.effectAllowed = "move";
         }}
         className={cn(
-          projectLabel ? "h-10" : "h-8",
+          projectTag ? "h-10" : "h-8",
           "relative isolate flex w-full min-w-0 cursor-pointer select-none items-center gap-2 overflow-hidden rounded-md px-2 text-left text-xs outline-hidden focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring group-data-[collapsible=icon]:hidden [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted-foreground",
           isActive
             ? "bg-sidebar-row-active font-medium text-sidebar-foreground hover:bg-sidebar-row-active"
@@ -944,19 +954,34 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               </Tooltip>
             )}
           </div>
-          {projectLabel ? (
+          {projectTag ? (
             <Tooltip>
               <TooltipTrigger
                 render={
                   <span
-                    className="mt-0.5 w-fit max-w-full truncate rounded bg-sidebar-foreground/6 px-1 text-3xs leading-4 text-sidebar-muted-foreground"
+                    className={cn(
+                      "mt-0.5 w-fit max-w-full truncate rounded px-1 text-3xs leading-4",
+                      projectTag.colors
+                        ? "bg-(--project-tag-bg) text-(--project-tag-fg) dark:bg-(--project-tag-bg-dark) dark:text-(--project-tag-fg-dark)"
+                        : "bg-sidebar-foreground/6 text-sidebar-muted-foreground",
+                    )}
+                    style={
+                      projectTag.colors
+                        ? ({
+                            "--project-tag-bg": projectTag.colors.light.background,
+                            "--project-tag-fg": projectTag.colors.light.foreground,
+                            "--project-tag-bg-dark": projectTag.colors.dark.background,
+                            "--project-tag-fg-dark": projectTag.colors.dark.foreground,
+                          } as React.CSSProperties)
+                        : undefined
+                    }
                     data-testid={`thread-project-${thread.id}`}
                   />
                 }
               >
-                {projectLabel}
+                {projectTag.label}
               </TooltipTrigger>
-              <TooltipPopup side="top">{projectLabel}</TooltipPopup>
+              <TooltipPopup side="top">{projectTag.label}</TooltipPopup>
             </Tooltip>
           ) : null}
         </div>
@@ -4414,14 +4439,33 @@ export default function LegacySidebar(props: { routeReveal: SidebarRouteReveal }
         }),
       )
     : null;
-  const threadProjectLabelMap =
-    sidebarGrouping === "category"
-      ? threadProjectLabels(sidebarThreads, (thread) => {
-          const name = threadProjectName(thread);
-          // The folder-less home is stored under its English name.
-          return name === "No project" ? uiText("No project") : name;
-        })
-      : null;
+  const threadProjectNameLabels =
+    sidebarGrouping === "category" ? threadProjectLabels(sidebarThreads, threadProjectName) : null;
+  // The folder-less home is stored under its English name; it is no project of its own, so its
+  // tag stays grey and takes no colour.
+  const isNoProjectLabel = (label: string) => label === "No project";
+  const projectColorSlots = useProjectColorSlots(
+    threadProjectNameLabels
+      ? [...threadProjectNameLabels.values()]
+          .filter((entry) => !isNoProjectLabel(entry.label))
+          .map((entry) => entry.projectKey)
+      : [],
+  );
+  const threadProjectTagMap = (() => {
+    if (!threadProjectNameLabels) return null;
+    const colorsByProject = new Map<string, ProjectTagColors | null>();
+    return new Map<string, ThreadProjectTag>(
+      [...threadProjectNameLabels].map(([threadKey, entry]) => {
+        if (isNoProjectLabel(entry.label))
+          return [threadKey, { label: uiText("No project"), colors: null }];
+        if (!colorsByProject.has(entry.projectKey)) {
+          const slot = projectColorSlots[entry.projectKey];
+          colorsByProject.set(entry.projectKey, slot === undefined ? null : projectTagColors(slot));
+        }
+        return [threadKey, { label: entry.label, colors: colorsByProject.get(entry.projectKey)! }];
+      }),
+    );
+  })();
   const acknowledgedErrors = useWorkbenchInboxStore((state) => state.acknowledgedErrors);
   const visibleSidebarThreadKeys = (() =>
     sortedProjects.flatMap((project) => {
@@ -4852,7 +4896,7 @@ export default function LegacySidebar(props: { routeReveal: SidebarRouteReveal }
           revealProject={expandThreadListForProject}
         >
           <ThreadProviderLabelContext.Provider value={threadProviderLabels}>
-            <ThreadProjectLabelContext.Provider value={threadProjectLabelMap}>
+            <ThreadProjectTagContext.Provider value={threadProjectTagMap}>
               <SidebarProjectsContent
                 attachInteraction={categoryOrder.attachInteraction}
                 workbenchInbox={
@@ -4920,7 +4964,7 @@ export default function LegacySidebar(props: { routeReveal: SidebarRouteReveal }
                 handleLocateProject={handleLocateProject}
                 isMobile={isMobile}
               />
-            </ThreadProjectLabelContext.Provider>
+            </ThreadProjectTagContext.Provider>
           </ThreadProviderLabelContext.Provider>
         </ThreadMoveProvider>
       </SidebarSubtasksContext.Provider>

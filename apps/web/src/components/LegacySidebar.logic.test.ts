@@ -1579,8 +1579,23 @@ describe("threadProjectLabels", () => {
       ],
       nameOf,
     );
-    expect(labels.get(keyOf(localEnvironmentId, "a"))).toBe("phone-tools");
-    expect(labels.get(keyOf(remote, "b"))).toBe("media-server");
+    expect(labels.get(keyOf(localEnvironmentId, "a"))?.label).toBe("phone-tools");
+    expect(labels.get(keyOf(remote, "b"))?.label).toBe("media-server");
+  });
+
+  it("carries a project key that differs between projects sharing an id across environments", () => {
+    const labels = threadProjectLabels(
+      [
+        { environmentId: localEnvironmentId, id: ThreadId.make("a"), projectId: phone },
+        { environmentId: localEnvironmentId, id: ThreadId.make("b"), projectId: phone },
+        { environmentId: remote, id: ThreadId.make("c"), projectId: phone },
+      ],
+      nameOf,
+    );
+    const keys = (id: string, environmentId: EnvironmentId) =>
+      labels.get(keyOf(environmentId, id))?.projectKey;
+    expect(keys("a", localEnvironmentId)).toBe(keys("b", localEnvironmentId));
+    expect(keys("a", localEnvironmentId)).not.toBe(keys("c", remote));
   });
 
   it("leaves out a thread whose project is unknown or has a blank name", () => {
