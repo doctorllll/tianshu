@@ -46,7 +46,13 @@ export function ThreadCategorySuggestions({
 }) {
   const text = useUiText();
   const { settings } = useSidebarCategories();
-  const waitingProposals = useCategoryProposals();
+  const storedProposals = useCategoryProposals();
+  // A suggestion stays up while two or more of its threads are still unsorted.
+  const unsortedKeys = new Set(candidates.map((candidate) => candidate.key));
+  const waitingProposals = storedProposals.flatMap((proposal) => {
+    const threadKeys = proposal.threadKeys.filter((key) => unsortedKeys.has(key));
+    return threadKeys.length >= 2 ? [{ ...proposal, threadKeys }] : [];
+  });
   const run = useAtomCommand(serverEnvironment.suggestSidebarCategories, { reportFailure: false });
   const { environmentId, models } = useSidebarSuggestionModels();
   const canSuggest = useAtomValue(

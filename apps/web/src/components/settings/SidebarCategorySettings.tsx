@@ -135,7 +135,9 @@ export function SidebarCategorySettingsSection() {
               {text("File by title automatically")}
             </label>
             <p className="text-xs text-muted-foreground">
-              {text("A title containing a keyword goes into its matching category.")}
+              {text(
+                "A thread whose title, or else whose folder name, contains a keyword goes into that category.",
+              )}
             </p>
           </div>
           <Switch

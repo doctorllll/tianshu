@@ -7732,6 +7732,8 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Group by": "分组方式",
   "Help me categorize": "帮我分类",
   "Let a model file threads": "让模型归类",
+  "A thread whose title, or else whose folder name, contains a keyword goes into that category.":
+    "标题含关键词就归入对应分类；标题没有时，再看所在文件夹名。",
   "Threads no keyword matches go to the model with their title, folder and agent. It can also suggest new categories.":
     "关键词没对上的会话，会把标题、所在文件夹和 agent 交给模型归类；模型也会建议新分类。",
   "Drag to reorder. Keywords file a thread at once; the line on what belongs here guides the model.":

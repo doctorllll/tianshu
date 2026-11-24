@@ -92,6 +92,20 @@ describe("filing by the model", () => {
     expect(resolve("k", "Root the phone")).toBe("devices");
     expect(resolve("k", "Commit the changes", { k: "devices" })).toBe("devices");
     expect(resolve("gone", "x")).toBe(UNSORTED_CATEGORY_ID);
+    // With no keyword in the title, the folder name decides before the model does.
+    expect(
+      resolveThreadCategory(
+        {},
+        "k",
+        { title: "Commit the changes", projectName: "phone-tools" },
+        filing,
+        categoryDefinitions(filing),
+        auto,
+      ),
+    ).toBe("devices");
+    expect(classifyThread({ title: "Root the phone", projectName: "phones" }, filing)).toBe(
+      "devices",
+    );
     expect(resolve("k", "Commit the changes", {}, { ...filing, suggestions: false })).toBe(
       UNSORTED_CATEGORY_ID,
     );

@@ -124,22 +124,30 @@ export function classifyThread(
     return UNSORTED_CATEGORY_ID;
   }
   const categories = categoryDefinitions(settings);
-  const title = input.title.normalize("NFKC").toLowerCase();
   const legacy = settings.preset === "general" ? settings.legacyRules : undefined;
   const matched =
     legacy?.title.find((rule) => matchLocalCategoryRule(rule, input.title)) ??
     legacy?.project.find((rule) => matchLocalCategoryRule(rule, input.projectName ?? ""));
   if (matched && categories.some((entry) => entry.id === matched.categoryId))
     return matched.categoryId;
-  const category = categories.find((entry) =>
+  // The title decides; a folder is usually named after what its threads work on.
+  const category =
+    categoryWithKeywordIn(categories, input.title) ??
+    (input.projectName ? categoryWithKeywordIn(categories, input.projectName) : undefined);
+  return category?.id ?? UNSORTED_CATEGORY_ID;
+}
+
+/** The first category with a keyword in the text: as a word for Latin keywords, else anywhere. */
+function categoryWithKeywordIn(categories: readonly ThreadCategory[], text: string) {
+  const value = text.normalize("NFKC").toLowerCase();
+  const words = value.split(/[^a-z0-9]+/);
+  return categories.find((entry) =>
     entry.keywords.some((keyword) => {
-      const value = keyword.normalize("NFKC").toLowerCase().trim();
-      if (!value) return false;
-      if (!/^[a-z0-9]+$/.test(value)) return title.includes(value);
-      return title.split(/[^a-z0-9]+/).includes(value);
+      const term = keyword.normalize("NFKC").toLowerCase().trim();
+      if (!term) return false;
+      return /^[a-z0-9]+$/.test(term) ? words.includes(term) : value.includes(term);
     }),
   );
-  return category?.id ?? UNSORTED_CATEGORY_ID;
 }
 
 /** A JSON value in local storage that components follow; a missing or broken value reads as `empty`. */
@@ -428,9 +436,10 @@ export function addCategoryProposals(
         ...current,
         threadKeys: [...new Set([...current.threadKeys, ...proposal.threadKeys])],
       };
-    } else if (pending.length < MAX_PENDING_PROPOSALS) pending.push(proposal);
+    } else pending.push(proposal);
   }
-  return proposalStore.write({ ...state, pending });
+  // The newest suggestions win; older ones have usually been overtaken by filing.
+  return proposalStore.write({ ...state, pending: pending.slice(-MAX_PENDING_PROPOSALS) });
 }
 /** Removes a waiting suggestion; a turned-down one is never suggested again. */
 export function settleCategoryProposal(label: string, dismissed: boolean): boolean {

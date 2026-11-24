@@ -132,15 +132,23 @@ it("offers a suggested category until the user takes it or turns it down", async
       pending: [
         { label: "Debate", description: "Speeches", keywords: [], threadKeys: ["a", "b"] },
         { label: "Travel", description: "", keywords: [], threadKeys: ["c", "d"] },
+        // Its threads were filed since, so it is not offered.
+        { label: "Stale", description: "", keywords: [], threadKeys: ["filed-1", "filed-2", "a"] },
       ],
       dismissed: [],
     }),
   );
+  const unsorted = ["a", "b", "c", "d"].map((key) => ({ key, title: `Title ${key}` }));
 
   await using screen = await render(
-    <ThreadCategorySuggestions candidates={[]} categories={categories} modelSelection={null} />,
+    <ThreadCategorySuggestions
+      candidates={unsorted}
+      categories={categories}
+      modelSelection={null}
+    />,
     { router: false },
   );
+  await expect.element(screen.getByText("Suggested new category: Stale")).not.toBeInTheDocument();
   await expect.element(screen.getByText("Suggested new category: Debate")).toBeVisible();
   await expect.element(screen.getByText("Speeches · 2 threads fit it")).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: "No thanks" }).last());
@@ -154,7 +162,9 @@ it("offers a suggested category until the user takes it or turns it down", async
     b: { category: added.id, scheme: "", title: "" },
   });
   expect(JSON.parse(localStorage.getItem(proposalsKey) ?? "{}")).toEqual({
-    pending: [],
+    pending: [
+      { label: "Stale", description: "", keywords: [], threadKeys: ["filed-1", "filed-2", "a"] },
+    ],
     dismissed: ["travel"],
   });
   expect(mocks.run).not.toHaveBeenCalled();
