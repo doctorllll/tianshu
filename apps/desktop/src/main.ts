@@ -82,6 +82,9 @@ import * as DesktopWslBackend from "./wsl/DesktopWslBackend.ts";
 import * as DesktopWslEnvironment from "./wsl/DesktopWslEnvironment.ts";
 import * as DesktopWslServerTree from "./wsl/DesktopWslServerTree.ts";
 
+// Opened from an agent's shell, the app must not hand that agent's identity to its backend.
+HostProcess.dropInheritedAgentIdentity(process.env);
+
 if (process.argv.includes("--version")) {
   try {
     NodeFS.writeSync(process.stdout.fd, `${Electron.app.getVersion()}\n`);

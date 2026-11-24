@@ -24,6 +24,10 @@ const runServerCommand = Effect.fn("server.runServerCommand")(function* (
     readonly rejectRunningServer?: boolean;
   },
 ) {
+  // A server started from an agent's shell must not pass that agent's identity to its own agents.
+  const environment = yield* HostProcess.Environment;
+  const dropped = HostProcess.dropInheritedAgentIdentity(environment);
+  if (dropped.length > 0) yield* Effect.logInfo("ignoring the launching agent's identity", dropped);
   // Before config resolution, which claims a port and creates directories.
   const { runServer } = yield* Effect.promise(() => import("../server.ts"));
   const logLevel = yield* GlobalFlag.LogLevel;

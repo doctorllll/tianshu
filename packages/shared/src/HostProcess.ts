@@ -133,3 +133,22 @@ export const UserId = Context.Reference<number | undefined>("@t3tools/shared/Hos
 });
 
 export const isWindows = Effect.map(Platform, (platform) => platform === "win32");
+
+// A fastctx job marks its shell with the agent running it. An app or server started from that
+// shell is not that agent: if its own agents inherit the marks, fastctx's `run` acts as the
+// launching agent and refuses ("no resident … lives here").
+const INHERITED_AGENT_IDENTITY = [
+  "FASTCTX_RESIDENT",
+  "FASTCTX_JOB",
+  "FASTCTX_JOB_TEMP",
+  "FASTCTX_SCRATCH",
+  "FASTCTX_TOWN",
+  "FASTCTX_MACHINE",
+] as const;
+
+/** Removes the launching agent's job identity from `env` in place and names what it removed. */
+export function dropInheritedAgentIdentity(env: NodeJS.ProcessEnv): ReadonlyArray<string> {
+  const present = INHERITED_AGENT_IDENTITY.filter((name) => env[name] !== undefined);
+  for (const name of present) delete env[name];
+  return present;
+}
