@@ -114,6 +114,15 @@ function unwrapEnsureSshEnvironmentResult(result: unknown) {
   return result as Awaited<ReturnType<DesktopBridge["ensureSshEnvironment"]>>;
 }
 
+// Electron hands webPreferences.additionalArguments to sandboxed preloads in process.argv.
+// public/boot-intro.js reads this to play the launch intro once per launch, not once per window.
+const launchArgument = process.argv.find((arg) =>
+  arg.startsWith(IpcChannels.LAUNCH_ARGUMENT_PREFIX),
+);
+contextBridge.exposeInMainWorld("tianshuLaunch", {
+  id: launchArgument ? launchArgument.slice(IpcChannels.LAUNCH_ARGUMENT_PREFIX.length) : null,
+});
+
 contextBridge.exposeInMainWorld("desktopBridge", {
   getAppBranding: () => {
     const result = ipcRenderer.sendSync(IpcChannels.GET_APP_BRANDING_CHANNEL);

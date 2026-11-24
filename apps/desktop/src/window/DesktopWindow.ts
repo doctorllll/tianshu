@@ -31,6 +31,7 @@ import {
   TRACKPAD_SCROLL_BEGIN_CHANNEL,
   TRACKPAD_SCROLL_END_CHANNEL,
   WINDOW_FULLSCREEN_STATE_CHANNEL,
+  LAUNCH_ARGUMENT_PREFIX,
 } from "../ipc/channels.ts";
 import {
   PASSKEY_BRIDGE_ARGUMENT,
@@ -515,6 +516,8 @@ export const make = Effect.gen(function* () {
       ...getWindowTitleBarOptions(shouldUseDarkColors, environment.platform),
       webPreferences: {
         preload: environment.preloadPath,
+        // The main process lives as long as the launch; windows reopened in it skip the intro.
+        additionalArguments: [`${LAUNCH_ARGUMENT_PREFIX}${process.pid}`],
         // Hidden-renderer throttling stalls first paint; re-enable it after the first reveal.
         backgroundThrottling: false,
         contextIsolation: true,

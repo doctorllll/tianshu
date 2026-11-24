@@ -159,3 +159,6 @@ export const START_FILE_DRAG_CHANNEL = "desktop:start-file-drag";
 
 export const PREVIEW_PIN_ACTION_CHANNEL = "desktop:preview-pin-action";
 export const PREVIEW_PIN_STATE_CHANNEL = "desktop:preview-pin-state";
+
+/** Names the app launch to the main window's preload, so the launch intro plays once per launch. */
+export const LAUNCH_ARGUMENT_PREFIX = "--tianshu-launch=";

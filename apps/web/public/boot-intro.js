@@ -1,10 +1,9 @@
 "use strict";
 
 /**
- * Plays the 天枢 launch intro over the page once per window, while the app loads underneath, and
- * lifts it once the app has rendered (or right away on a boot error, a key press or a click).
- * `?intro` forces it, for checking, and `?intro=<ms>` holds the frame at that time, for reviewing
- * it frame by frame; automated browsers and reduced motion skip it.
+ * Plays the 天枢 launch intro over the loading app once per launch (once per tab on the web) and
+ * lifts it when the app has rendered, on a boot error, a key or a click. `?intro` forces it and
+ * `?intro=<ms>` holds that frame; automated browsers and reduced motion skip it.
  */
 (() => {
   const KEY = "tianshu:launch-intro";
@@ -14,9 +13,13 @@
   const param = new URLSearchParams(location.search).get("intro");
   const forced = param !== null;
   const seek = param && /^\d+$/.test(param) ? Number(param) : undefined;
+  // The desktop preload names the launch; windows reopened during it skip the intro.
+  const launch = globalThis.tianshuLaunch?.id;
   try {
-    if (!forced && sessionStorage.getItem(KEY)) return;
-    sessionStorage.setItem(KEY, "1");
+    const seen = launch ? localStorage.getItem(KEY) === launch : sessionStorage.getItem(KEY);
+    if (!forced && seen) return;
+    if (launch) localStorage.setItem(KEY, launch);
+    else sessionStorage.setItem(KEY, "1");
   } catch {
     // Storage may be unavailable; the intro then plays on every load.
   }
