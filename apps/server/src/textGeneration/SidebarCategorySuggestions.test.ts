@@ -2,7 +2,9 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import { ProviderInstanceId, type ServerProvider } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 
+import * as ServerConfig from "../config.ts";
 import type { ProviderInstanceRegistry } from "../provider/ProviderInstanceRegistry.ts";
 import type { UsageService } from "../usage/UsageService.ts";
 import { suggestSidebarCategories } from "./SidebarCategorySuggestions.ts";
@@ -17,14 +19,23 @@ const provider = {
   models: [{ slug: "small-model" }],
 } as unknown as ServerProvider;
 
+const testLayer = ServerConfig.layerTest(process.cwd(), {
+  prefix: "t3-category-suggestions-",
+}).pipe(Layer.provideMerge(NodeServices.layer));
+
 const fixture = (reply: unknown) => {
   const prompts: string[] = [];
+  const cwds: string[] = [];
   const instances = {
     getInstance: () =>
       Effect.succeed({
         textGeneration: {
-          generateTranscriptionPostProcessing: (input: { readonly prompt: string }) => {
+          generateTranscriptionPostProcessing: (input: {
+            readonly prompt: string;
+            readonly cwd: string;
+          }) => {
             prompts.push(input.prompt);
+            cwds.push(input.cwd);
             return Effect.succeed({ transcription: JSON.stringify(reply) });
           },
         },
@@ -33,12 +44,12 @@ const fixture = (reply: unknown) => {
   const usage = {
     modelRates: () => Effect.succeed(new Map()),
   } as unknown as UsageService["Service"];
-  return { prompts, instances, usage };
+  return { prompts, cwds, instances, usage };
 };
 
 it.effect("files titles with their folder and agent, and keeps only sound new categories", () =>
   Effect.gen(function* () {
-    const { prompts, instances, usage } = fixture({
+    const { prompts, cwds, instances, usage } = fixture({
       suggestions: [
         { titleIndex: 0, categoryIndex: 1, reason: "The folder is the media library" },
         { titleIndex: 0, categoryIndex: 0, reason: "Duplicate of title 0" },
@@ -98,7 +109,10 @@ it.effect("files titles with their folder and agent, and keeps only sound new ca
     assert.include(prompt, '"agent":"zcode"');
     assert.include(prompt, '"about":"Films, series and the library server"');
     assert.include(prompt, "propose up to 3 new categories");
-  }).pipe(Effect.provide(NodeServices.layer)),
+    // Every call runs from the same empty directory under the server's state.
+    const { stateDir } = yield* ServerConfig.ServerConfig;
+    assert.deepStrictEqual(cwds, [`${stateDir}/category-suggestions`]);
+  }).pipe(Effect.provide(testLayer)),
 );
 
 it.effect("asks for no new categories unless they are wanted", () =>
@@ -121,5 +135,5 @@ it.effect("asks for no new categories unless they are wanted", () =>
     assert.isUndefined(result.proposals);
     assert.notInclude(prompts[0] ?? "", "proposals");
     assert.include(prompts[0] ?? "", '"titles":[{"title":"Closing speech"}');
-  }).pipe(Effect.provide(NodeServices.layer)),
+  }).pipe(Effect.provide(testLayer)),
 );

@@ -5,6 +5,7 @@ import {
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import { extractJsonObject } from "@t3tools/shared/schemaJson";
 import {
@@ -12,6 +13,7 @@ import {
   type SidebarCategoryProposal,
   type SidebarCategorySuggestionInput,
 } from "@t3tools/contracts";
+import * as ServerConfig from "../config.ts";
 import type { ProviderInstanceRegistry } from "../provider/ProviderInstanceRegistry.ts";
 import type { UsageService } from "../usage/UsageService.ts";
 
@@ -69,7 +71,7 @@ const prompt = (input: SidebarCategorySuggestionInput, data: string) =>
   ].join("\n");
 
 /** Keeps proposals that hold two or more titles no category took and are not an existing category. */
-export const proposalsFromReply = (
+const proposalsFromReply = (
   values: ReadonlyArray<unknown>,
   input: SidebarCategorySuggestionInput,
   suggested: ReadonlySet<number>,
@@ -157,11 +159,16 @@ export const suggestSidebarCategories = Effect.fn("SidebarCategorySuggestions.su
   if (!instance) return yield* new SidebarCategorySuggestionError({ reason: "noModel" });
 
   // A text-only call from an empty working directory. There is no orchestration thread, repository,
-  // message content, credential payload, or silent fallback to a different model.
+  // message content, credential payload, or silent fallback to a different model. The directory is
+  // a fixed one, so the agent's own per-directory bookkeeping (Claude keeps one per working
+  // directory even when it saves no session) does not pile up one entry per call.
   const fileSystem = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const { stateDir } = yield* ServerConfig.ServerConfig;
   const reply = yield* Effect.scoped(
     Effect.gen(function* () {
-      const cwd = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-category-suggestions-" });
+      const cwd = path.join(stateDir, "category-suggestions");
+      yield* fileSystem.makeDirectory(cwd, { recursive: true });
       const data = yield* encodePromptData({
         categories: input.categories.map((label, index) => {
           const about = input.descriptions?.[index]?.trim();
