@@ -1059,7 +1059,8 @@ it.layer(driverLayer, { excludeTestServices: true })("AcpRegistryDriver", (it) =
       const agentPath = path.join(directory, "agent.mjs");
       const modelsPath = path.join(directory, "models.json");
       yield* fileSystem.writeFileString(agentPath, fakeAgentSource);
-      yield* fileSystem.writeFileString(modelsPath, JSON.stringify(["model-a"]));
+      // Two models: a single one reads as provisional and the probe waits out its grace period.
+      yield* fileSystem.writeFileString(modelsPath, JSON.stringify(["model-a", "model-b"]));
 
       const instance = yield* AcpRegistryDriver.create({
         instanceId: identity.instanceId,
