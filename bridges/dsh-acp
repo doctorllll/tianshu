@@ -10,18 +10,24 @@ DSH desktop sidebar (on the App's next start when it is open), as dsh-dispatch.p
 A new session has a provisional id until its first turn; the mapping to DSH's session id is
 kept in ~/.local/state/dsh-acp/sessions.json so a client can resume by the id it was given.
 
+Models: DSH has no model flag. A run takes the profile's `agent-default-model` row, and a resumed
+session is moved onto it as well. The bridge lists the models the headless profile composes (its
+`dsh --dump-config` provider rows) and runs a turn on the chosen one with a `--patch` overlay that
+replaces that row. A session continued from the DSH App keeps the model its log last recorded.
+
 Environment: DSH_BIN (default: dsh on PATH), DSH_HOME (default ~/.dsh).
 """
-import glob, json, os, plistlib, re, shutil, signal, subprocess, sys, threading, uuid
+import collections, glob, json, os, plistlib, re, shutil, signal, subprocess, sys, threading, time, uuid
 
 VERSION = "0.1.0"
 DSH = os.environ.get("DSH_BIN") or "dsh"
 DSH_HOME = os.environ.get("DSH_HOME") or os.path.join(os.path.expanduser("~"), ".dsh")
 STATE = os.path.join(os.path.expanduser("~"), ".local", "state", "dsh-acp", "sessions.json")
+PATCHES = os.path.join(os.path.dirname(STATE), "patches")
 
 _out = threading.Lock()
 _state_lock = threading.Lock()
-SESS = {}  # acp id -> {"dsh": session id or None, "cwd", "proc", "cancelled"}
+SESS = {}  # acp id -> {"dsh": session id or None, "cwd", "model", "effort", "proc", "cancelled"}
 
 
 def log(*a):
@@ -52,10 +58,10 @@ def load_state():
         return {}
 
 
-def remember(acp_id, dsh_id, cwd):
+def remember(acp_id, **fields):
     with _state_lock:
         st = load_state()
-        st[acp_id] = {"dsh": dsh_id, "cwd": cwd}
+        st[acp_id] = {**(st.get(acp_id) or {}), **fields}
         os.makedirs(os.path.dirname(STATE), exist_ok=True)
         tmp = STATE + ".tmp"
         with open(tmp, "w") as f:
@@ -68,7 +74,8 @@ def resolve(acp_id, cwd=None):
     if s is None:
         hit = load_state().get(acp_id) or {}
         dsh_id = hit.get("dsh") or (acp_id if acp_id.startswith("session-") else None)
-        s = SESS.setdefault(acp_id, {"dsh": dsh_id, "cwd": hit.get("cwd") or cwd})
+        s = SESS.setdefault(acp_id, {"dsh": dsh_id, "cwd": hit.get("cwd") or cwd,
+                                     "model": hit.get("model"), "effort": hit.get("effort")})
     if cwd and not s.get("cwd"):
         s["cwd"] = cwd
     return s
@@ -136,11 +143,17 @@ def tool_title(name, args):
 
 
 def replay(acp_id, dsh_id):
+    """Replay the session's log as ACP updates; returns the model selection it last recorded."""
     path = session_file(dsh_id)
     if not path:
-        return
+        return None
+    selection = None
     for rec in read_records(path):
         kind, data = rec.get("type"), rec.get("data") or {}
+        if kind in ("model/selection", "request/context") and data.get("provider") and data.get("model"):
+            # a request names its model but not its effort: the effort stays the one last selected for it
+            same = selection and (selection["provider"], selection["model"]) == (data["provider"], data["model"])
+            selection = {**(selection if same else {}), **data}
         if kind == "user/message" and (data.get("source") or {}).get("kind") == "user":
             text = "\n".join(c.get("text", "") for c in data.get("content") or [] if c.get("type") == "text").strip()
             if text:
@@ -161,6 +174,171 @@ def replay(acp_id, dsh_id):
             update(acp_id, {"sessionUpdate": "tool_call_update", "toolCallId": msg.get("toolCallId") or "",
                             "status": "failed" if msg.get("isError") else "completed",
                             **({"content": [{"type": "content", "content": {"type": "text", "text": text[:20000]}}]} if text else {})})
+    return selection
+
+
+# ------------------------------------------------------------------ models
+# Effort names as the client already translates them (Low, High, Max...), as the other bridges send them.
+EFFORT_LABELS = {"low": "Low", "medium": "Medium", "high": "High", "xhigh": "Extra High", "max": "Max"}
+_catalog = {"key": None, "value": None, "until": 0.0}
+_catalog_lock = threading.Lock()
+
+
+def _catalog_key():
+    """The catalog changes when the headless profile or DSH itself does (magpie edits the profile)."""
+    paths = [os.path.join(DSH_HOME, "profiles", "headless", n) for n in ("cordis.patch.yml", "package.json")]
+    paths.append(os.path.realpath(shutil.which(DSH) or DSH))
+    key = []
+    for p in paths:
+        try:
+            key.append(os.stat(p).st_mtime_ns)
+        except OSError:
+            key.append(None)
+    return tuple(key)
+
+
+def _load_dump(text):
+    import yaml
+
+    class Loader(yaml.SafeLoader):
+        pass
+
+    # `!!js` rows are expressions DSH evaluates at boot; the catalog needs none of them.
+    Loader.add_constructor("tag:yaml.org,2002:js", lambda loader, node: {"$js": loader.construct_scalar(node)})
+    return yaml.load(text, Loader=Loader)
+
+
+def catalog():
+    """{"models": [{id, provider, model, name, efforts}], "default": {provider, model, reasoningEffort?}}"""
+    key = _catalog_key()
+    with _catalog_lock:
+        if _catalog["key"] == key and time.monotonic() < _catalog["until"]:
+            return _catalog["value"]
+        value = {"models": [], "default": {}}
+        try:
+            out = subprocess.run([DSH, "--profile", "headless", "--dump-config"], capture_output=True, text=True,
+                                 timeout=30)
+            rows = _load_dump(out.stdout) if out.returncode == 0 else None
+            if rows is None:
+                raise RuntimeError("dump-config exited %s" % out.returncode)
+        except Exception as e:  # noqa: BLE001 - no catalog is a session on DSH's own default
+            log("catalog:", e)
+            # a failing DSH is asked again in a minute, not on every request
+            _catalog.update(key=key, value=value, until=time.monotonic() + 60)
+            return value
+        for row in rows if isinstance(rows, list) else []:
+            if not isinstance(row, dict) or row.get("disabled") is True:
+                continue
+            cfg = row.get("config") if isinstance(row.get("config"), dict) else {}
+            if row.get("id") == "agent-default-model":
+                value["default"] = {k: cfg[k] for k in ("provider", "model", "reasoningEffort") if isinstance(cfg.get(k), str)}
+            providers = cfg.get("providers")
+            for pid, prov in (providers.items() if isinstance(providers, dict) else []):
+                for m in (prov.get("models") if isinstance(prov, dict) else None) or []:
+                    if not isinstance(m, dict) or not isinstance(m.get("id"), str):
+                        continue
+                    efforts = m.get("reasoningEfforts")
+                    value["models"].append({"id": pid + "/" + m["id"], "provider": pid, "model": m["id"],
+                                            "name": str(m.get("name") or m["id"]),
+                                            "group": str(prov.get("displayName") or pid),
+                                            "efforts": [e for e in efforts if isinstance(e, str)]
+                                            if isinstance(efforts, (dict, list)) else []})
+        names = collections.Counter(m["name"] for m in value["models"])
+        for m in value["models"]:
+            if names[m["name"]] > 1:
+                m["name"] += " · " + m["group"]
+        d = value["default"]
+        if d.get("provider") and d.get("model") and not any(m["id"] == default_id(value) for m in value["models"]):
+            value["models"].insert(0, {"id": default_id(value), "provider": d["provider"], "model": d["model"],
+                                       "name": d["model"], "group": d["provider"], "efforts": []})
+        _catalog.update(key=key, value=value, until=float("inf"))
+        return value
+
+
+def default_id(cat):
+    d = cat["default"]
+    return d["provider"] + "/" + d["model"] if d.get("provider") and d.get("model") else None
+
+
+def find_model(cat, mid):
+    return next((m for m in cat["models"] if m["id"] == mid), None)
+
+
+def selected_model(s, cat):
+    """The session's model: chosen (and still listed), else the profile's default, else the first listed."""
+    return (find_model(cat, s.get("model")) or find_model(cat, default_id(cat))
+            or (cat["models"][0] if cat["models"] else None))
+
+
+def effort_now(s, m, cat):
+    """The effort a turn on this model runs at: chosen if the model has it, else the profile's for its own
+    default model, else High (or the middle one)."""
+    efs = (m or {}).get("efforts") or []
+    if not efs:
+        return None
+    if s.get("effort") in efs:
+        return s["effort"]
+    if m["id"] == default_id(cat) and cat["default"].get("reasoningEffort") in efs:
+        return cat["default"]["reasoningEffort"]
+    return "high" if "high" in efs else efs[len(efs) // 2]
+
+
+def models_state(s):
+    cat = catalog()
+    sel = selected_model(s, cat)
+    if sel is None:
+        return None
+
+    def meta(m):
+        if not m["efforts"]:
+            return {"supportsReasoningEffort": False}
+        return {"reasoningEfforts": [{"value": v, "label": EFFORT_LABELS.get(v, v)} for v in m["efforts"]],
+                "reasoningEffort": effort_now(s, m, cat)}
+
+    return {"currentModelId": sel["id"],
+            "availableModels": [{"modelId": m["id"], "name": m["name"], "_meta": meta(m)} for m in cat["models"]]}
+
+
+def config_options(s):
+    cat = catalog()
+    sel = selected_model(s, cat)
+    if sel is None:
+        return []
+    opts = [{"id": "model", "name": "Model", "category": "model", "type": "select", "currentValue": sel["id"],
+             "options": [{"value": m["id"], "name": m["name"]} for m in cat["models"]]}]
+    if sel["efforts"]:
+        opts.append({"id": "effort", "name": "Effort", "category": "thought_level", "type": "select",
+                     "currentValue": effort_now(s, sel, cat),
+                     "options": [{"value": v, "name": EFFORT_LABELS.get(v, v)} for v in sel["efforts"]]})
+    return opts
+
+
+def session_state(s):
+    out = {"configOptions": config_options(s)}
+    models = models_state(s)
+    if models:
+        out["models"] = models
+    return out
+
+
+def model_patch(s):
+    """An overlay running this turn on the session's model, or None when nothing was chosen (DSH's default)."""
+    if s.get("model") is None and s.get("effort") is None:
+        return None
+    cat = catalog()
+    m = selected_model(s, cat)
+    if m is None:
+        return None
+    lines = ["- id: agent-default-model", "  config:",
+             "    provider: " + json.dumps(m["provider"]), "    model: " + json.dumps(m["model"])]
+    effort = effort_now(s, m, cat)
+    if effort:
+        lines.append("    reasoningEffort: " + json.dumps(effort))
+    os.makedirs(PATCHES, exist_ok=True)
+    path = os.path.join(PATCHES, uuid.uuid4().hex + ".yml")
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    return path
 
 
 # ------------------------------------------------------------------ prompt text
@@ -190,7 +368,19 @@ def prompt_text(blocks):
 
 # ------------------------------------------------------------------ one turn
 def run_turn(acp_id, s, text, cwd):
-    cmd = [DSH, "--profile", "headless", "--json"]
+    patch = model_patch(s)
+    try:
+        return _run_turn(acp_id, s, text, cwd, patch)
+    finally:
+        if patch:
+            try:
+                os.unlink(patch)
+            except OSError:
+                pass
+
+
+def _run_turn(acp_id, s, text, cwd, patch):
+    cmd = [DSH, "--profile", "headless"] + (["--patch", patch] if patch else []) + ["--json"]
     if s.get("dsh"):
         cmd += ["--session-id", s["dsh"]]
     proc = subprocess.Popen(cmd + ["-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -250,7 +440,7 @@ def h_prompt(p):
         new_id, reason, error = run_turn(acp_id, s, text, cwd)
     if new_id and not s.get("dsh"):
         s["dsh"] = new_id
-        remember(acp_id, new_id, cwd)
+        remember(acp_id, dsh=new_id, cwd=cwd)
         try:
             adopt(new_id, cwd)
         except OSError as e:
@@ -294,15 +484,42 @@ def h_initialize(p):
 
 def h_new(p):
     acp_id = "dsh-new-" + uuid.uuid4().hex
-    SESS[acp_id] = {"dsh": None, "cwd": p.get("cwd")}
-    return {"sessionId": acp_id}
+    s = SESS[acp_id] = {"dsh": None, "cwd": p.get("cwd"), "model": None, "effort": None}
+    return {"sessionId": acp_id, **session_state(s)}
 
 
 def h_load(p):
     acp_id = p["sessionId"]
     s = resolve(acp_id, p.get("cwd"))
-    if s.get("dsh"):
-        replay(acp_id, s["dsh"])
+    recorded = replay(acp_id, s["dsh"]) if s.get("dsh") else None
+    # Not chosen here: keep the model the session last ran on (in the App, say), when this profile has it.
+    if recorded and s.get("model") is None:
+        m = find_model(catalog(), recorded["provider"] + "/" + recorded["model"])
+        if m:
+            s["model"] = m["id"]
+            if recorded.get("reasoningEffort") in m["efforts"]:
+                s["effort"] = recorded["reasoningEffort"]
+    return session_state(s)
+
+
+def h_set_option(p):
+    acp_id = p["sessionId"]
+    s = resolve(acp_id)
+    value = p.get("value")
+    if p.get("configId") == "model":
+        s["model"] = None if value in (None, "", "default") else str(value)
+        # an effort the new model lacks falls back to the new model's own
+        if s.get("effort") not in ((selected_model(s, catalog()) or {}).get("efforts") or []):
+            s["effort"] = None
+    elif p.get("configId") == "effort":
+        s["effort"] = None if value in (None, "", "default") else str(value)
+    remember(acp_id, model=s.get("model"), effort=s.get("effort"),
+             **({"dsh": s["dsh"]} if s.get("dsh") else {}), **({"cwd": s["cwd"]} if s.get("cwd") else {}))
+    return {"configOptions": config_options(s)}
+
+
+def h_set_model(p):
+    h_set_option({"sessionId": p["sessionId"], "configId": "model", "value": p.get("modelId")})
     return {}
 
 
@@ -317,7 +534,8 @@ def h_cancel(p):
             proc.terminate()
 
 
-HANDLERS = {"initialize": h_initialize, "session/new": h_new, "session/load": h_load, "session/prompt": h_prompt}
+HANDLERS = {"initialize": h_initialize, "session/new": h_new, "session/load": h_load, "session/prompt": h_prompt,
+            "session/set_config_option": h_set_option, "session/set_model": h_set_model}
 NOTIFICATIONS = {"session/cancel": h_cancel}
 
 
