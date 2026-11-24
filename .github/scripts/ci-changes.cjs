@@ -12,9 +12,10 @@ const INERT = [
   /^LICENSE$/,
 ];
 
-// Shared test setup and vendored mobile dependencies affect every package.
+// Shared test setup and vendored mobile dependencies affect every package. gitEnv.ts is a
+// setupFile of every package's tests, and it loads gitRepositoryEnv.ts.
 const RUNS_EVERYTHING = [
-  /^packages\/shared\/src\/(HostProcess|testing\/(longTempDir|providerEnv))\.ts$/,
+  /^packages\/shared\/src\/(HostProcess|testing\/(longTempDir|providerEnv|gitEnv|gitRepositoryEnv))\.ts$/,
   /^apps\/mobile\/deps\//,
 ];
 
