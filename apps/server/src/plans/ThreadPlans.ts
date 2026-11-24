@@ -92,7 +92,7 @@ export function dshSessionId(nativeId: string, sessions: unknown): string | null
 }
 
 /** Where a plan lives, so a thread that moved to another agent can tell its plan moved too. */
-export function planLocationKey(location: PlanLocation): string | null {
+function planLocationKey(location: PlanLocation): string | null {
   switch (location.source) {
     case "tianshu":
       return "tianshu";
@@ -161,7 +161,7 @@ const samePlan = (left: ThreadPlan, right: ThreadPlan) =>
   left.error === right.error &&
   left.editable === right.editable;
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const config = yield* ServerConfig.ServerConfig;
@@ -523,15 +523,14 @@ export const make = Effect.gen(function* () {
     );
 
   /** Reads the plan again until the plan a handoff left waiting has moved in, or gives up. */
-  const settleCarried = (threadId: ThreadId) =>
-    Effect.gen(function* () {
-      for (const wait of ["10 seconds", "30 seconds", "2 minutes"] as const) {
-        yield* Effect.sleep(wait);
-        yield* read(threadId).pipe(Effect.ignore);
-        const carried = yield* readCarried(threadId);
-        if (carried === null || !carried.key.startsWith("handoff:")) return;
-      }
-    });
+  const settleCarried = Effect.fn("ThreadPlans.settleCarried")(function* (threadId: ThreadId) {
+    for (const wait of ["10 seconds", "30 seconds", "2 minutes"] as const) {
+      yield* Effect.sleep(wait);
+      yield* read(threadId).pipe(Effect.ignore);
+      const carried = yield* readCarried(threadId);
+      if (carried === null || !carried.key.startsWith("handoff:")) return;
+    }
+  });
 
   const handOff: ThreadPlansShape["handOff"] = Effect.fn("ThreadPlans.handOff")(function* (
     input: PlanHandoffInput,

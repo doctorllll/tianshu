@@ -86,7 +86,7 @@ const readUpdateChannel = Effect.fn("ClaudeMaintenance.readUpdateChannel")(funct
 const LAUNCHER_MAX_BYTES = 4096;
 
 /** A small shell launcher that runs a build from the native versions directory itself. */
-export function isVersionsDirectoryLauncher(source: string): boolean {
+function isVersionsDirectoryLauncher(source: string): boolean {
   return (
     source.length <= LAUNCHER_MAX_BYTES &&
     /^#!\s*\/(?:usr\/)?bin\/(?:env\s+)?(?:ba)?sh\b/.test(source) &&

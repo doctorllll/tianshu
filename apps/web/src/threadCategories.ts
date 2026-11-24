@@ -204,7 +204,7 @@ export function matchLocalCategoryRule(rule: Rule, text: string): boolean {
   return compiledPatterns.get(rule)?.test(text) ?? false;
 }
 
-export function isUntitledThreadTitle(title: string) {
+function isUntitledThreadTitle(title: string) {
   const value = title.trim();
   return !value || /^(<image|\[external unsupported|Call your built-in)/.test(value);
 }
@@ -508,7 +508,7 @@ const proposalStore = localStore(
   parseCategoryProposals,
   EMPTY_PROPOSALS,
 );
-export function sameCategoryLabel(label: string) {
+function sameCategoryLabel(label: string) {
   return label.normalize("NFKC").toLowerCase().replace(/\s+/g, "");
 }
 export function useCategoryProposals(): readonly PendingCategoryProposal[] {

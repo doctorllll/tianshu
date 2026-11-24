@@ -95,7 +95,7 @@ const START_PLAN = /^builtin:[a-z0-9]+-start-plan$/;
 const CODING_PLAN_LEVELS = ["low", "high", "max"];
 
 /** The bridge names an account plan by its legacy config id (`account-provider.ts`). */
-export function zcodeConfigProviderId(providerId: string): string {
+function zcodeConfigProviderId(providerId: string): string {
   const match = ACCOUNT_PLAN.exec(providerId);
   if (!match) return providerId;
   return `builtin:${match[1]}-${match[2] === "start-plan" ? "start-plan" : "coding-plan"}`;

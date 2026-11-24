@@ -207,7 +207,7 @@ export interface ZcodeBuiltinTables {
   }) => Effect.Effect<ZcodeEngineChoice>;
 }
 
-export const zcodePlanModelSlugs = (table: Pick<ZcodeBuiltinTable, "accountModels">) =>
+const zcodePlanModelSlugs = (table: Pick<ZcodeBuiltinTable, "accountModels">) =>
   [...zcodePlanModels(table)].flatMap(([providerId, models]) =>
     models.map((model) => `${providerId}\\${model}`),
   );

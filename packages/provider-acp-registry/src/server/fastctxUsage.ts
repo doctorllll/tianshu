@@ -28,7 +28,7 @@ const stringOf = (value: unknown) =>
 const listOf = (value: unknown): ReadonlyArray<unknown> => (Array.isArray(value) ? value : []);
 const micros = (value: unknown) => (numberOf(value) ?? 0) / 1e6;
 
-export const usd = (value: number) => `$${Math.round(value).toLocaleString("en-US")}`;
+const usd = (value: number) => `$${Math.round(value).toLocaleString("en-US")}`;
 
 function tokens(n: number): string {
   if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`;

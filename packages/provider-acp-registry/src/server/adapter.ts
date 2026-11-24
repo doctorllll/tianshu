@@ -195,7 +195,7 @@ const isFastctx = (
 ) => initializeResult.agentInfo?.name === "fastctx-acp";
 
 /** fastctx-acp, run as `python3 <path>/fastctx-acp`. */
-export const isFastctxAcpCommand = (commandArgs: ReadonlyArray<string>) =>
+const isFastctxAcpCommand = (commandArgs: ReadonlyArray<string>) =>
   commandArgs.some((arg) => /(?:^|[\\/])fastctx-acp(?:\.[\w-]+)?$/.test(arg));
 
 export const makeAcpRegistryAdapterV2 = Effect.fn("makeAcpRegistryAdapterV2")(function* (

@@ -1347,7 +1347,7 @@ const layerThemeToolkit = toolkitRegistration(ThemeToolkit, ThemeHandlers.layer)
 );
 
 export const layerArtifactToolkit = toolkitRegistration(ArtifactToolkit, ArtifactHandlers.layer);
-export const layerPlanToolkit = toolkitRegistration(PlanToolkit, PlanHandlers.layer);
+const layerPlanToolkit = toolkitRegistration(PlanToolkit, PlanHandlers.layer);
 
 export const layerProjectRegistration = toolkitRegistration(ProjectToolkit, ProjectHandlers.layer);
 

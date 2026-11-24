@@ -765,8 +765,8 @@ describe("rightPanelStore", () => {
     });
   });
 
+  // "plan" was a retired kind upstream; Tianshu's living plan brought it back as a live tab.
   it.each([
-    { kind: "plan", isOpen: true },
     { kind: "agents", isOpen: true },
     { kind: "agents", isOpen: false },
   ])("drops $kind with isOpen=$isOpen and falls back", ({ kind, isOpen }) => {

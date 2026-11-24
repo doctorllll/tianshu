@@ -99,7 +99,7 @@ function resolveDesktopAppStageLabel(input: {
   return isNightlyDesktopVersion(input.appVersion) ? "Nightly" : "Beta";
 }
 
-export const STARDUST_DISPLAY_NAME = "天枢";
+const STARDUST_DISPLAY_NAME = "天枢";
 
 export function resolveDesktopAppBranding(input: {
   readonly isDevelopment: boolean;

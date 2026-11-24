@@ -4,7 +4,7 @@ import type { ScopedThreadRef } from "@t3tools/contracts";
 import { create } from "zustand";
 import type { BoardData } from "./taskBoard.logic";
 /** Shown wherever the board would be: Tianshu connects no external task board. */
-export const NO_TASK_BOARD = "No task board is connected.";
+const NO_TASK_BOARD = "No task board is connected.";
 interface BoardState {
   reveal: { folder: string | null; revision: number } | null;
   data: BoardData | null;
@@ -86,8 +86,4 @@ export function requestTaskBoardCard(folder: string | null = null) {
   useTaskBoard.setState((state) => ({
     reveal: { folder, revision: (state.reveal?.revision ?? 0) + 1 },
   }));
-}
-
-export async function autoLinkBoardTask(_folder: string, _session: string, _title: string) {
-  /* No board to link to. */
 }

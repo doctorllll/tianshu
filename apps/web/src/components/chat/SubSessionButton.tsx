@@ -83,7 +83,7 @@ export function SubSessionButton({
 }
 
 /** The model's reasoning select, the one choice a sub-session form offers besides the model. */
-export function subSessionEffortControl(
+function subSessionEffortControl(
   provider: ServerProvider | undefined,
   model: string | null,
 ): Extract<ProviderOptionDescriptor, { type: "select" }> | undefined {

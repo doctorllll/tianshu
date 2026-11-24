@@ -13,7 +13,7 @@ interface Occluder {
  * sprite) laid under it so stars do not shine through the night side. `free` bodies are too big
  * for the track and spill out of it; `power` (0–1) is how hard their sparks and shocks hit.
  */
-export const CELESTIAL_STAGES = [
+const CELESTIAL_STAGES = [
   {
     id: "stardust",
     line: "Stardust · barely thinking",

@@ -3821,10 +3821,11 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
   }
 
   // Stardust: keep the production web brand under the nightly-named native shell.
+  const webAssetBrandOverride = yield* Config.String("T3CODE_DESKTOP_WEB_ASSET_BRAND").pipe(
+    Config.withDefault(""),
+  );
   const webAssetBrand: WebAssetBrand =
-    process.env.T3CODE_DESKTOP_WEB_ASSET_BRAND === "production"
-      ? "production"
-      : resolveDesktopWebAssetBrand(appVersion);
+    webAssetBrandOverride === "production" ? "production" : resolveDesktopWebAssetBrand(appVersion);
   yield* applyWebBrandAssets(webAssetBrand, "apps/server/dist/client");
   yield* Effect.log(`[desktop-artifact] Applied ${webAssetBrand} web client branding.`);
   yield* validateBundledClientAssets(path.dirname(bundledClientEntry));

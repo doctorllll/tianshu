@@ -302,7 +302,7 @@ export function antigravityHub(text: string): { port: number; csrfToken: string 
 const AG_WINDOW_MINS: Readonly<Record<string, number>> = { "5h": 5 * HOUR, weekly: WEEK };
 
 /** What the App says under its quota panel, put shortly enough to translate. */
-export const ANTIGRAVITY_FOOTNOTE =
+const ANTIGRAVITY_FOOTNOTE =
   "Models in a group share one 5-hour and one weekly limit; quota is spent in proportion to the cost of the tokens.";
 
 function antigravityGroupName(name: string): string {
