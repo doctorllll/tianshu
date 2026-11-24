@@ -185,15 +185,19 @@ _catalog_lock = threading.Lock()
 
 
 def _catalog_key():
-    """The catalog changes when the headless profile or DSH itself does (magpie edits the profile)."""
-    paths = [os.path.join(DSH_HOME, "profiles", "headless", n) for n in ("cordis.patch.yml", "package.json")]
-    paths.append(os.path.realpath(shutil.which(DSH) or DSH))
+    """The catalog changes when the headless profile or DSH itself does (magpie edits the profile). The
+    profile is compared by content: every headless run writes it back unchanged, which moves its mtime."""
     key = []
-    for p in paths:
+    for name in ("cordis.patch.yml", "package.json"):
         try:
-            key.append(os.stat(p).st_mtime_ns)
+            with open(os.path.join(DSH_HOME, "profiles", "headless", name), "rb") as f:
+                key.append(hash(f.read()))
         except OSError:
             key.append(None)
+    try:
+        key.append(os.stat(os.path.realpath(shutil.which(DSH) or DSH)).st_mtime_ns)
+    except OSError:
+        key.append(None)
     return tuple(key)
 
 
