@@ -7,6 +7,7 @@ import {
   categoryScheme,
   categorySuggestionRequest,
   classifyThread,
+  localizedCategory,
   parseAutoAssignments,
   parseCategoryOverrides,
   parseCategoryProposals,
@@ -214,5 +215,39 @@ describe("suggested new categories", () => {
       ["debate", "Home"],
       [UNSORTED_CATEGORY_ID, undefined],
     ]);
+  });
+});
+
+describe("the coding lawyer preset", () => {
+  const lawyer = { ...settings, preset: "lawyer" as const };
+
+  it("ships grouped categories, each with a line for the model", () => {
+    const rows = categoryDefinitions(lawyer).filter((entry) => entry.id !== UNSORTED_CATEGORY_ID);
+    expect([...new Set(rows.map((entry) => entry.group))]).toEqual([
+      "Legal work",
+      "Tools & tech",
+      "Other",
+    ]);
+    expect(rows.every((entry) => entry.description)).toBe(true);
+    expect(classifyThread({ title: "起草一份律师函" }, lawyer)).toBe("drafting");
+    expect(classifyThread({ title: "写个批处理脚本整理卷宗" }, lawyer)).toBe("automation");
+    // Coding words that look legal stay out of the legal categories.
+    expect(classifyThread({ title: "Fix the edge case in the client" }, lawyer)).toBe(
+      UNSORTED_CATEGORY_ID,
+    );
+    expect(classifyThread({ title: "执行迁移命令" }, lawyer)).toBe(UNSORTED_CATEGORY_ID);
+  });
+
+  it("translates the built-in wording and keeps what the user wrote", () => {
+    const text = (value: string) => `zh:${value}`;
+    const cases = categoryDefinitions(lawyer)[0]!;
+    expect(localizedCategory(cases, text)).toMatchObject({
+      label: "zh:Cases",
+      group: "zh:Legal work",
+      description: `zh:${cases.description}`,
+    });
+    expect(
+      localizedCategory({ ...cases, group: "我的大类", description: "自己写的范围" }, text),
+    ).toMatchObject({ label: "zh:Cases", group: "我的大类", description: "自己写的范围" });
   });
 });

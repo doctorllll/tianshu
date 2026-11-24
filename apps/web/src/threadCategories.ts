@@ -22,11 +22,19 @@ export const SIDEBAR_CATEGORY_PRESETS = {
   general: { label: "General preset", description: "A bit of everything" },
   developer: { label: "Developer", description: "Mostly code" },
   creator: { label: "Creator", description: "Writing, video, and publishing" },
+  lawyer: { label: "Coding lawyer", description: "Cases, legal research, and the tools you build" },
   project: { label: "By project", description: "Organize by folder" },
 } as const satisfies Record<SidebarCategoryPreset, { label: string; description: string }>;
 
 function category(id: string, label: string, keywords: string): ThreadCategory {
   return { id, label, keywords: keywords.split("|") };
+}
+function grouped(group: string, entries: readonly (readonly [string, string, string, string])[]) {
+  return entries.map(([id, label, description, keywords]) => ({
+    ...category(id, label, keywords),
+    group,
+    description,
+  }));
 }
 const PRESET_CATEGORIES: Record<SidebarCategoryPreset, readonly ThreadCategory[]> = {
   general: [
@@ -53,6 +61,68 @@ const PRESET_CATEGORIES: Record<SidebarCategoryPreset, readonly ThreadCategory[]
     category("media", "Video & audio", "视频|动画|音频|video|audio|animation"),
     category("publishing", "Publishing", "发布|运营|推广|publish|campaign|marketing"),
   ],
+  lawyer: [
+    ...grouped("Legal work", [
+      [
+        "cases",
+        "Cases",
+        "Litigation and arbitration: filing, hearings, evidence and enforcement",
+        "案件|诉讼|仲裁|庭审|开庭|证据|强制执行|上诉|立案|保全|litigation|arbitration|hearing|evidence",
+      ],
+      [
+        "legal-research",
+        "Legal research",
+        "Statutes, case law and judicial interpretations",
+        "法条|法规|类案|案例检索|司法解释|判例|法律研究|检索报告|statute|precedent",
+      ],
+      [
+        "drafting",
+        "Drafting",
+        "Complaints, briefs, contract review and legal opinions",
+        "起诉状|答辩状|代理词|合同|法律意见书|律师函|文书|起草|brief|memorandum",
+      ],
+      [
+        "practice",
+        "Clients & practice",
+        "Consultations, engagements, fees and scheduling",
+        "咨询|委托|收费|律师费|会见|日程|当事人|所务|consultation|engagement|invoice",
+      ],
+    ]),
+    ...grouped("Tools & tech", [
+      [
+        "automation",
+        "Automation",
+        "Scripts and small tools that take over repetitive work",
+        "脚本|自动化|批处理|爬虫|小工具|script|automation|batch|scraper",
+      ],
+      [
+        "ai-agents",
+        "AI & agents",
+        "Models, prompts, MCP and agent setup",
+        "模型|提示词|智能体|agent|mcp|prompt|llm|claude|codex|gpt",
+      ],
+      [
+        "ops",
+        "Servers & ops",
+        "Servers, networks, deployment and backups",
+        "服务器|部署|运维|网络|备份|域名|server|deploy|backup|docker|nas|vps",
+      ],
+    ]),
+    ...grouped("Other", [
+      [
+        "content",
+        "Writing & content",
+        "Articles, posts and other public writing",
+        "文章|公众号|写作|博客|文案|演讲|article|blog|writing",
+      ],
+      [
+        "life",
+        "Life admin",
+        "Family, travel, shopping and other errands",
+        "生活|家庭|购物|旅行|出行|life|travel|shopping",
+      ],
+    ]),
+  ],
   project: [],
 };
 const UNSORTED: ThreadCategory = { id: UNSORTED_CATEGORY_ID, label: "Unsorted", keywords: [] };
@@ -74,7 +144,7 @@ export function visibleCategoryDefinitions(
   if (settings.preset === "project") return definitions;
   const included = new Set(definitions.map((entry) => entry.id));
   const assigned = new Set(Object.values(overrides));
-  const extra = (["general", "developer", "creator"] as const).flatMap((preset) =>
+  const extra = (["general", "developer", "creator", "lawyer"] as const).flatMap((preset) =>
     categoryDefinitions({ ...settings, preset }).filter((entry) => {
       if (!assigned.has(entry.id) || included.has(entry.id)) return false;
       included.add(entry.id);
@@ -83,13 +153,36 @@ export function visibleCategoryDefinitions(
   );
   return [...definitions.slice(0, -1), ...extra, UNSORTED];
 }
+/** Whether a field still holds the built-in wording, which is translated; the user's own is not. */
+function isBuiltInText(category: ThreadCategory, field: "label" | "group" | "description") {
+  const value = category[field];
+  return (
+    value !== undefined &&
+    Object.values(PRESET_CATEGORIES).some((entries) =>
+      entries.some((entry) => entry.id === category.id && entry[field] === value),
+    )
+  );
+}
 export function categoryLabel(category: ThreadCategory, text = uiText) {
   if (category.id === UNSORTED_CATEGORY_ID) return text("Unsorted");
-  const isPresetLabel = Object.values(PRESET_CATEGORIES).some((entries) =>
-    entries.some((entry) => entry.id === category.id && entry.label === category.label),
-  );
-  if (!isPresetLabel) return category.label;
-  return text(category.label);
+  return isBuiltInText(category, "label") ? text(category.label) : category.label;
+}
+/** A category as the user reads it: built-in name, group and description translated. */
+export function localizedCategory(category: ThreadCategory, text = uiText): ThreadCategory {
+  const group =
+    category.group !== undefined && isBuiltInText(category, "group")
+      ? text(category.group)
+      : category.group;
+  const description =
+    category.description !== undefined && isBuiltInText(category, "description")
+      ? text(category.description)
+      : category.description;
+  return {
+    ...category,
+    label: categoryLabel(category, text),
+    ...(group !== undefined ? { group } : {}),
+    ...(description !== undefined ? { description } : {}),
+  };
 }
 export function threadCategoryById(
   id: string,

@@ -16,6 +16,7 @@ import { setSidebarGrouping } from "~/sidebarProjectFirst";
 import {
   categoryDefinitions,
   categoryLabel,
+  localizedCategory,
   resolveThreadCategory,
   SIDEBAR_CATEGORY_PRESETS,
   UNSORTED_CATEGORY_ID,
@@ -64,15 +65,13 @@ export function SidebarCategorySettingsSection() {
   const counts = new Map<string, number>();
   for (const thread of threads) {
     if (thread.archivedAt || thread.deletedAt) continue;
+    const projectName = namesByProject.get(
+      scopedProjectKey(scopeProjectRef(thread.environmentId, thread.projectId)),
+    );
     const id = resolveThreadCategory(
       overrides,
       scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
-      {
-        title: thread.title,
-        projectName: namesByProject.get(
-          scopedProjectKey(scopeProjectRef(thread.environmentId, thread.projectId)),
-        ),
-      },
+      { title: thread.title, projectName, folderName: projectName },
       settings,
       categories,
       auto,
@@ -88,7 +87,8 @@ export function SidebarCategorySettingsSection() {
   const editRow = (id: string, patch: Partial<ThreadCategory>) =>
     saveRows(editable.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry)));
   const editText = (entry: ThreadCategory, field: "group" | "description", value: string) => {
-    if (value === (entry[field] ?? "")) return;
+    // Built-in wording shows translated; leaving it as shown changes nothing.
+    if (value === (localizedCategory(entry, text)[field] ?? "")) return;
     const row = withText(entry, field, value);
     saveRows(editable.map((item) => (item.id === entry.id ? row : item)));
   };
@@ -277,7 +277,7 @@ export function SidebarCategorySettingsSection() {
                     aria-label={text("Category group")}
                     placeholder={text("Category group")}
                     className="w-24"
-                    defaultValue={entry.group ?? ""}
+                    defaultValue={localizedCategory(entry, text).group ?? ""}
                     onBlur={(event) => editText(entry, "group", event.currentTarget.value.trim())}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") event.currentTarget.blur();
@@ -371,7 +371,7 @@ export function SidebarCategorySettingsSection() {
                     })}
                     placeholder={text("What belongs here, in one line")}
                     className="basis-full"
-                    defaultValue={entry.description ?? ""}
+                    defaultValue={localizedCategory(entry, text).description ?? ""}
                     onBlur={(event) =>
                       editText(entry, "description", event.currentTarget.value.trim())
                     }

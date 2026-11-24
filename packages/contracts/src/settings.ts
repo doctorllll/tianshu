@@ -429,6 +429,7 @@ export const SidebarCategoryPreset = Schema.Literals([
   "general",
   "developer",
   "creator",
+  "lawyer",
   "project",
 ]);
 export type SidebarCategoryPreset = typeof SidebarCategoryPreset.Type;
@@ -458,6 +459,7 @@ export const SidebarCategorySettings = Schema.Struct({
     general: Schema.optionalKey(EditableSidebarCategories),
     developer: Schema.optionalKey(EditableSidebarCategories),
     creator: Schema.optionalKey(EditableSidebarCategories),
+    lawyer: Schema.optionalKey(EditableSidebarCategories),
   }),
   legacyRules: Schema.optionalKey(
     Schema.Struct({

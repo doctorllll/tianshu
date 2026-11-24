@@ -796,5 +796,68 @@
     "text": "项目管理",
     "count": 2,
     "reason": "Persisted group identifiers or legacy workspace folder names; display labels are localized."
+  },
+  {
+    "path": "apps/web/src/threadCategories.ts",
+    "kind": "string",
+    "text": "案件|诉讼|仲裁|庭审|开庭|证据|强制执行|上诉|立案|保全|litigation|arbitration|hearing|evidence",
+    "count": 1,
+    "reason": "Multilingual input keywords for search or classification."
+  },
+  {
+    "path": "apps/web/src/threadCategories.ts",
+    "kind": "string",
+    "text": "法条|法规|类案|案例检索|司法解释|判例|法律研究|检索报告|statute|precedent",
+    "count": 1,
+    "reason": "Multilingual input keywords for search or classification."
+  },
+  {
+    "path": "apps/web/src/threadCategories.ts",
+    "kind": "string",
+    "text": "起诉状|答辩状|代理词|合同|法律意见书|律师函|文书|起草|brief|memorandum",
+    "count": 1,
+    "reason": "Multilingual input keywords for search or classification."
+  },
+  {
+    "path": "apps/web/src/threadCategories.ts",
+    "kind": "string",
+    "text": "咨询|委托|收费|律师费|会见|日程|当事人|所务|consultation|engagement|invoice",
+    "count": 1,
+    "reason": "Multilingual input keywords for search or classification."
+  },
+  {
+    "path": "apps/web/src/threadCategories.ts",
+    "kind": "string",
+    "text": "脚本|自动化|批处理|爬虫|小工具|script|automation|batch|scraper",
+    "count": 1,
+    "reason": "Multilingual input keywords for search or classification."
+  },
+  {
+    "path": "apps/web/src/threadCategories.ts",
+    "kind": "string",
+    "text": "模型|提示词|智能体|agent|mcp|prompt|llm|claude|codex|gpt",
+    "count": 1,
+    "reason": "Multilingual input keywords for search or classification."
+  },
+  {
+    "path": "apps/web/src/threadCategories.ts",
+    "kind": "string",
+    "text": "服务器|部署|运维|网络|备份|域名|server|deploy|backup|docker|nas|vps",
+    "count": 1,
+    "reason": "Multilingual input keywords for search or classification."
+  },
+  {
+    "path": "apps/web/src/threadCategories.ts",
+    "kind": "string",
+    "text": "文章|公众号|写作|博客|文案|演讲|article|blog|writing",
+    "count": 1,
+    "reason": "Multilingual input keywords for search or classification."
+  },
+  {
+    "path": "apps/web/src/threadCategories.ts",
+    "kind": "string",
+    "text": "生活|家庭|购物|旅行|出行|life|travel|shopping",
+    "count": 1,
+    "reason": "Multilingual input keywords for search or classification."
   }
 ]

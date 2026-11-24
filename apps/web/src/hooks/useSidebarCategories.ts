@@ -1,7 +1,7 @@
 import { useClientSettings } from "./useSettings";
 import { useUiText } from "../i18n/useUiText";
 import {
-  categoryLabel,
+  localizedCategory,
   useThreadCategoryAutoAssignments,
   useThreadCategoryOverrides,
   visibleCategoryDefinitions,
@@ -12,10 +12,9 @@ export function useSidebarCategories() {
   const overrides = useThreadCategoryOverrides();
   const auto = useThreadCategoryAutoAssignments();
   const text = useUiText();
-  const categories = visibleCategoryDefinitions(settings, overrides).map((category) => ({
-    ...category,
-    label: categoryLabel(category, text),
-  }));
+  const categories = visibleCategoryDefinitions(settings, overrides).map((category) =>
+    localizedCategory(category, text),
+  );
   return {
     settings,
     overrides,
