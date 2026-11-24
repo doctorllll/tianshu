@@ -77,6 +77,25 @@ export function threadProjectNames(
     names.get(scopedProjectKey(scopeProjectRef(thread.environmentId, thread.projectId)));
 }
 
+/**
+ * Thread key to the name of the project the thread belongs to, so the by-category view can still
+ * say where a thread comes from. Sidebar rows are merged collections ("Other projects"), so this
+ * names the thread's own project. A thread whose project is unknown gets no entry.
+ */
+export function threadProjectLabels(
+  threads: ReadonlyArray<Pick<SidebarThreadSummary, "environmentId" | "id" | "projectId">>,
+  projectNameOf: (
+    thread: Pick<SidebarThreadSummary, "environmentId" | "projectId">,
+  ) => string | undefined,
+): Map<string, string> {
+  const labels = new Map<string, string>();
+  for (const thread of threads) {
+    const name = projectNameOf(thread)?.trim();
+    if (name) labels.set(scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)), name);
+  }
+  return labels;
+}
+
 const THREAD_JUMP_HINT_SHOW_DELAY_MS = 200;
 
 // Each prewarm retains growing thread detail and a live subscription, multiplying heap and server load.

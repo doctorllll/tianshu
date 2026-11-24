@@ -236,6 +236,7 @@ import {
   useSidebarRowSubscriptionLease,
   useThreadJumpHintsVisible,
   ThreadStatusPill,
+  threadProjectLabels,
   threadProjectNames,
 } from "./LegacySidebar.logic";
 import { sortThreads, getThreadSortTimestamp } from "@t3tools/client-runtime/state/thread-sort";
@@ -505,6 +506,8 @@ type ThreadProviderDisplay = {
 const ThreadProviderLabelContext = createContext<ReadonlyMap<string, ThreadProviderDisplay> | null>(
   null,
 );
+/** By-category rows name the project each thread comes from, by thread key; null elsewhere. */
+const ThreadProjectLabelContext = createContext<ReadonlyMap<string, string> | null>(null);
 const MORE_PROJECTS_EXPANSION_KEY = "project-first:more";
 const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowProps) {
   const uiText = useUiText();
@@ -540,6 +543,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   const threadRef = scopeThreadRef(thread.environmentId, thread.id);
   const threadKey = scopedThreadKey(threadRef);
   const providerChipLabel = useContext(ThreadProviderLabelContext)?.get(threadKey);
+  const projectLabelOfThread = useContext(ThreadProjectLabelContext)?.get(threadKey);
+  // A subtask sits under its root conversation, which already names the project.
+  const projectLabel = props.indent ? undefined : projectLabelOfThread;
   const movedTo = useThreadPlacementStore((state) => state.placements[threadKey]);
   const originalWorkspace = useThreadMove().workspacePath(threadKey);
   const [isFileDragOver, setIsFileDragOver] = useState(false);
@@ -840,7 +846,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           event.dataTransfer.effectAllowed = "move";
         }}
         className={cn(
-          "relative isolate flex h-8 w-full min-w-0 cursor-pointer select-none items-center gap-2 overflow-hidden rounded-md px-2 text-left text-xs outline-hidden focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring group-data-[collapsible=icon]:hidden [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted-foreground",
+          projectLabel ? "h-10" : "h-8",
+          "relative isolate flex w-full min-w-0 cursor-pointer select-none items-center gap-2 overflow-hidden rounded-md px-2 text-left text-xs outline-hidden focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring group-data-[collapsible=icon]:hidden [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted-foreground",
           isActive
             ? "bg-sidebar-row-active font-medium text-sidebar-foreground hover:bg-sidebar-row-active"
             : isSelected
@@ -859,82 +866,99 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           if (!event.currentTarget.contains(event.relatedTarget)) setPortsFocused(false);
         }}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
-          {prStatus && pr && (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <a
-                    href={prStatus.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={prStatus.tooltip}
-                    className={`inline-flex items-center justify-center ${prStatus.colorClass} cursor-pointer rounded-sm outline-hidden focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring`}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onClick={handlePrClick}
-                  >
-                    <ChangeRequestStatusIcon
-                      state={pr.state}
-                      isDraft={pr.isDraft}
-                      className="size-3"
-                    />
-                  </a>
-                }
+        <div className="flex min-w-0 flex-1 flex-col justify-center text-left">
+          <div className="flex min-w-0 items-center gap-1.5">
+            {prStatus && pr && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <a
+                      href={prStatus.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={prStatus.tooltip}
+                      className={`inline-flex items-center justify-center ${prStatus.colorClass} cursor-pointer rounded-sm outline-hidden focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring`}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={handlePrClick}
+                    >
+                      <ChangeRequestStatusIcon
+                        state={pr.state}
+                        isDraft={pr.isDraft}
+                        className="size-3"
+                      />
+                    </a>
+                  }
+                />
+                <TooltipPopup side="top">
+                  <PrStatusTooltipContent status={prStatus} />
+                </TooltipPopup>
+              </Tooltip>
+            )}
+            {!pr && currentLinkedPr ? (
+              <a
+                href={currentLinkedPr.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={handlePrClick}
+                className="text-muted-foreground"
+                aria-label={uiText("PR #{0}, status pending", { "0": currentLinkedPr.number })}
+              >
+                <PullRequestGlyph.pullRequest className="size-3" />
+              </a>
+            ) : null}
+            <TaskBoardDot cwd={thread.worktreePath ?? originalWorkspace} threadId={thread.id} />
+            {urgentRowReason ? (
+              <InboxStatusMark reason={urgentRowReason} />
+            ) : threadStatus ? (
+              <ThreadStatusLabel status={threadStatus} compact={threadStatus.label === "Working"} />
+            ) : null}
+            {canOperateThread && renamingThreadKey === threadKey ? (
+              <input
+                ref={handleRenameInputRef}
+                className="min-w-0 flex-1 truncate rounded border border-ring bg-transparent px-0.5 text-sm outline-none"
+                value={renamingTitle}
+                onChange={handleRenameInputChange}
+                onKeyDown={handleRenameInputKeyDown}
+                onBlur={handleRenameInputBlur}
+                onClick={handleRenameInputClick}
+                onDoubleClick={handleRenameInputClick}
               />
-              <TooltipPopup side="top">
-                <PrStatusTooltipContent status={prStatus} />
-              </TooltipPopup>
-            </Tooltip>
-          )}
-          {!pr && currentLinkedPr ? (
-            <a
-              href={currentLinkedPr.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={handlePrClick}
-              className="text-muted-foreground"
-              aria-label={uiText("PR #{0}, status pending", { "0": currentLinkedPr.number })}
-            >
-              <PullRequestGlyph.pullRequest className="size-3" />
-            </a>
-          ) : null}
-          <TaskBoardDot cwd={thread.worktreePath ?? originalWorkspace} threadId={thread.id} />
-          {urgentRowReason ? (
-            <InboxStatusMark reason={urgentRowReason} />
-          ) : threadStatus ? (
-            <ThreadStatusLabel status={threadStatus} compact={threadStatus.label === "Working"} />
-          ) : null}
-          {canOperateThread && renamingThreadKey === threadKey ? (
-            <input
-              ref={handleRenameInputRef}
-              className="min-w-0 flex-1 truncate rounded border border-ring bg-transparent px-0.5 text-sm outline-none"
-              value={renamingTitle}
-              onChange={handleRenameInputChange}
-              onKeyDown={handleRenameInputKeyDown}
-              onBlur={handleRenameInputBlur}
-              onClick={handleRenameInputClick}
-              onDoubleClick={handleRenameInputClick}
-            />
-          ) : (
+            ) : (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <span
+                      className={cn(
+                        "min-w-0 flex-1 truncate text-sm text-sidebar-foreground/85",
+                        isActive ? "font-medium" : "font-normal",
+                      )}
+                      data-testid={`thread-title-${thread.id}`}
+                    >
+                      {thread.archivedAt ? uiText("[Archived] ") : ""}
+                      {thread.title}
+                    </span>
+                  }
+                />
+                <TooltipPopup side="top">{thread.title}</TooltipPopup>
+              </Tooltip>
+            )}
+          </div>
+          {projectLabel ? (
             <Tooltip>
               <TooltipTrigger
                 render={
                   <span
-                    className={cn(
-                      "min-w-0 flex-1 truncate text-sm text-sidebar-foreground/85",
-                      isActive ? "font-medium" : "font-normal",
-                    )}
-                    data-testid={`thread-title-${thread.id}`}
-                  >
-                    {thread.archivedAt ? uiText("[Archived] ") : ""}
-                    {thread.title}
-                  </span>
+                    className="mt-0.5 w-fit max-w-full truncate rounded bg-sidebar-foreground/6 px-1 text-3xs leading-4 text-sidebar-muted-foreground"
+                    data-testid={`thread-project-${thread.id}`}
+                  />
                 }
-              />
-              <TooltipPopup side="top">{thread.title}</TooltipPopup>
+              >
+                {projectLabel}
+              </TooltipTrigger>
+              <TooltipPopup side="top">{projectLabel}</TooltipPopup>
             </Tooltip>
-          )}
+          ) : null}
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {providerChipLabel ? (
@@ -4390,6 +4414,14 @@ export default function LegacySidebar(props: { routeReveal: SidebarRouteReveal }
         }),
       )
     : null;
+  const threadProjectLabelMap =
+    sidebarGrouping === "category"
+      ? threadProjectLabels(sidebarThreads, (thread) => {
+          const name = threadProjectName(thread);
+          // The folder-less home is stored under its English name.
+          return name === "No project" ? uiText("No project") : name;
+        })
+      : null;
   const acknowledgedErrors = useWorkbenchInboxStore((state) => state.acknowledgedErrors);
   const visibleSidebarThreadKeys = (() =>
     sortedProjects.flatMap((project) => {
@@ -4820,73 +4852,75 @@ export default function LegacySidebar(props: { routeReveal: SidebarRouteReveal }
           revealProject={expandThreadListForProject}
         >
           <ThreadProviderLabelContext.Provider value={threadProviderLabels}>
-            <SidebarProjectsContent
-              attachInteraction={categoryOrder.attachInteraction}
-              workbenchInbox={
-                <WorkbenchInbox
-                  threads={sidebarThreads}
-                  projects={providerSortedProjects}
-                  activeKey={routeThreadKey}
-                  navigate={navigateFromOverview}
-                />
-              }
-              openArchivedHistory={openArchivedHistory}
-              showArm64IntelBuildWarning={showArm64IntelBuildWarning}
-              arm64IntelBuildWarningDescription={arm64IntelBuildWarningDescription}
-              desktopUpdateButtonAction={desktopUpdateButtonAction}
-              desktopUpdateButtonDisabled={desktopUpdateButtonDisabled}
-              desktopUpdateActionPending={desktopUpdateActionPending}
-              handleDesktopUpdateButtonClick={handleDesktopUpdateButtonClick}
-              projectSortOrder={sidebarProjectSortOrder}
-              threadSortOrder={sidebarThreadSortOrder}
-              threadPreviewCount={sidebarThreadPreviewCount}
-              updateSettings={updateSettings}
-              openAddProject={openAddProjectCommandPalette}
-              isManualProjectSorting={isManualProjectSorting}
-              projectDnDSensors={projectDnDSensors}
-              projectCollisionDetection={projectCollisionDetection}
-              handleProjectDragStart={handleProjectDragStart}
-              handleProjectDragEnd={handleProjectDragEnd}
-              handleProjectDragCancel={handleProjectDragCancel}
-              handleNewThread={handleNewThread}
-              archiveThread={archiveThread}
-              deleteThread={deleteThread}
-              markThreadUnread={markThreadUnread}
-              sortedProjects={sortedProjects}
-              projectSections={projectSections}
-              categorySections={categorySections}
-              emptyCategories={emptyCategories}
-              categorySuggestions={categorySuggestions}
-              sidebarGrouping={sidebarGrouping}
-              onSidebarGroupingChange={(grouping) => {
-                if (grouping === "category" && categorySettings.preset === "project") {
-                  void updateClientSettings({
-                    sidebarCategories: { ...categorySettings, preset: "general" },
-                  });
+            <ThreadProjectLabelContext.Provider value={threadProjectLabelMap}>
+              <SidebarProjectsContent
+                attachInteraction={categoryOrder.attachInteraction}
+                workbenchInbox={
+                  <WorkbenchInbox
+                    threads={sidebarThreads}
+                    projects={providerSortedProjects}
+                    activeKey={routeThreadKey}
+                    navigate={navigateFromOverview}
+                  />
                 }
-                setSidebarGrouping(grouping);
-              }}
-              expandedThreadListsByProject={expandedThreadListsByProject}
-              routeThreadKey={routeThreadKey}
-              openPullRequestsInRightPanel={routeThreadRef !== null}
-              newThreadShortcutLabel={newThreadShortcutLabel}
-              commandPaletteShortcutLabel={commandPaletteShortcutLabel}
-              threadJumpLabelByKey={visibleThreadJumpLabelByKey}
-              attachThreadListAutoAnimateRef={attachThreadListAutoAnimateRef}
-              expandThreadListForProject={expandThreadListForProject}
-              collapseThreadListForProject={collapseThreadListForProject}
-              dragInProgressRef={dragInProgressRef}
-              suppressProjectClickAfterDragRef={suppressProjectClickAfterDragRef}
-              suppressProjectClickForContextMenuRef={suppressProjectClickForContextMenuRef}
-              attachProjectListAutoAnimateRef={attachProjectListAutoAnimateRef}
-              projectsLength={projects.length}
-              sidebarProjects={sidebarProjects}
-              threadsByProjectKey={threadsByProjectKey}
-              activeProjectKey={activeProjectKey}
-              navigateToThread={navigateToThread}
-              handleLocateProject={handleLocateProject}
-              isMobile={isMobile}
-            />
+                openArchivedHistory={openArchivedHistory}
+                showArm64IntelBuildWarning={showArm64IntelBuildWarning}
+                arm64IntelBuildWarningDescription={arm64IntelBuildWarningDescription}
+                desktopUpdateButtonAction={desktopUpdateButtonAction}
+                desktopUpdateButtonDisabled={desktopUpdateButtonDisabled}
+                desktopUpdateActionPending={desktopUpdateActionPending}
+                handleDesktopUpdateButtonClick={handleDesktopUpdateButtonClick}
+                projectSortOrder={sidebarProjectSortOrder}
+                threadSortOrder={sidebarThreadSortOrder}
+                threadPreviewCount={sidebarThreadPreviewCount}
+                updateSettings={updateSettings}
+                openAddProject={openAddProjectCommandPalette}
+                isManualProjectSorting={isManualProjectSorting}
+                projectDnDSensors={projectDnDSensors}
+                projectCollisionDetection={projectCollisionDetection}
+                handleProjectDragStart={handleProjectDragStart}
+                handleProjectDragEnd={handleProjectDragEnd}
+                handleProjectDragCancel={handleProjectDragCancel}
+                handleNewThread={handleNewThread}
+                archiveThread={archiveThread}
+                deleteThread={deleteThread}
+                markThreadUnread={markThreadUnread}
+                sortedProjects={sortedProjects}
+                projectSections={projectSections}
+                categorySections={categorySections}
+                emptyCategories={emptyCategories}
+                categorySuggestions={categorySuggestions}
+                sidebarGrouping={sidebarGrouping}
+                onSidebarGroupingChange={(grouping) => {
+                  if (grouping === "category" && categorySettings.preset === "project") {
+                    void updateClientSettings({
+                      sidebarCategories: { ...categorySettings, preset: "general" },
+                    });
+                  }
+                  setSidebarGrouping(grouping);
+                }}
+                expandedThreadListsByProject={expandedThreadListsByProject}
+                routeThreadKey={routeThreadKey}
+                openPullRequestsInRightPanel={routeThreadRef !== null}
+                newThreadShortcutLabel={newThreadShortcutLabel}
+                commandPaletteShortcutLabel={commandPaletteShortcutLabel}
+                threadJumpLabelByKey={visibleThreadJumpLabelByKey}
+                attachThreadListAutoAnimateRef={attachThreadListAutoAnimateRef}
+                expandThreadListForProject={expandThreadListForProject}
+                collapseThreadListForProject={collapseThreadListForProject}
+                dragInProgressRef={dragInProgressRef}
+                suppressProjectClickAfterDragRef={suppressProjectClickAfterDragRef}
+                suppressProjectClickForContextMenuRef={suppressProjectClickForContextMenuRef}
+                attachProjectListAutoAnimateRef={attachProjectListAutoAnimateRef}
+                projectsLength={projects.length}
+                sidebarProjects={sidebarProjects}
+                threadsByProjectKey={threadsByProjectKey}
+                activeProjectKey={activeProjectKey}
+                navigateToThread={navigateToThread}
+                handleLocateProject={handleLocateProject}
+                isMobile={isMobile}
+              />
+            </ThreadProjectLabelContext.Provider>
           </ThreadProviderLabelContext.Provider>
         </ThreadMoveProvider>
       </SidebarSubtasksContext.Provider>

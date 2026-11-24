@@ -36,6 +36,7 @@ import {
   groupSidebarThreadsByProject,
   resolveSidebarFolderDot,
   sidebarFolderExpansionKeys,
+  threadProjectLabels,
   threadProjectNames,
 } from "./LegacySidebar.logic";
 import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
@@ -1555,6 +1556,46 @@ describe("shouldCreateNewThreadInCurrentProject", () => {
     expect(shouldCreateNewThreadInCurrentProject(false, 1, 3)).toBe(true);
     expect(shouldCreateNewThreadInCurrentProject(false, 0, 0)).toBe(true);
     expect(shouldCreateNewThreadInCurrentProject(true, 2, 2)).toBe(true);
+  });
+});
+
+describe("threadProjectLabels", () => {
+  const remote = EnvironmentId.make("environment-remote");
+  const phone = ProjectId.make("project-phone");
+  const media = ProjectId.make("project-media");
+  const nameOf = threadProjectNames([
+    { environmentId: localEnvironmentId, id: phone, title: "phone-tools" },
+    { environmentId: remote, id: phone, title: "  media-server  " },
+    { environmentId: localEnvironmentId, id: media, title: "   " },
+  ]);
+  const keyOf = (environmentId: EnvironmentId, id: string) =>
+    scopedThreadKey(scopeThreadRef(environmentId, ThreadId.make(id)));
+
+  it("names each thread by its own project, trimmed, also across environments", () => {
+    const labels = threadProjectLabels(
+      [
+        { environmentId: localEnvironmentId, id: ThreadId.make("a"), projectId: phone },
+        { environmentId: remote, id: ThreadId.make("b"), projectId: phone },
+      ],
+      nameOf,
+    );
+    expect(labels.get(keyOf(localEnvironmentId, "a"))).toBe("phone-tools");
+    expect(labels.get(keyOf(remote, "b"))).toBe("media-server");
+  });
+
+  it("leaves out a thread whose project is unknown or has a blank name", () => {
+    const labels = threadProjectLabels(
+      [
+        { environmentId: localEnvironmentId, id: ThreadId.make("c"), projectId: media },
+        {
+          environmentId: localEnvironmentId,
+          id: ThreadId.make("d"),
+          projectId: ProjectId.make("gone"),
+        },
+      ],
+      nameOf,
+    );
+    expect(labels.size).toBe(0);
   });
 });
 
