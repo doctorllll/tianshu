@@ -63,8 +63,9 @@ const CLAUDE_HOST_SESSION_VARIABLES = [
 ];
 
 /**
- * Base env for the Claude processes T3 Code runs, before `makeClaudeEnvironment`.
- * Claude Code reads its entrypoint from the process env, not its settings `env`, so T3 Code applies that override itself.
+ * Base env for the Claude processes Tianshu runs, before `makeClaudeEnvironment`.
+ * Claude Code reads its entrypoint from the process env, not its settings `env`, so Tianshu applies that override itself.
+ * The entrypoint names Tianshu, not the SDK default `sdk-ts`: Claude Code's /resume hides sdk-* sessions.
  */
 export const mergeClaudeProcessEnvironment = Effect.fn("mergeClaudeProcessEnvironment")(function* (
   config: Pick<ClaudeSettings, "homePath">,
@@ -73,7 +74,7 @@ export const mergeClaudeProcessEnvironment = Effect.fn("mergeClaudeProcessEnviro
 ) {
   const baseEnvironment: NodeJS.ProcessEnv = {
     ...hostEnvironment,
-    CLAUDE_CODE_ENTRYPOINT: "t3-code",
+    CLAUDE_CODE_ENTRYPOINT: "tianshu",
   };
   for (const name of CLAUDE_HOST_SESSION_VARIABLES) delete baseEnvironment[name];
   // The desktop runs the server as Node through Electron. Commands Claude runs inherit its env, so
