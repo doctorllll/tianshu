@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/based%20on-T3%20Code-6e56cf" alt="Based on T3 Code" />
 </p>
 
-天枢是北斗第一星，居中调度。它把 Claude Code、Codex、ZCode、Antigravity、Grok、DeepSeek Harness、fastctx 等 agent 放进同一个窗口：开会话、切模型和思考强度、看各家套餐的剩余额度、让一个会话派生子会话给另一个 agent 去做。
+天枢是北斗第一星，居中调度。它把 Claude Code、Codex、ZCode、Antigravity、Grok、DeepSeek Harness 等 agent 放进同一个窗口：开会话、切模型和思考强度、看各家套餐的剩余额度、让一个会话派生子会话给另一个 agent 去做。
 
 天枢只是外壳。每个 agent 都跑它自己的原生程序，发出去的请求和它的官方 app 一样；会话照样出现在各家原生 app 的会话列表里。
 
@@ -26,7 +26,7 @@
 - **原生 harness，纯外壳**：Claude 走 Claude Code CLI，ZCode 走 `zcode-acp-server`，Antigravity 和 DeepSeek Harness 通过各自 app 的本地服务接入（见 `bridges/`），不另造一套请求。
 - **会话归原生**：会话正本在各 agent 自己的存储里，天枢只记索引和父子关系；在原生 app 里也能接着用。
 - **子会话**：一个会话可以把子任务派给任意 agent（比如 Claude 派给 ZCode），子会话完成后带着它的回复自动唤醒父会话；新建子会话时按「剩余额度多、离重置近」推荐 agent。
-- **套餐额度**：顶栏和用量页显示各 agent 的剩余额度与重置时间（ZCode Coding Plan、Antigravity、Grok、fastctx 等）。
+- **套餐额度**：顶栏和用量页显示各 agent 的剩余额度与重置时间（ZCode Coding Plan、Antigravity、Grok 等）。
 - **原生程序守护**：某个 agent 依赖的原生 app 没开时，提示并可一键在后台启动。
 - **思考强度滑块**：档位随模型变化，从小行星、行星、恒星、黑洞到星系；恒星往上的天体会冲出滑槽，档位越高，粒子、冲击波和升档的震动越猛。
 - **中文优先**：界面默认中文。
@@ -47,8 +47,6 @@
 | `bridges/antigravity-acp` | 把 Antigravity 包成 ACP agent（走 Antigravity app 自己的本地服务） |
 | `bridges/dsh-acp` | 把 DeepSeek Harness 包成 ACP agent（独立的无界面 profile） |
 | `assets/tianshu` | 字标、图标与天体素材的源文件 |
-
-fastctx 的 ACP 桥不在本仓库，随 fastctx-web 提供。
 
 ## 开发与打包
 
@@ -82,7 +80,7 @@ vp run dist:desktop:dmg:arm64         # 打包 macOS（Apple Silicon），产物
 
 ## English
 
-Tianshu (天枢, the first star of the Big Dipper) is a desktop workbench for running many coding agents side by side — Claude Code, Codex, ZCode, Antigravity, Grok, DeepSeek Harness, fastctx and more. It is only a shell: each agent runs its own native harness and sends the same requests its official app would, and sessions stay in each agent's own store, so they show up in the native apps too.
+Tianshu (天枢, the first star of the Big Dipper) is a desktop workbench for running many coding agents side by side — Claude Code, Codex, ZCode, Antigravity, Grok, DeepSeek Harness and more. It is only a shell: each agent runs its own native harness and sends the same requests its official app would, and sessions stay in each agent's own store, so they show up in the native apps too.
 
 Highlights: cross-agent sub-sessions that wake the parent with the child's reply, plan quota for each agent in the top bar, one-click start of an agent's native app, a per-model reasoning-effort slider whose top levels (a black hole, a galaxy) burst out of the track, Chinese UI by default, and no telemetry.
 
