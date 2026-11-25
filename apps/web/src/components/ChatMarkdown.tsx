@@ -115,6 +115,8 @@ import {
 } from "@t3tools/shared/codexMarkdownDirectives";
 import { renderSkillInlineMarkdownChildren } from "./chat/SkillInlineText";
 import { MarkdownMath } from "./chat/MarkdownMath";
+import { AskBlockCard } from "./chat/AskBlockCard";
+import { countAskFences, parseAskBlock } from "./chat/askBlock";
 import {
   resolveMarkdownMediaPreview,
   type ExpandedImagePreview,
@@ -265,6 +267,10 @@ interface ChatMarkdownProps {
   parseRawHtml?: boolean;
   onUseArtifactTemplate?: ((template: CodexArtifactTemplate) => void) | undefined;
   onRunShellCommand?: ((command: string) => void) | undefined;
+  /** Your next message after this one, which settles the `ask` questions it holds. */
+  askReply?: string | null | undefined;
+  /** Sends an answer to an `ask` question as your message; unset shows the questions read-only. */
+  onAnswerAsk?: ((text: string) => Promise<void>) | undefined;
   imageBaseDir?: string | undefined;
   workspaceMutationId?: string | null | undefined;
   onImageExpand?: ((preview: ExpandedImagePreview) => void) | undefined;
@@ -538,6 +544,8 @@ function useChatMarkdownState({
   skills = EMPTY_MARKDOWN_SKILLS,
   onUseArtifactTemplate,
   onRunShellCommand,
+  askReply,
+  onAnswerAsk,
   imageBaseDir,
   workspaceMutationId,
   onImageExpand,
@@ -1040,6 +1048,8 @@ function useChatMarkdownState({
     onTaskListChange,
     onUseArtifactTemplate,
     onRunShellCommand,
+    askReply,
+    onAnswerAsk,
     openChangeRequestLink,
     openIssueLink,
     openDeferredMarkdownLink,
@@ -1775,6 +1785,8 @@ const CHAT_MARKDOWN_COMPONENTS = {
       expandMedia,
       isStreaming,
       onRunShellCommand,
+      askReply,
+      onAnswerAsk,
       inline,
       mathEnabled,
     } = use(ChatMarkdownRendererContext);
@@ -1793,6 +1805,23 @@ const CHAT_MARKDOWN_COMPONENTS = {
         isClosedCodeFence(node, text, codeBlock.code))
     ) {
       return <MarkdownMath tex={codeBlock.code} display focusable={!inline} />;
+    }
+    if (
+      language === "ask" &&
+      !inline &&
+      (!isStreaming || isClosedCodeFence(node, text, codeBlock.code))
+    ) {
+      const askBlock = parseAskBlock(codeBlock.code);
+      if (askBlock) {
+        return (
+          <AskBlockCard
+            block={askBlock}
+            askCount={countAskFences(text)}
+            reply={askReply ?? null}
+            onAnswer={isStreaming ? undefined : onAnswerAsk}
+          />
+        );
+      }
     }
     const fenceTitle = extractFenceTitle(extractPreCodeMeta(node));
     const highlightedCode = (

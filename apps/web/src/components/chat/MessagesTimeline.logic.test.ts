@@ -1717,6 +1717,56 @@ describe("deriveMessagesTimelineRows", () => {
     });
   });
 
+  it("gives an assistant message that asks in an ask block the user's next message", () => {
+    const time = (second: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, second)).toISOString();
+    const message = (
+      id: string,
+      second: number,
+      role: "user" | "assistant",
+      text: string,
+      runId: RunId,
+    ): TimelineEntry => ({
+      kind: "message",
+      id,
+      createdAt: time(second),
+      message: {
+        id: MessageId.make(id),
+        role,
+        text,
+        runId,
+        createdAt: time(second),
+        updatedAt: time(second),
+        streaming: false,
+      },
+    });
+    const firstRun = RunId.make("ask-run-1");
+    const secondRun = RunId.make("ask-run-2");
+    const ask = "Before\n\n```ask\nShip it?\n* Yes\n- No\n```\n";
+    const rows = deriveMessagesTimelineRows({
+      timelineEntries: [
+        message("prompt", 0, "user", "Start", firstRun),
+        message("question", 5, "assistant", ask, firstRun),
+        message("answer", 10, "user", "Yes", secondRun),
+        message("asked-again", 15, "assistant", ask, secondRun),
+      ],
+      latestRun: {
+        runId: secondRun,
+        status: "completed",
+        startedAt: time(10),
+        completedAt: time(20),
+      },
+      isWorking: false,
+      expandedRunIds: new Set(),
+      turnDiffSummaries: [],
+      supportsConversationRollback: false,
+    });
+
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    expect(byId.get("question")).toMatchObject({ askReply: "Yes" });
+    expect(byId.get("asked-again")).not.toHaveProperty("askReply");
+    expect(byId.get("prompt")).not.toHaveProperty("askReply");
+  });
+
   it("keeps the previous turn folded while a newly sent message awaits its turn", () => {
     const rows = deriveMessagesTimelineRows({
       timelineEntries: [

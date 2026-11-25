@@ -85,6 +85,8 @@ export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind
               headingLevelOffset={MESSAGE_HEADING_LEVEL}
               onUseArtifactTemplate={ctx.onUseArtifactTemplate}
               onRunShellCommand={ctx.onRunShellCommand}
+              askReply={row.askReply}
+              onAnswerAsk={ctx.canOperateThread ? ctx.onSendAppMessage : undefined}
               onImageExpand={ctx.onImageExpand}
             />
           </AssistantCitationSource>

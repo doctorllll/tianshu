@@ -75,6 +75,7 @@ import { mcpAppReferencesEqual, type McpAppReference } from "@t3tools/shared/mcp
 import { formatDuration } from "@t3tools/shared/orchestrationTimingCopy";
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
 import { m, type MessageResolver } from "../../i18n/messages";
+import { hasAskFence } from "./askBlock";
 import { collectToolFilePaths } from "@t3tools/shared/toolActivity";
 import {
   dynamicToolTitle,
@@ -647,6 +648,8 @@ type MessagesTimelineRowContent =
       groupedWithPrevious?: boolean;
       /** Set when the message above is a steer too, so the label shows once. */
       continuesSteer?: boolean;
+      /** Your next message after an assistant message that asks in an `ask` block. */
+      askReply?: string;
     }
   | {
       kind: "assistant-meta";
@@ -2425,6 +2428,11 @@ export function deriveMessagesTimelineRows(
     if (timelineRowIsWorkLog(row) && timelineRowIsWorkLog(result[index + 1])) {
       return { ...row, continuesWorkLog: true };
     }
+    if (row.kind === "message" && row.message.role === "assistant") {
+      if (!hasAskFence(row.message.text)) return row;
+      const askReply = nextOwnUserMessageText(result, index);
+      return askReply === undefined ? row : { ...row, askReply };
+    }
     if (!timelineRowIsOwnUserMessage(row)) return row;
     const previous = result[index - 1];
     const groupedWithNext = timelineRowIsOwnUserMessage(result[index + 1]);
@@ -2444,6 +2452,17 @@ function timelineRowIsOwnUserMessage(
     row.message.role === "user" &&
     resolveUserMessagePresentation(row.message).attribution === null
   );
+}
+
+function nextOwnUserMessageText(
+  rows: ReadonlyArray<MessagesTimelineRow>,
+  index: number,
+): string | undefined {
+  for (let next = index + 1; next < rows.length; next += 1) {
+    const row = rows[next];
+    if (timelineRowIsOwnUserMessage(row)) return row.message.text;
+  }
+  return undefined;
 }
 
 function messageIsSteer(message: ChatMessage): boolean {
@@ -2910,7 +2929,8 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
         a.revertTurnCount === bm.revertTurnCount &&
         a.groupedWithNext === bm.groupedWithNext &&
         a.groupedWithPrevious === bm.groupedWithPrevious &&
-        a.continuesSteer === bm.continuesSteer
+        a.continuesSteer === bm.continuesSteer &&
+        a.askReply === bm.askReply
       );
     }
   }

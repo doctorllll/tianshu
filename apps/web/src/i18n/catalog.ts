@@ -9819,4 +9819,9 @@ export const zhCN: Readonly<Record<string, string>> = {
   "Could not read the plan: {error}": "读不到计划：{error}",
   "No plan yet.": "还没有计划。",
   "the previous agent": "上一个 agent",
+  Answered: "已回复",
+  "Other answer": "其他答案",
+  "Write your own answer…": "自己写一个答案…",
+  "Your reply: {reply}": "你的回复：{reply}",
+  "Could not send the reply: {reason}": "没发出去：{reason}",
 };
