@@ -41,7 +41,7 @@ describe("T3 device instructions", () => {
 
   it("reach OpenCode and Cursor only when the session holds device access", () => {
     assert.include(t3OrchestrationSystemPrompt(true, true), T3_CODE_DEVICE_TOOL_INSTRUCTIONS);
-    assert.notInclude(t3OrchestrationSystemPrompt(true, false), "## T3 Code devices");
+    assert.notInclude(t3OrchestrationSystemPrompt(true, false), "## Tianshu devices");
     assert.isUndefined(t3OrchestrationSystemPrompt(false, true));
 
     const firstRun = (hasDeviceTools: boolean) =>
@@ -53,7 +53,7 @@ describe("T3 device instructions", () => {
         deviceInstructionsDelivered: false,
       });
     assert.include(firstRun(true), T3_CODE_DEVICE_TOOL_INSTRUCTIONS);
-    assert.notInclude(firstRun(false), "## T3 Code devices");
+    assert.notInclude(firstRun(false), "## Tianshu devices");
 
     const laterRun = (deviceInstructionsDelivered: boolean) =>
       t3OrchestrationPrompt({
@@ -95,9 +95,9 @@ describe("T3 device instructions", () => {
       t3AcpPromptWithInstructions({ prompt: "Again.", state, previousState: state }),
       "Again.",
     );
-    assert.notInclude(t3AcpPromptWithInstructions({ prompt: "Hi.", state }), "## T3 Code devices");
+    assert.notInclude(t3AcpPromptWithInstructions({ prompt: "Hi.", state }), "## Tianshu devices");
     const userFirst = t3AcpPromptWithInstructions({ prompt: "Hi.", state, instructionsLast: true });
-    assert.isTrue(userFirst.startsWith("Hi.\n\n<t3_code_instructions>"));
+    assert.isTrue(userFirst.startsWith("Hi.\n\n<tianshu_instructions>"));
     assert.notInclude(userFirst, "<user_request>");
   });
 });

@@ -1870,13 +1870,13 @@ it.effect("delivers agent messages queued behind /compact before a later one ste
       yield* Fiber.join(alphaRunning);
       yield* lock;
       assert.deepEqual(
-        started.map((turn) => turn.message.text.split("\n").at(-1)),
+        started.map((turn) => turn.message.text.split("\n")[0]),
         ["first", "/compact", "ALPHA"],
       );
 
       yield* sendFromAgent("CHARLIE");
       const delivered = [...steered, ...started.slice(3).map((turn) => turn.message.text)]
-        .map((text) => text.split("\n").at(-1))
+        .map((text) => text.split("\n")[0])
         .filter((text) => text === "BRAVO" || text === "CHARLIE");
       // Whatever reaches the agent so far does so in send order: CHARLIE never before BRAVO.
       assert.deepEqual(delivered, ["BRAVO", "CHARLIE"].slice(0, delivered.length));
@@ -2595,7 +2595,7 @@ it.effect("steers a promoted scheduled delivery with the thread's current select
 
         const projection = yield* orchestrator.getThreadProjection(threadId);
         assert.deepEqual(steered, [
-          '[T3 Code: scheduled task "task:scheduled" sent this prompt, not the user typing in this chat.]\n\nscheduled',
+          'scheduled\n\n[Tianshu: scheduled task "task:scheduled" sent this prompt, not the user typing in this chat.]',
         ]);
         assert.deepEqual(projection.thread.modelSelection, composerSelection);
       }).pipe(Effect.provide(layer));
@@ -3420,7 +3420,7 @@ it.effect("starts a restart that stops the running turn ahead of an older held q
             "first",
             ...["second", "do this instead"].map(
               (text) =>
-                `[T3 Code: this message came through T3 Code's tools, not from the user typing in this chat.]\n\n${text}`,
+                `${text}\n\n[Tianshu: this message came through Tianshu's tools, not from the user typing in this chat.]`,
             ),
           ],
         },
@@ -3544,7 +3544,7 @@ it.effect("replays an accepted steer after its target turn completes", () =>
       assert.equal(fresh._tag, "ThreadManagementNoSteerableRunError");
       yield* worker.drain();
       assert.deepEqual(steered, [
-        `[T3 Code: this message came through T3 Code's tools, not from the user typing in this chat.]\n\n${input.text}`,
+        `${input.text}\n\n[Tianshu: this message came through Tianshu's tools, not from the user typing in this chat.]`,
       ]);
       assert.lengthOf(started, 1);
     }).pipe(

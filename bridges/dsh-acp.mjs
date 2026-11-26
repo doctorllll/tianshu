@@ -481,7 +481,8 @@ async function applyModel(s, cat) {
 // ------------------------------------------------------------------ prompt content
 // The client's notes (its collaboration tools, runtime info) are for agents that can use them; DSH cannot reach
 // those tools, and the notes would show in the DSH App as part of your message.
-const NOTES = /\s*<(t3_code_instructions|runtime_info|pull_request_linking)>[\s\S]*?<\/\1>\s*/g;
+const NOTES =
+  /\s*<(tianshu_instructions|t3_code_instructions|runtime_info|pull_request_linking)>[\s\S]*?<\/\1>\s*/g;
 const REQUEST = /<user_request>\n?([\s\S]*?)\n?<\/user_request>/;
 
 function promptContent(blocks) {

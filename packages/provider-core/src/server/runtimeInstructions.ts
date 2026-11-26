@@ -18,7 +18,7 @@ export function buildRuntimeInstructions(runtime: {
   readonly runtimePolicy?: Pick<ProviderAdapterV2RuntimePolicy, "cwd" | "workspace"> | undefined;
   /**
    * Short runtime note and no pull-request block. When omitted, follows `T3CODE_AGENT_NOTES=lean`,
-   * which the 天枢 desktop app sets; unset keeps the upstream text that replay fixtures record.
+   * which the 天枢 desktop app sets; unset keeps the full text that replay fixtures record.
    */
   readonly lean?: boolean;
 }): string {
@@ -33,7 +33,7 @@ export function buildRuntimeInstructions(runtime: {
   const effortInfo = effort ? ` with ${effort} reasoning effort` : "";
   const runtimeInfo = lean
     ? `<runtime_info>Harness: ${harness}${modelInfo}${effortInfo}. Link files you cite or produce by absolute path, as in [http.ts:42](/abs/path/http.ts:42); embed images, video and audio with Markdown image syntax and absolute paths.</runtime_info>`
-    : `<runtime_info>In case you're asked: you are running in T3 Code through the ${harness} harness${modelInfo}${effortInfo}. No need to mention this otherwise. You can embed images, video, and audio using Markdown image syntax with absolute file paths. Link every other file you cite or produce by its absolute path, as in [http.ts:42](/abs/path/http.ts:42), so the user can open it in T3 Code's files viewer.</runtime_info>`;
+    : `<runtime_info>In case you're asked: you are running in Tianshu through the ${harness} harness${modelInfo}${effortInfo}. No need to mention this otherwise. You can embed images, video, and audio using Markdown image syntax with absolute file paths. Link every other file you cite or produce by its absolute path, as in [http.ts:42](/abs/path/http.ts:42), so the user can open it in Tianshu's files viewer.</runtime_info>`;
   const workspace =
     runtime.runtimePolicy === undefined ? "" : buildWorkspaceInstructions(runtime.runtimePolicy);
   return [

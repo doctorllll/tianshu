@@ -69,6 +69,8 @@ import * as ProviderReplayHarness from "./ProviderReplayHarness.ts";
 import { checkpointWorkspace } from "@t3tools/provider-testing/replayWorkspace";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 
+// Sender notes ride at the end of a prompt; match on what was sent before them.
+const withoutSenderNote = (text: string) => text.replace(/\n\n\[Tianshu: [^\]]*\]$/u, "");
 const encodeJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 
 const threadId = ThreadId.make("thread:provider-switch");
@@ -5041,7 +5043,7 @@ describe("orchestration v2 provider switching", () => {
           yield* waitForIdle(threadId);
           const turns = yield* Ref.get(capturedTurns);
           const turnFor = (name: string) =>
-            turns.find((turn) => turn.text.endsWith(`Scheduled ${name}`));
+            turns.find((turn) => withoutSenderNote(turn.text).endsWith(`Scheduled ${name}`));
           assert.isDefined(turnFor("second"));
           assert.notEqual(turnFor("second")!.nativeThreadId, turnFor("first")!.nativeThreadId);
           // Closing the busy session would end its background work.
@@ -5173,7 +5175,8 @@ describe("orchestration v2 provider switching", () => {
           yield* waitForIdle(threadId);
         }
         const turns = yield* Ref.get(capturedTurns);
-        const turnFor = (name: string) => turns.find((turn) => turn.text.endsWith(name));
+        const turnFor = (name: string) =>
+          turns.find((turn) => withoutSenderNote(turn.text).endsWith(name));
         assert.notEqual(
           turnFor("scheduled")!.nativeThreadId,
           turnFor("user-first")!.nativeThreadId,

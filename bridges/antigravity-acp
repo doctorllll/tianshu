@@ -392,7 +392,7 @@ def replay(cid):
 # ------------------------------------------------------------------ prompt text
 # The client's notes (its collaboration tools, runtime info) are for agents that can use them;
 # Antigravity cannot reach those tools, and the notes would show in the App as your message.
-_NOTES = re.compile(r"\s*<(t3_code_instructions|runtime_info|pull_request_linking)>.*?</\1>\s*", re.S)
+_NOTES = re.compile(r"\s*<(tianshu_instructions|t3_code_instructions|runtime_info|pull_request_linking)>.*?</\1>\s*", re.S)
 _REQUEST = re.compile(r"<user_request>\n?(.*?)\n?</user_request>", re.S)
 
 
