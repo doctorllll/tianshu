@@ -32,6 +32,9 @@ const APP_LOG = path.join(APP_DIR, "stdout.log");
 const LAUNCH_LOCK = path.join(APP_DIR, "launch.lock");
 const CATALOG_CACHE = path.join(STATE_DIR, "catalog.json");
 const LAUNCH_TIMEOUT_MS = 90_000;
+const LAUNCH_TRIES = 3;
+// An App that `open` started is up within a second; one not running this long after is gone without its address.
+const LAUNCH_GONE_MS = 4_000;
 const HISTORY_PAGE = 400;
 const HISTORY_LIMIT = 4000;
 // Effort and mode names as the client already translates them, as the other bridges send them.
@@ -130,22 +133,38 @@ function takeLock() {
   }
 }
 
-/** Open the App with its stdout in our state directory; several bridge processes share one launch. */
+/**
+ * Open the App with its stdout in our state directory; several bridge processes share one launch.
+ * An instance can quit at once (seen after a restart of the Mac: the App refused its single-instance
+ * lock and exited within half a second), so one that is gone before printing its address is opened again.
+ */
 async function launchApp() {
   fs.mkdirSync(APP_DIR, { recursive: true, mode: 0o700 });
   fs.chmodSync(STATE_DIR, 0o700);
   fs.chmodSync(APP_DIR, 0o700);
   if (!takeLock()) {
-    await waitFor(() => !fs.existsSync(LAUNCH_LOCK), LAUNCH_TIMEOUT_MS);
+    await waitFor(() => !fs.existsSync(LAUNCH_LOCK), LAUNCH_TIMEOUT_MS * LAUNCH_TRIES);
     return;
   }
   try {
     if (appRunning()) return;
-    fs.writeFileSync(APP_LOG, "", { mode: 0o600 });
-    const r = spawnSync("open", ["-g", "-a", APP, "--stdout", APP_LOG, "--stderr", APP_LOG]);
-    if (r.status !== 0) throw new UserError(`没能打开 DSH App：${String(r.stderr).trim()}`);
-    log("opened the DSH App");
-    await waitFor(() => readLaunch() !== null, LAUNCH_TIMEOUT_MS);
+    for (let attempt = 1; attempt <= LAUNCH_TRIES; attempt++) {
+      fs.writeFileSync(APP_LOG, "", { mode: 0o600 });
+      const r = spawnSync("open", ["-g", "-a", APP, "--stdout", APP_LOG, "--stderr", APP_LOG]);
+      if (r.status !== 0) throw new UserError(`没能打开 DSH App：${String(r.stderr).trim()}`);
+      log(`opened the DSH App (attempt ${attempt})`);
+      const opened = Date.now();
+      await waitFor(
+        () => readLaunch() !== null || (Date.now() - opened > LAUNCH_GONE_MS && !appRunning()),
+        LAUNCH_TIMEOUT_MS,
+      );
+      if (readLaunch() !== null || appRunning()) return;
+      log(`the DSH App quit before printing its address (attempt ${attempt})`);
+      if (attempt < LAUNCH_TRIES) await sleep(attempt * 2_000);
+    }
+    throw new UserError(
+      `DSH App 每次一打开就退出了（试了 ${LAUNCH_TRIES} 次）。请从 Dock 打开它看看有没有报错，再把它退出后重发；还不行就重启一下 Mac。`,
+    );
   } finally {
     try {
       fs.rmdirSync(LAUNCH_LOCK);
@@ -268,8 +287,8 @@ class AppLink {
   }
 
   /** Open one logical stream; `close()` cancels it. */
-  async stream(endpoint, args, onItem) {
-    await this.ensure();
+  async stream(endpoint, args, onItem, launch = true) {
+    await this.ensure(launch);
     const id = `s${++this.n}`;
     let end, fail;
     const done = new Promise((a, b) => {
@@ -740,12 +759,20 @@ async function hNew(p) {
 /** Create the App session on first use: in the Workspace for its directory, so the App's sidebar lists it. */
 async function ensureSession(acpId, s) {
   if (s.dsh) return;
+  // Another bridge process (or a repair of the state file) may have bound it since this one read it.
+  const saved = loadState()[acpId]?.dsh;
+  if (saved) {
+    s.dsh = saved;
+    s.started = true;
+    return;
+  }
   const cwd = s.cwd || process.cwd();
   let request = { cwd };
   try {
     const ws = await app.call("workspace/create", { request: { path: cwd } });
     if (ws?.workspace?.workspaceId) request = { workspaceId: ws.workspace.workspaceId };
   } catch (e) {
+    if (e instanceof UserError) throw e; // the App is not reachable: session/create would only try again
     log("workspace:", e.message);
   }
   if (s.preset) request.agentPreset = s.preset;
@@ -774,7 +801,7 @@ async function hPrompt(p) {
 }
 
 /** Read a session's history through the App: the follow opening carries the newest records and the projections. */
-async function readHistory(sid) {
+async function readHistory(sid, launch = true) {
   let snapshot = null;
   const opening = await app.stream(
     "session/follow",
@@ -782,6 +809,7 @@ async function readHistory(sid) {
     (v) => {
       if (v?.type === "snapshot" && !snapshot) snapshot = v;
     },
+    launch,
   );
   try {
     await Promise.race([waitFor(() => snapshot !== null, 60_000), opening.done]);
@@ -812,7 +840,16 @@ async function hLoad(p) {
   const acpId = p.sessionId;
   const s = resolve(acpId, p.cwd);
   if (!s.dsh) return sessionState(s, await catalog(false));
-  const { records, projections } = await readHistory(s.dsh);
+  // Loading binds the client to this session. When the App cannot be reached now, keep the binding and
+  // leave opening the App to the next prompt: a failed load makes the client start a new, empty session.
+  let history;
+  try {
+    history = await readHistory(s.dsh, false);
+  } catch (e) {
+    log(`loaded ${s.dsh} without its history: ${e.message}`);
+    return sessionState(s, await catalog(false));
+  }
+  const { records, projections } = history;
   for (const r of records) if (r?.type === "event" && r.event) replayEvent(acpId, r.event);
   s.known = {
     model: projections.modelSelection?.next || projections.modelSelection?.lastUsed,
