@@ -10,12 +10,16 @@ project that holds the folder when there is one, and the App can open and contin
 The App must be running. Its server writes ~/.gemini/antigravity/daemon/hub_<port>.json with the
 ports and the CSRF token; nothing else is read from the App.
 
-Environment: AG_DAEMON_DIR (default ~/.gemini/antigravity/daemon).
+Other apps run the same engine and register in the same directory (Gemini.app starts its built-in
+Antigravity there with its own sign-in); only a server started by the Antigravity App is used.
+
+Environment: AG_DAEMON_DIR (default ~/.gemini/antigravity/daemon), AG_APP (default /Applications/Antigravity.app).
 """
-import glob, json, os, pathlib, re, sys, threading, time, urllib.error, urllib.parse, urllib.request, uuid
+import glob, json, os, pathlib, re, subprocess, sys, threading, time, urllib.error, urllib.parse, urllib.request, uuid
 
 VERSION = "0.1.0"
 DAEMON = os.environ.get("AG_DAEMON_DIR") or os.path.join(os.path.expanduser("~"), ".gemini", "antigravity", "daemon")
+AG_APP = (os.environ.get("AG_APP") or "/Applications/Antigravity.app").rstrip("/")
 SERVICE = "exa.language_server_pb.LanguageServerService"
 POLL = 0.6
 NOT_RUNNING = "Antigravity is not running. Open the Antigravity App (or start it from Tianshu's banner) and try again."
@@ -69,6 +73,16 @@ def alive(pid):
         return False
 
 
+def started_by_app(pid):
+    """Whether the process is the Antigravity App's own language server, not another app's copy of the engine."""
+    try:
+        exe = subprocess.run(["ps", "-o", "comm=", "-p", str(int(pid))],
+                             capture_output=True, text=True, timeout=5).stdout.strip()
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError):
+        return False
+    return exe.startswith(AG_APP + "/")
+
+
 def find_hub():
     hubs = sorted(glob.glob(os.path.join(DAEMON, "hub_*.json")), key=os.path.getmtime, reverse=True)
     for path in hubs:
@@ -77,7 +91,8 @@ def find_hub():
                 hub = json.load(f)
         except (OSError, ValueError):
             continue
-        if hub.get("csrfToken") and hub.get("httpPort") and alive(hub.get("pid")):
+        if (hub.get("csrfToken") and hub.get("httpPort") and alive(hub.get("pid"))
+                and started_by_app(hub.get("pid"))):
             return hub
     return None
 
