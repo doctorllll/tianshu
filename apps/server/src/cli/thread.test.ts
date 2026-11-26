@@ -175,6 +175,17 @@ it.effect("start, run by a thread's agent, asks for a sub-session of that thread
         env: { FASTCTX_RESIDENT: "claude-1@machine-1" },
         header: "fastctx=claude-1%40machine-1",
         offered: asThread,
+        delegated: Effect.succeed({
+          structuredContent: { status: "awaiting_user_confirmation", message: "Not started yet." },
+        }),
+        tools: ["t3_project_list", "tools/list", "delegate_task"],
+        printed: "awaiting_user_confirmation",
+      },
+      {
+        // Servers on older versions answer a held sub-session with a failure instead.
+        env: { FASTCTX_RESIDENT: "claude-1@machine-1" },
+        header: "fastctx=claude-1%40machine-1",
+        offered: asThread,
         delegated: failure("awaiting_user_confirmation"),
         tools: ["t3_project_list", "tools/list", "delegate_task"],
         printed: "awaiting_user_confirmation",

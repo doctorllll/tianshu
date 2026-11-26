@@ -62,6 +62,7 @@ import * as McpInvocationContext from "./McpInvocationContext.ts";
 import * as McpSessionRegistry from "./McpSessionRegistry.ts";
 import * as OrchestratorMcpService from "./OrchestratorMcpService.ts";
 import * as PreviewAutomationBroker from "./PreviewAutomationBroker.ts";
+import { answerAwaitingConfirmation } from "./toolkits/orchestrator/handlers.ts";
 import { OrchestratorToolkit } from "./toolkits/orchestrator/tools.ts";
 import { PreviewToolkit } from "./toolkits/preview/tools.ts";
 import { PreviewControlsToolkit } from "./toolkits/previewControls/tools.ts";
@@ -296,7 +297,10 @@ it.effect("rejects a metadata-only response when the screenshot is saved", () =>
   ).pipe(Effect.provide(layerTest)),
 );
 
-const layerRecordingTools = (calls: Array<unknown>) => {
+const layerRecordingTools = (
+  calls: Array<unknown>,
+  failure = new OrchestratorMcpFailure({ code: "thread_not_found", message: "Recorded." }),
+) => {
   const RecordingToolkit = Toolkit.make(
     OrchestratorToolkit.tools.delegate_task,
     OrchestratorToolkit.tools.t3_thread_list,
@@ -308,17 +312,15 @@ const layerRecordingTools = (calls: Array<unknown>) => {
     PreviewControlsToolkit.tools.t3_preview_list,
     ProjectToolkit.tools.t3_thread_launch,
   );
-  const record = McpToolAccess.reads((params: unknown) =>
-    Effect.sync(() => calls.push(params)).pipe(
-      Effect.andThen(
-        Effect.fail(new OrchestratorMcpFailure({ code: "thread_not_found", message: "Recorded." })),
-      ),
-    ),
-  );
+  const recordCall = (params: unknown) =>
+    Effect.sync(() => calls.push(params)).pipe(Effect.andThen(Effect.fail(failure)));
+  const record = McpToolAccess.reads(recordCall);
   return McpHttpServer.toolkitRegistration(
     RecordingToolkit,
     McpToolAccess.toLayer(RecordingToolkit, {
-      delegate_task: record,
+      delegate_task: McpToolAccess.reads((params: unknown) =>
+        answerAwaitingConfirmation(recordCall(params)),
+      ),
       t3_thread_list: record,
       t3_thread_read: record,
       t3_thread_wait: record,
@@ -670,6 +672,24 @@ it.effect("decodes null optional arguments the way it decodes omitted ones", () 
     expect(calls[4]).toStrictEqual({ projectId: "project-1", projectIcon: null });
   }).pipe(Effect.provide(layerRecordingTools(calls)));
 });
+
+it.effect("answers a delegate_task held for the user's review as a result, not an error", () =>
+  Effect.gen(function* () {
+    const message = "Not started yet: the user reviews sub-sessions before they start.";
+    for (const [code, isError] of [
+      ["awaiting_user_confirmation", false],
+      ["thread_not_found", true],
+    ] as const) {
+      const result = yield* callTool("delegate_task", { task: "Inspect", target: {} }).pipe(
+        Effect.provide(layerRecordingTools([], new OrchestratorMcpFailure({ code, message }))),
+      );
+      expect(result.isError, code).toBe(isError);
+      if (!isError) {
+        expect(result.structuredContent).toEqual({ status: code, message });
+      }
+    }
+  }),
+);
 
 it.effect("decodes a JSON-stringified delegate target as the same object", () => {
   const calls: Array<unknown> = [];

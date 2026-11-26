@@ -290,6 +290,23 @@ export const OrchestratorMcpDelegateTaskResult = Schema.Struct({
 });
 export type OrchestratorMcpDelegateTaskResult = typeof OrchestratorMcpDelegateTaskResult.Type;
 
+/**
+ * delegate_task's answer while the user reviews sub-sessions before they start: nothing has
+ * started yet. A result rather than a failure, so clients do not mark the call failed.
+ */
+export const OrchestratorMcpDelegateTaskAwaitingConfirmation = Schema.Struct({
+  status: Schema.Literal("awaiting_user_confirmation"),
+  message: Schema.String,
+});
+export type OrchestratorMcpDelegateTaskAwaitingConfirmation =
+  typeof OrchestratorMcpDelegateTaskAwaitingConfirmation.Type;
+
+export const OrchestratorMcpDelegateTaskResponse = Schema.Union([
+  OrchestratorMcpDelegateTaskResult,
+  OrchestratorMcpDelegateTaskAwaitingConfirmation,
+]);
+export type OrchestratorMcpDelegateTaskResponse = typeof OrchestratorMcpDelegateTaskResponse.Type;
+
 export const OrchestratorMcpTaskStatusInput = Schema.Struct({
   taskId: NodeId,
 });
@@ -1036,6 +1053,7 @@ export class OrchestratorMcpFailure extends Schema.TaggedError<OrchestratorMcpFa
       "orchestration_error",
       "thread_credential_required",
       "target_required",
+      // Still sent by linked environments on older versions; delegate_task now answers with a result.
       "awaiting_user_confirmation",
     ]),
     message: Schema.String,

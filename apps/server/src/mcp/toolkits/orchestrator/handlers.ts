@@ -12,6 +12,18 @@ import * as McpToolAccess from "../../McpToolAccess.ts";
 import * as OrchestratorMcpService from "../../OrchestratorMcpService.ts";
 import * as ThreadMetadataMcpService from "../../ThreadMetadataMcpService.ts";
 
+/** A sub-session held for the user's review is no error, so the caller's tool call does not show as failed. */
+export const answerAwaitingConfirmation = <A, R>(
+  delegation: Effect.Effect<A, OrchestratorMcpFailure, R>,
+) =>
+  delegation.pipe(
+    Effect.catchIf(
+      (error) => error.code === "awaiting_user_confirmation",
+      (error) =>
+        Effect.succeed({ status: "awaiting_user_confirmation" as const, message: error.message }),
+    ),
+  );
+
 const handlers = {
   usage_limits: McpToolAccess.reads((input) =>
     Effect.gen(function* () {
@@ -31,7 +43,7 @@ const handlers = {
     Effect.gen(function* () {
       const scope = yield* McpInvocationContext.McpInvocationContext;
       const service = yield* OrchestratorMcpService.OrchestratorMcpService;
-      return yield* service.delegateTask(scope, input);
+      return yield* answerAwaitingConfirmation(service.delegateTask(scope, input));
     }),
   ),
   task_status: McpToolAccess.actsAsCaller(({ taskId }) =>

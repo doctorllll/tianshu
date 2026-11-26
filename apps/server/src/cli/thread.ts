@@ -1,6 +1,6 @@
 import {
   ORCHESTRATOR_MCP_RUNNING_TASK_NEXT,
-  OrchestratorMcpDelegateTaskResult,
+  OrchestratorMcpDelegateTaskResponse,
   OrchestratorMcpFailure,
   OrchestratorMcpThreadListResult,
   OrchestratorMcpThreadReadResult,
@@ -925,11 +925,14 @@ const startAsSubSession = Effect.fn("cli.thread.startAsSubSession")(function* (
               }),
         },
       },
-      OrchestratorMcpDelegateTaskResult,
+      OrchestratorMcpDelegateTaskResponse,
     )
     .pipe(
-      Effect.map((task) => ({ task })),
+      Effect.map((result) => ({
+        task: result.status === "awaiting_user_confirmation" ? undefined : result,
+      })),
       Effect.catchIf(failedWith("thread_credential_required"), () => Effect.undefined),
+      // Servers before delegate_task answered awaiting_user_confirmation as a result sent it as a failure.
       Effect.catchIf(failedWith("awaiting_user_confirmation"), () =>
         Effect.succeed({ task: undefined }),
       ),

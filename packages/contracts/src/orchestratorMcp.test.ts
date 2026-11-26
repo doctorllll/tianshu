@@ -3,6 +3,7 @@ import * as Schema from "effect/Schema";
 
 import {
   OrchestratorMcpDelegateTaskInput,
+  OrchestratorMcpDelegateTaskResponse,
   OrchestratorMcpDelegateTaskResult,
   OrchestratorMcpThreadWaitResult,
 } from "./orchestratorMcp.ts";
@@ -10,8 +11,15 @@ import {
 const decodeDelegateTaskInput = Schema.decodeUnknownSync(OrchestratorMcpDelegateTaskInput);
 const decodeDelegateTaskResult = Schema.decodeUnknownSync(OrchestratorMcpDelegateTaskResult);
 const decodeThreadWaitResult = Schema.decodeUnknownSync(OrchestratorMcpThreadWaitResult);
+const decodeDelegateTaskResponse = Schema.decodeUnknownSync(OrchestratorMcpDelegateTaskResponse);
 
 describe("orchestrator MCP contracts", () => {
+  it("answers a delegation held for the user's review without a task", () => {
+    const held = { status: "awaiting_user_confirmation", message: "Not started yet." };
+    expect(decodeDelegateTaskResponse(held)).toEqual(held);
+    expect(() => decodeDelegateTaskResult(held)).toThrow();
+  });
+
   it("decodes cross-provider delegated task requests and durable results", () => {
     const request = decodeDelegateTaskInput({
       task: "Inspect the workspace and report the result.",
