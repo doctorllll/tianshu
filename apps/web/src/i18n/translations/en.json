@@ -12470,5 +12470,11 @@
   "b7df38b7d8792d78": "Open guide",
   "9e91e9a77b664e4e": "Could not start a review guide",
   "d8aaf932f90429c4": "Move this command to the front of the queue ({shortcut})",
-  "425ab15036aec8a4": "Move this command to the front of the queue"
+  "425ab15036aec8a4": "Move this command to the front of the queue",
+  "5bd0e54cb44f6574": "Open daily notes",
+  "7569e93c1d566c9a": "Daily notes: Open",
+  "abd70526e929ba7a": "Daily notes",
+  "731cc7c326be2892": "Daily notes ({shortcut})",
+  "0443676f963c6a2c": "beta journal today outline memo diary notes",
+  "15b85998d81673b3": "Outline notes by day, with prompts you plan to send and the threads you are driving. Turning it off only hides it; your notes stay on disk. Stored on this device only."
 }
