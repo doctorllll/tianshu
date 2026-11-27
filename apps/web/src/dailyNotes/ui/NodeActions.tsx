@@ -11,7 +11,7 @@ import {
   Trash2Icon,
   TypeIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuShortcut } from "~/components/ui/menu";
 import { useUiText } from "~/i18n/useUiText";
@@ -50,13 +50,10 @@ function TodayNodeMenu(props: {
   const uiText = useUiText();
   const { store, nodeId, controller, anchor } = props;
   const node = store.outline.getNode(nodeId);
-  const positioned = useMemo(
-    () =>
-      "getBoundingClientRect" in anchor
-        ? anchor
-        : { getBoundingClientRect: () => new DOMRect(anchor.x, anchor.y, 0, 0) },
-    [anchor],
-  );
+  const positioned =
+    "getBoundingClientRect" in anchor
+      ? anchor
+      : { getBoundingClientRect: () => new DOMRect(anchor.x, anchor.y, 0, 0) };
   if (!node) return null;
   const canConvert = node.text.replaceAll(TODAY_MENTION_CHAR, "").trim().length > 0;
   const todo =
@@ -149,15 +146,16 @@ export function TodayNodeActions(props: {
     nodeId: TodayNodeId;
     anchor: HTMLElement | { x: number; y: number };
   } | null>(null);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the effect adopts state owned outside React (store, controller or DOM) into a React mirror
   useEffect(() => {
     if (!controller) return undefined;
-    controller.onNodeMenu = (store, nodeId, anchor) => {
-      controller.selectBlocks(store, [nodeId]);
-      setNodeMenu({ store, nodeId, anchor });
-    };
-    return () => {
-      controller.onNodeMenu = null;
-    };
+    controller.setHooks({
+      onNodeMenu: (store, nodeId, anchor) => {
+        controller.selectBlocks(store, [nodeId]);
+        setNodeMenu({ store, nodeId, anchor });
+      },
+    });
+    return () => controller.setHooks({ onNodeMenu: null });
   }, [controller]);
   const convert = (store: TodayPageStore, nodeId: TodayNodeId) => {
     const [fragment] = store.outline.extract([nodeId]);

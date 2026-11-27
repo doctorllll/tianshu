@@ -4,15 +4,7 @@
  */
 import { useLocale } from "gt-react";
 import { MoreHorizontalIcon, PinIcon } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { Button } from "~/components/ui/button";
 import { Menu, MenuCheckboxItem, MenuPopup, MenuTrigger } from "~/components/ui/menu";
@@ -162,6 +154,7 @@ export function TodayView(props: {
   const [moreOpen, setMoreOpen] = useState(false);
   const pinnedColumn = props.surface === "pinned";
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the effect adopts state owned outside React (store, controller or DOM) into a React mirror
   useEffect(() => {
     if (!cache) return undefined;
     return cache.observeDates((entries) => {
@@ -170,7 +163,7 @@ export function TodayView(props: {
     });
   }, [cache]);
 
-  const onEmptyChange = useCallback((date: TodayDate, isEmpty: boolean) => {
+  const onEmptyChange = (date: TodayDate, isEmpty: boolean) => {
     setEmpty((previous) => {
       if (previous.has(date) === isEmpty) return previous;
       const next = new Set(previous);
@@ -178,20 +171,19 @@ export function TodayView(props: {
       else next.delete(date);
       return next;
     });
-  }, []);
+  };
   const focus = props.target.focus;
   const focusDate = focus ? (anchor ?? today) : null;
   const zoomRoot = focus && focus !== "day" ? (focus as TodayNodeId) : null;
-  const days = useMemo(() => {
-    if (focusDate) return [focusDate];
-    // Open pages are the better witness of emptiness; a day's saved flag covers the rest.
-    const skipped = new Set([...savedEmpty].filter((date) => !empty.has(date) || true));
-    for (const date of empty) skipped.add(date);
-    return buildDayStream({ today, ...(anchor ? { anchor } : {}), registered, empty: skipped });
-  }, [anchor, empty, focusDate, registered, savedEmpty, today]);
+  const skipped = new Set(savedEmpty);
+  for (const date of empty) skipped.add(date);
+  const days = focusDate
+    ? [focusDate]
+    : buildDayStream({ today, ...(anchor ? { anchor } : {}), registered, empty: skipped });
 
   const [controller, setController] = useState<TodayEditorController | null>(null);
   const latest = useRef({ onOpenThread: props.onOpenThread });
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the effect adopts state owned outside React (store, controller or DOM) into a React mirror
   useEffect(() => {
     latest.current = { onOpenThread: props.onOpenThread };
   }, [props.onOpenThread]);
@@ -199,15 +191,19 @@ export function TodayView(props: {
   useEffect(() => {
     if (!cache) return undefined;
     const created = new TodayEditorController(cache);
-    created.mentionText = (mention) =>
-      todayMentionMarkdown(mention, { title: threadMentionTitle(mention) });
-    created.onOpenSession = (mentionId) => latest.current.onOpenThread(mentionId);
+    created.setHooks({
+      mentionText: (mention) =>
+        todayMentionMarkdown(mention, { title: threadMentionTitle(mention) }),
+      onOpenSession: (mentionId) => latest.current.onOpenThread(mentionId),
+    });
+    // oxlint-disable-next-line react/set-state-in-effect -- the effect adopts state owned outside React (store, controller or DOM) into a React mirror
     setController(created);
     return () => {
       created.dispose();
       setController(null);
     };
   }, [cache]);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the effect adopts state owned outside React (store, controller or DOM) into a React mirror
   useEffect(
     () => controller?.setFocus(focusDate ? { date: focusDate, rootId: zoomRoot } : null),
     [controller, focusDate, zoomRoot],
@@ -245,18 +241,20 @@ export function TodayView(props: {
     },
   };
   const navRef = useRef(nav);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the effect adopts state owned outside React (store, controller or DOM) into a React mirror
   useEffect(() => {
     navRef.current = nav;
   });
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the effect adopts state owned outside React (store, controller or DOM) into a React mirror
   useEffect(() => {
     if (!controller) return undefined;
-    controller.onZoom = (store, nodeId) => navRef.current.zoom(store, nodeId);
-    controller.onZoomOut = () => navRef.current.zoomOut();
-    return () => {
-      controller.onZoom = null;
-      controller.onZoomOut = null;
-    };
+    controller.setHooks({
+      onZoom: (store, nodeId) => navRef.current.zoom(store, nodeId),
+      onZoomOut: () => navRef.current.zoomOut(),
+    });
+    return () => controller.setHooks({ onZoom: null, onZoomOut: null });
   }, [controller]);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the effect adopts state owned outside React (store, controller or DOM) into a React mirror
   useLayoutEffect(() => {
     if (focusDate || !streamReturn.current) return undefined;
     const { anchor: saved } = streamReturn.current;

@@ -37,10 +37,10 @@ export function TodayOutlineSurface(props: {
   return (
     <div
       className={cn(
-        "group/surface min-h-0 flex-1 overflow-y-auto pb-8 focus-visible:shadow-none focus-visible:outline-none",
-        placement === "page" && "pe-6 ps-[41px]",
-        placement === "pinned" && "pe-4 ps-[41px]",
-        placement === "pinnedAtWindowEdge" && "pe-4 ps-[39px]",
+        "group/surface min-h-0 flex-1 overflow-y-auto scrollbar-gutter-both pb-8 focus-visible:shadow-none focus-visible:outline-none",
+        placement === "page" && "pe-6 ps-10.25",
+        placement === "pinned" && "pe-4 ps-10.25",
+        placement === "pinnedAtWindowEdge" && "pe-4 ps-9.75",
       )}
       ref={(element) => {
         surfaceRef.current = element;

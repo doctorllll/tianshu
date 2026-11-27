@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { useIsMobile } from "~/hooks/useMediaQuery";
+import { useUiText } from "~/i18n/useUiText";
 import { useResizeDrag } from "~/hooks/useResizeDrag";
 
 import {
@@ -17,6 +18,7 @@ import { useOpenThreadMention } from "./DailyNotesPage";
  * this device; a window too narrow for it shows the notes as a page instead.
  */
 export function DailyNotesPinnedColumn() {
+  const uiText = useUiText();
   const enabled = useDailyNotesPrefs((prefs) => prefs.enabled);
   const pinned = useDailyNotesPrefs((prefs) => prefs.pinned);
   const width = useDailyNotesPrefs((prefs) => prefs.pinnedWidth);
@@ -48,7 +50,7 @@ export function DailyNotesPinnedColumn() {
     <aside
       className="relative my-2 me-2 flex min-h-0 shrink-0 flex-col overflow-hidden rounded-xl bg-background shadow-sm/5 ring-1 ring-border/60"
       style={{ width }}
-      aria-label="Daily notes"
+      aria-label={uiText("Daily notes")}
       data-testid="daily-notes-pinned-column"
     >
       <TodayView
@@ -59,15 +61,15 @@ export function DailyNotesPinnedColumn() {
         onOpenThread={openThread}
       />
       <div
-        ref={resize.ref}
+        ref={(node) => resize.ref(node)}
         role="separator"
         aria-orientation="vertical"
         className={`absolute inset-y-0 right-0 z-10 w-1.5 cursor-col-resize touch-none hover:bg-border/60 ${dragging ? "bg-border" : ""}`}
-        onPointerDown={resize.onPointerDown}
-        onPointerMove={resize.onPointerMove}
-        onPointerUp={resize.onPointerUp}
-        onPointerCancel={resize.onPointerCancel}
-        onLostPointerCapture={resize.onLostPointerCapture}
+        onPointerDown={(e) => resize.onPointerDown(e)}
+        onPointerMove={(e) => resize.onPointerMove(e)}
+        onPointerUp={(e) => resize.onPointerUp(e)}
+        onPointerCancel={(e) => resize.onPointerCancel(e)}
+        onLostPointerCapture={(e) => resize.onLostPointerCapture(e)}
       />
     </aside>
   );

@@ -3,7 +3,7 @@
  * (TodayCalendar). Modified for Tianshu (Tailwind, Base UI popover).
  */
 import { CalendarDaysIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "~/components/ui/button";
 import { Popover, PopoverPopup, PopoverTrigger } from "~/components/ui/popover";
@@ -33,8 +33,8 @@ export function TodayCalendar(props: {
   const uiText = useUiText();
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(() => todayDateToLocalDate(props.selected));
-  const marked = useMemo(() => new Set(props.registered), [props.registered]);
-  const cells = useMemo(() => monthCells(month), [month]);
+  const marked = new Set(props.registered);
+  const cells = monthCells(month);
   const locale = toIntlLocale(props.language);
   const weekdayFormat = new Intl.DateTimeFormat(locale, { weekday: "narrow" });
   const monthFormat = new Intl.DateTimeFormat(locale, { year: "numeric", month: "long" });
@@ -68,7 +68,7 @@ export function TodayCalendar(props: {
       </Tooltip>
       <PopoverPopup align="end" side="bottom">
         <div className="flex w-[252px] flex-col gap-2 p-2">
-          <div className="flex items-center justify-between text-[13px]">
+          <div className="flex items-center justify-between text-ui-body">
             <Button
               variant="ghost"
               size="icon-xs"
@@ -91,7 +91,7 @@ export function TodayCalendar(props: {
             {cells.slice(0, 7).map((cell) => (
               <span
                 key={`w${cell.getDay()}`}
-                className="text-center text-[11px] text-muted-foreground/60"
+                className="text-center text-2xs text-muted-foreground/60"
               >
                 {weekdayFormat.format(cell)}
               </span>

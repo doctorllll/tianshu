@@ -62,6 +62,7 @@ export function TodaySelectionBar(props: {
   );
   const surface = readSurface(version, controller);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the effect adopts state owned outside React (store, controller or DOM) into a React mirror
   useEffect(() => {
     if (!selection || !surface) return undefined;
     const bump = () => setLayout((value) => value + 1);
@@ -76,6 +77,7 @@ export function TodaySelectionBar(props: {
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- places the bar from the selected rows' DOM geometry
   useLayoutEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- the effect adopts state owned outside React (store, controller or DOM) into a React mirror
     if (!selection || !surface) return setPlace(null);
     const ids = new Set<string>(selection.ids);
     const rows = [...surface.querySelectorAll<HTMLElement>("[data-today-node]")].filter((row) =>
@@ -98,6 +100,7 @@ export function TodaySelectionBar(props: {
       left,
     });
     return undefined;
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- the extra dependency marks when the external controller state changed
   }, [selection, surface, version, layout, snapshot]);
 
   if (!controller || !selection) return null;
@@ -119,7 +122,7 @@ export function TodaySelectionBar(props: {
       ref={ref}
       role="toolbar"
       aria-label={uiText("Selected nodes")}
-      className="fixed z-45 box-border flex h-9 items-center gap-0.5 rounded-xl bg-popover p-1 shadow-[0_8px_24px_rgb(0_0_0/0.16)] ring-1 ring-border"
+      className="fixed z-45 box-border flex h-9 items-center gap-0.5 rounded-xl bg-popover p-1 shadow-lg ring-1 ring-border"
       style={place ? place : { visibility: "hidden", top: 0, left: 0 }}
       onPointerDown={(event) => event.preventDefault()}
       onMouseDown={(event) => event.preventDefault()}

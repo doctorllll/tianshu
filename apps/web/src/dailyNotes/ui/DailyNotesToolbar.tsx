@@ -21,7 +21,7 @@ export function DailyNotesToolbar(props: {
     <>
       <span
         className={cn(
-          "min-w-0 flex-1 truncate text-[13px] text-muted-foreground",
+          "min-w-0 flex-1 truncate text-ui-body text-muted-foreground",
           props.interactiveTitle && "[-webkit-app-region:no-drag]",
         )}
       >

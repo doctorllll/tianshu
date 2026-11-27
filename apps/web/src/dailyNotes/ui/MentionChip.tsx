@@ -77,10 +77,7 @@ const MENTION_CLASS =
  * metrics match; its root carries `data-today-mention`, which caret geometry counts as one
  * character. Pointer presses never reach the row, so they never activate the editor.
  */
-export function TodayMention(props: {
-  mention: { kind: string; id: string };
-  selected?: boolean;
-}) {
+export function TodayMention(props: { mention: { kind: string; id: string }; selected?: boolean }) {
   const uiText = useUiText();
   const { mention, selected = false } = props;
   if (mention.kind !== THREAD_MENTION_KIND || !mention.id) {
@@ -111,7 +108,11 @@ function ThreadMention(props: { mentionId: string; selected: boolean }) {
   if (display.state !== "ok") {
     return (
       <span
-        className={cn(MENTION_CLASS, "italic text-muted-foreground/60", props.selected && "bg-info/25")}
+        className={cn(
+          MENTION_CLASS,
+          "italic text-muted-foreground/60",
+          props.selected && "bg-info/25",
+        )}
         {...rootProps}
       >
         {display.state === "missing" ? uiText("Thread deleted") : "…"}
@@ -135,7 +136,7 @@ function ThreadMention(props: { mentionId: string; selected: boolean }) {
     >
       <button
         type="button"
-        className="inline-block min-w-4.5 cursor-pointer rounded-[5px] border-0 bg-transparent py-0 ps-0 pe-[3px] ms-px me-[1px] align-baseline text-start font-[inherit] text-[length:inherit] leading-5 text-inherit outline-none hover:bg-accent focus-visible:outline-2 focus-visible:outline-info"
+        className="inline-block min-w-4.5 cursor-pointer rounded-sm border-0 bg-transparent py-0 ps-0 pe-0.75 ms-px me-[1px] align-baseline text-start leading-5 text-inherit outline-none hover:bg-accent focus-visible:outline-2 focus-visible:outline-info"
         data-today-mention-status=""
         aria-haspopup="menu"
         aria-label={uiText("Status: {status}. Change status", { status: statusLabel })}
@@ -159,7 +160,7 @@ function ThreadMention(props: { mentionId: string; selected: boolean }) {
       <span
         role="button"
         className={cn(
-          "inline cursor-pointer text-info underline decoration-transparent underline-offset-[3px] hover:decoration-current",
+          "inline cursor-pointer text-info underline decoration-transparent underline-offset-4 hover:decoration-current",
           display.status === "done" && "text-muted-foreground/60 line-through decoration-current",
         )}
         aria-label={uiText("Thread: {title}, {status}", { title, status: statusLabel })}

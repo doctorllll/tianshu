@@ -26,12 +26,13 @@ import { threadMentionRef, useThreadMentionDisplay } from "./threadMentionState"
 export function TodayMentionStatusMenuHost() {
   const controller = useTodayEditor();
   const [target, setTarget] = useState<{ mentionId: string; anchor: HTMLElement } | null>(null);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the effect adopts state owned outside React (store, controller or DOM) into a React mirror
   useEffect(() => {
     if (!controller) return undefined;
-    controller.onMentionMenu = (mentionId, anchor) => setTarget({ mentionId, anchor });
-    return () => {
-      controller.onMentionMenu = null;
-    };
+    controller.setHooks({
+      onMentionMenu: (mentionId, anchor) => setTarget({ mentionId, anchor }),
+    });
+    return () => controller.setHooks({ onMentionMenu: null });
   }, [controller]);
   if (!target) return null;
   return <StatusMenu {...target} onClose={() => setTarget(null)} />;
@@ -60,6 +61,7 @@ function StatusMenu(props: { mentionId: string; anchor: HTMLElement; onClose: ()
         {display.unread ? (
           <MenuItem
             onClick={() => {
+              // oxlint-disable-next-line react/purity -- runs in an event handler (oxc#27309)
               acknowledge(ref, new Date().toISOString());
               close();
             }}

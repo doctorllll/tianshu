@@ -8,6 +8,7 @@ const TODAY_CLOCK_FALLBACK_MS = 60_000;
 /** The local date, rolling over at midnight and rechecked when the window shows or focuses again. */
 export function useTodayClock(): TodayDate {
   const [today, setToday] = useState(() => localTodayDate(new Date()));
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the effect adopts state owned outside React (store, controller or DOM) into a React mirror
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const check = () => {

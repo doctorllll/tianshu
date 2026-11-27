@@ -68,6 +68,7 @@ function defaultEffort(
 function titleOf(prompt: string): string {
   const line = prompt.split("\n").find((candidate) => candidate.trim()) ?? "";
   const plain = line.replace(/^\s*(?:[-*]\s+(?:\[[ xX]\]\s+)?)/, "").trim();
+  // oxlint-disable-next-line t3code/no-untranslated-copy -- the default title of a stored thread, not shown copy
   return plain.length > 80 ? `${plain.slice(0, 79)}…` : plain || "New thread";
 }
 
@@ -134,7 +135,9 @@ function ConvertForm(props: {
     agent !== undefined &&
     prompt.trim().length > 0;
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the effect adopts state owned outside React (store, controller or DOM) into a React mirror
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- the effect adopts state owned outside React (store, controller or DOM) into a React mirror
     if (projectId === "" && initialProject) setProjectId(initialProject.id);
   }, [initialProject, projectId]);
 
@@ -152,6 +155,7 @@ function ConvertForm(props: {
     setError(null);
     const threadId = newThreadId();
     const title = titleOf(prompt);
+    // oxlint-disable-next-line react/purity -- runs in an event handler (oxc#27309)
     const createdAt = new Date().toISOString();
     const options =
       control !== undefined && effort !== null ? [{ id: control.id, value: effort }] : undefined;

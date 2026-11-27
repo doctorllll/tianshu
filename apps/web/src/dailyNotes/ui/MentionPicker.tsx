@@ -3,7 +3,7 @@
  * Modified for Tianshu (Tailwind, threads only: one local author has no people to mention).
  */
 import { MessageSquareIcon } from "lucide-react";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import { useUiText } from "~/i18n/useUiText";
 import { cn, normalizeSearchText } from "~/lib/utils";
@@ -40,24 +40,28 @@ function ThreadPicker() {
   const picker = readPicker(version, controller);
   const root = readEditorRoot(version, controller);
   const query = picker?.query ?? null;
-  const rows = useMemo(() => {
-    if (query === null) return [];
-    const needle = normalizeSearchText(query);
-    return threads
-      .filter((thread) => thread.archivedAt === null)
-      .filter((thread) => !needle || normalizeSearchText(thread.title).includes(needle))
-      .toSorted((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
-      .slice(0, PICKER_LIMIT)
-      .map((thread) => ({
-        title: thread.title.trim(),
-        target: {
-          kind: THREAD_MENTION_KIND,
-          id: encodeThreadMentionId({ environmentId: thread.environmentId, threadId: thread.id }),
-        },
-      }));
-  }, [query, threads]);
+  const needle = normalizeSearchText(query ?? "");
+  const rows =
+    query === null
+      ? []
+      : threads
+          .filter((thread) => thread.archivedAt === null)
+          .filter((thread) => !needle || normalizeSearchText(thread.title).includes(needle))
+          .toSorted((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
+          .slice(0, PICKER_LIMIT)
+          .map((thread) => ({
+            title: thread.title.trim(),
+            target: {
+              kind: THREAD_MENTION_KIND,
+              id: encodeThreadMentionId({
+                environmentId: thread.environmentId,
+                threadId: thread.id,
+              }),
+            },
+          }));
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- hands the visible rows to the controller's key handler
   useLayoutEffect(() => {
-    if (controller) controller.pickerItems = rows.map((row) => row.target);
+    controller?.setHooks({ pickerItems: rows.map((row) => row.target) });
   }, [controller, rows]);
   const anchorBottom = picker ? (root?.getBoundingClientRect().bottom ?? 0) : null;
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- flips the picker above the caret when it would leave the window
@@ -67,6 +71,7 @@ function ThreadPicker() {
     setAbove(
       anchorBottom + 4 + menu.offsetHeight > (root?.ownerDocument.defaultView?.innerHeight ?? 0),
     );
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- the extra dependency marks when the external controller state changed
   }, [anchorBottom, root, rows.length]);
   if (!controller || !picker || !root) return null;
   // Under the `@`: the caret's line when the browser can measure it, else the node.
@@ -79,7 +84,7 @@ function ThreadPicker() {
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 flex w-80 max-w-[calc(100vw-16px)] flex-col gap-0.5 rounded-xl bg-popover p-1 shadow-[0_8px_24px_rgb(0_0_0/0.16)] ring-1 ring-border"
+      className="fixed z-50 flex w-80 max-w-[calc(100vw-16px)] flex-col gap-0.5 rounded-xl bg-popover p-1 shadow-lg ring-1 ring-border"
       style={
         above
           ? {
@@ -103,7 +108,7 @@ function ThreadPicker() {
               role="option"
               aria-selected={index === picker.index}
               className={cn(
-                "flex cursor-pointer items-center gap-2 rounded-lg border-0 bg-transparent px-2 py-1 text-start text-[13px] text-foreground",
+                "flex cursor-pointer items-center gap-2 rounded-lg border-0 bg-transparent px-2 py-1 text-start text-ui-body text-foreground",
                 index === picker.index && "bg-accent",
               )}
               onClick={() => controller.acceptPicker(row.target)}

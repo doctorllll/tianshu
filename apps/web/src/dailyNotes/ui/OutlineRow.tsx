@@ -47,7 +47,7 @@ export const TodayRow = memo(function TodayRow(props: {
   return (
     <div
       className={cn(
-        "group/row relative flex min-h-7 items-start gap-1 rounded-[5px]",
+        "group/row relative flex min-h-7 items-start gap-1 rounded-sm",
         title && "static",
         selected && "bg-info/14",
         selected && props.joinsPrevious && "rounded-t-none",
@@ -70,7 +70,7 @@ export const TodayRow = memo(function TodayRow(props: {
       {title || !node ? null : (
         <button
           type="button"
-          className="absolute top-0 inline-flex h-7 w-4 cursor-pointer items-center justify-center rounded-[5px] border-0 bg-transparent p-0 text-muted-foreground/60 opacity-0 transition-opacity duration-100 hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100"
+          className="absolute top-0 inline-flex h-7 w-4 cursor-pointer items-center justify-center rounded-sm border-0 bg-transparent p-0 text-muted-foreground/60 opacity-0 transition-opacity duration-100 hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100"
           style={moreAtEnd ? { right: 0 } : { left: node.depth * TODAY_INDENT_PX - 16 }}
           aria-label={uiText("Node actions")}
           aria-haspopup="menu"
@@ -122,7 +122,7 @@ export const TodayRow = memo(function TodayRow(props: {
             <span
               className={cn(
                 "size-1.5 rounded-full bg-muted-foreground",
-                node?.collapsed && "shadow-[0_0_0_4px_var(--color-accent)]",
+                node?.collapsed && "ring-4 ring-accent",
                 quiet && "opacity-0 transition-opacity duration-100 group-hover/row:opacity-100",
               )}
               data-today-dot={quiet ? "quiet" : undefined}
@@ -141,7 +141,7 @@ export const TodayRow = memo(function TodayRow(props: {
         >
           <span
             className={cn(
-              "box-border inline-flex size-3.5 items-center justify-center rounded-[4px] border-[1.5px] border-solid border-muted-foreground/60 text-white hover:border-muted-foreground",
+              "box-border inline-flex size-3.5 items-center justify-center rounded-sm border-2 border-solid border-muted-foreground/60 text-white hover:border-muted-foreground",
               done && "border-info bg-info hover:border-info",
             )}
           >
@@ -153,7 +153,7 @@ export const TodayRow = memo(function TodayRow(props: {
         <>
           <div
             key="editor"
-            ref={controller.attachRoot}
+            ref={(element) => controller.attachRoot(element)}
             contentEditable
             suppressContentEditableWarning
             spellCheck={false}
@@ -205,10 +205,14 @@ function TodayStaticText(props: { node: TodayNodeView }) {
   const parts: ReactNode[] = [];
   let cursor = 0;
   for (const mention of mentions) {
-    if (mention.start > cursor) parts.push(text.slice(cursor, mention.start));
-    parts.push(<TodayMention key={mention.start} mention={mention} />);
+    if (mention.start > cursor) {
+      parts.push(<Fragment key={`text-${cursor}`}>{text.slice(cursor, mention.start)}</Fragment>);
+    }
+    parts.push(<TodayMention key={`mention-${mention.start}`} mention={mention} />);
     cursor = mention.start + 1;
   }
-  if (cursor < text.length) parts.push(text.slice(cursor));
-  return parts.map((part, index) => <Fragment key={index}>{part}</Fragment>);
+  if (cursor < text.length) {
+    parts.push(<Fragment key={`text-${cursor}`}>{text.slice(cursor)}</Fragment>);
+  }
+  return parts;
 }

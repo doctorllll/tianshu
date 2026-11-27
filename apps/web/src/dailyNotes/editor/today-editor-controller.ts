@@ -303,6 +303,23 @@ export class TodayEditorController {
     return () => this.listeners.delete(listener);
   };
   getVersion = () => this.version;
+  /** The host's callbacks, set through one method so React code never writes to the controller. */
+  setHooks(
+    hooks: Partial<
+      Pick<
+        TodayEditorController,
+        | "onZoom"
+        | "onZoomOut"
+        | "onNodeMenu"
+        | "onMentionMenu"
+        | "onOpenSession"
+        | "mentionText"
+        | "pickerItems"
+      >
+    >,
+  ) {
+    Object.assign(this, hooks);
+  }
   private notify() {
     this.version += 1;
     for (const listener of this.listeners) listener();

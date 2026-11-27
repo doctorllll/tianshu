@@ -108,42 +108,43 @@ const make = Effect.gen(function* () {
     return { days: days.toSorted((a, b) => (a.date < b.date ? 1 : -1)) };
   });
 
-  const save = Effect.fn("DailyNotes.save")(
-    function* (input: SaveDailyNoteInput) {
-      const current = yield* readMeta(input.date);
-      const revision = current?.revision ?? 0;
-      if (revision !== input.baseRevision) {
-        const latest = yield* get(input.date);
-        return {
-          result: "conflict",
-          revision: latest.revision,
-          snapshot: latest.snapshot,
-        } satisfies SaveDailyNoteResult;
-      }
-      const decoded = Base64.decode(input.snapshot);
-      if (Result.isFailure(decoded)) {
-        return yield* new DailyNoteError({ message: "The note snapshot is not valid base64." });
-      }
-      const mapWriteError = Effect.mapError(fail(`Could not save the note for ${input.date}`));
-      yield* fs.makeDirectory(dir, { recursive: true }).pipe(mapWriteError);
-      if (current !== null) {
-        yield* fs
-          .copyFile(snapshotFile(input.date), `${snapshotFile(input.date)}.prev`)
-          .pipe(Effect.ignore);
-      }
-      const meta: DailyNoteMeta = {
-        revision: revision + 1,
-        empty: input.empty,
-        preview: input.preview,
-        updatedAt: DateTime.formatIso(yield* DateTime.now),
-      };
-      const encodedMeta = yield* encodeMeta(meta).pipe(mapWriteError);
-      yield* writeAtomically(snapshotFile(input.date), decoded.success).pipe(mapWriteError);
-      yield* writeAtomically(metaFile(input.date), encodedMeta).pipe(mapWriteError);
-      return { result: "saved", revision: meta.revision, snapshot: null } satisfies SaveDailyNoteResult;
-    },
-    lock.withPermits(1),
-  );
+  const save = Effect.fn("DailyNotes.save")(function* (input: SaveDailyNoteInput) {
+    const current = yield* readMeta(input.date);
+    const revision = current?.revision ?? 0;
+    if (revision !== input.baseRevision) {
+      const latest = yield* get(input.date);
+      return {
+        result: "conflict",
+        revision: latest.revision,
+        snapshot: latest.snapshot,
+      } satisfies SaveDailyNoteResult;
+    }
+    const decoded = Base64.decode(input.snapshot);
+    if (Result.isFailure(decoded)) {
+      return yield* new DailyNoteError({ message: "The note snapshot is not valid base64." });
+    }
+    const mapWriteError = Effect.mapError(fail(`Could not save the note for ${input.date}`));
+    yield* fs.makeDirectory(dir, { recursive: true }).pipe(mapWriteError);
+    if (current !== null) {
+      yield* fs
+        .copyFile(snapshotFile(input.date), `${snapshotFile(input.date)}.prev`)
+        .pipe(Effect.ignore);
+    }
+    const meta: DailyNoteMeta = {
+      revision: revision + 1,
+      empty: input.empty,
+      preview: input.preview,
+      updatedAt: DateTime.formatIso(yield* DateTime.now),
+    };
+    const encodedMeta = yield* encodeMeta(meta).pipe(mapWriteError);
+    yield* writeAtomically(snapshotFile(input.date), decoded.success).pipe(mapWriteError);
+    yield* writeAtomically(metaFile(input.date), encodedMeta).pipe(mapWriteError);
+    return {
+      result: "saved",
+      revision: meta.revision,
+      snapshot: null,
+    } satisfies SaveDailyNoteResult;
+  }, lock.withPermits(1));
 
   return DailyNotes.of({
     list: list(),
