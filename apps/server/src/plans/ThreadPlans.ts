@@ -30,6 +30,7 @@ import {
   planHandoffNote,
   shouldCarry,
 } from "./planHandoff.ts";
+import { planRequirement } from "./planRequirement.ts";
 
 /**
  * Where a thread's plan lives. Agents with a plan of their own keep it there: fastctx in its
@@ -136,6 +137,14 @@ export interface ThreadPlansShape {
    * when that one is empty or older; returns what that agent should hear on its first turn.
    */
   readonly handOff: (input: PlanHandoffInput) => Effect.Effect<string, ThreadPlanError>;
+  /**
+   * What an agent that keeps Tianshu's plan is told with its prompt: the plan is required, and
+   * what it says now. Empty for agents with a plan of their own.
+   */
+  readonly requirement: (input: {
+    readonly threadId: ThreadId;
+    readonly providerInstanceId: ProviderInstanceId;
+  }) => Effect.Effect<string>;
 }
 
 export interface PlanHandoffInput {
@@ -495,10 +504,16 @@ const make = Effect.gen(function* () {
       ),
     );
 
+  /** The plan version each thread's agent was last shown or wrote itself. */
+  const lastSeen = new Map<ThreadId, number | null>();
+
   const write: ThreadPlansShape["write"] = Effect.fn("ThreadPlans.write")(
     function* (input: Parameters<ThreadPlansShape["write"]>[0]) {
       const location = yield* locate(input.threadId);
       const outcome = yield* writeAt(input.threadId, location, input);
+      if (input.updatedBy === "agent" && outcome.result === "saved") {
+        lastSeen.set(input.threadId, outcome.plan.version);
+      }
       const key = planLocationKey(location);
       if (key !== null && outcome.result === "saved") {
         const carried = yield* readCarried(input.threadId);
@@ -594,7 +609,24 @@ const make = Effect.gen(function* () {
     return note(moved.value.plan, true);
   });
 
-  return ThreadPlans.of({ read, write, changes, handOff });
+  const requirement: ThreadPlansShape["requirement"] = Effect.fn("ThreadPlans.requirement")(
+    function* (input: Parameters<ThreadPlansShape["requirement"]>[0]) {
+      const location = yield* locate(input.threadId, {
+        providerInstanceId: input.providerInstanceId,
+      });
+      if (location.source !== "tianshu") return "";
+      const plan = yield* readAt(input.threadId, location);
+      const showPlan =
+        !lastSeen.has(input.threadId) || lastSeen.get(input.threadId) !== plan.version;
+      lastSeen.set(input.threadId, plan.version);
+      return planRequirement({ markdown: plan.markdown, version: plan.version, showPlan });
+    },
+    Effect.catch((error) =>
+      Effect.logWarning("Could not read the plan for a turn", { error }).pipe(Effect.as("")),
+    ),
+  );
+
+  return ThreadPlans.of({ read, write, changes, handOff, requirement });
 });
 
 export const layer = Layer.effect(ThreadPlans, make);
@@ -605,4 +637,5 @@ export const unavailable: ThreadPlansShape = {
   write: () => Effect.fail(new ThreadPlanError({ message: "Plans are not available here." })),
   changes: () => Stream.fail(new ThreadPlanError({ message: "Plans are not available here." })),
   handOff: () => Effect.succeed(""),
+  requirement: () => Effect.succeed(""),
 };

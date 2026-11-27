@@ -2034,6 +2034,24 @@ export const layer: Layer.Layer<
         (yield* serverSettings.getSettings).memory,
         projection.thread.projectId,
       );
+      // An agent that keeps Tianshu's plan is told with every prompt that using it is required.
+      const planRuleForRun =
+        threadPlans === undefined || goalCommand
+          ? ""
+          : yield* threadPlans
+              .requirement({
+                threadId: input.threadId,
+                providerInstanceId: run.providerInstanceId,
+              })
+              .pipe(
+                Effect.timeout("5 seconds"),
+                Effect.catchCause((cause) =>
+                  Effect.logWarning("Could not add the plan rules to the turn", {
+                    runId: run.id,
+                    cause,
+                  }).pipe(Effect.as("")),
+                ),
+              );
       const startWithHandoffs = Effect.fn("ProviderTurnStartService.startWithHandoffs")(
         function* (turnInput: Parameters<typeof session.startTurn>[0], compact = false) {
           const delivery = yield* deliverContextHandoffs({
@@ -2087,6 +2105,7 @@ export const layer: Layer.Layer<
                       }).pipe(Effect.as("")),
                     ),
                   );
+          const planRule = compact || goalCommand || turnInput.resume ? "" : planRuleForRun;
           const start = compact ? session.compactThread! : session.startTurn;
           // Like history, the side chat context waits for a turn that sends a prompt.
           const sideChatContext =
@@ -2100,6 +2119,7 @@ export const layer: Layer.Layer<
             memoryContext,
             delivery.context,
             planContext,
+            planRule,
             sideChatContext,
             restartNote,
           ]
@@ -2193,6 +2213,7 @@ export const layer: Layer.Layer<
       );
       const deliverySession =
         approvedMemoryContext === "" &&
+        planRuleForRun === "" &&
         effectiveHandoffs.length === 0 &&
         retryHandoff.handoffs.length === 0 &&
         retryHandoff.attachments.length === 0 &&
