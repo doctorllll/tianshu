@@ -13,7 +13,7 @@ export const DailyNoteDate = Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-
 export type DailyNoteDate = typeof DailyNoteDate.Type;
 
 /** Large enough for a day of tens of thousands of lines; a runaway client is refused. */
-export const DAILY_NOTE_MAX_SNAPSHOT_CHARS = 48 * 1024 * 1024;
+const DAILY_NOTE_MAX_SNAPSHOT_CHARS = 48 * 1024 * 1024;
 const DailyNoteSnapshot = Schema.String.check(Schema.isMaxLength(DAILY_NOTE_MAX_SNAPSHOT_CHARS));
 
 export const DailyNoteEntry = Schema.Struct({

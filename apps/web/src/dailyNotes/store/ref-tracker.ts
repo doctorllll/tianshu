@@ -29,7 +29,7 @@ type TrackerEntry = {
   timerId: ReturnType<typeof setTimeout> | null;
 };
 
-export function createStoreRefTracker<K>(opts: {
+function createStoreRefTracker<K>(opts: {
   releaseDelayMs: number;
   onRelease: (key: K) => void;
 }): StoreRefTracker<K> {

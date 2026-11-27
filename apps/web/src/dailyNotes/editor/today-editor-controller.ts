@@ -124,10 +124,7 @@ export type TodayPickerTab = "all" | "member" | "session";
 const PICKER_TRIGGER = /(?:^|[\s\uFFFC])([@＠])([^\n\uFFFC]*)$/;
 
 /** The open picker, if the caret ends an `@query`. */
-export function findPickerTrigger(
-  text: string,
-  caret: number,
-): { start: number; query: string } | null {
+function findPickerTrigger(text: string, caret: number): { start: number; query: string } | null {
   const match = PICKER_TRIGGER.exec(text.slice(0, caret));
   if (!match) return null;
   const query = match[2] ?? "";

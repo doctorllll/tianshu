@@ -1104,9 +1104,6 @@ importers:
       '@lexical/plain-text':
         specifier: 0.53.0
         version: 0.53.0(typescript@6.0.3)
-      '@lexical/utils':
-        specifier: 0.53.0
-        version: 0.53.0(typescript@6.0.3)
       '@noble/hashes':
         specifier: 'catalog:'
         version: 1.8.0

@@ -39,7 +39,7 @@ function modelLength(node: Node): number {
 }
 
 /** The node text `root` shows, each mention read as U+FFFC. */
-export function modelText(root: Node): string {
+function modelText(root: Node): string {
   if (root.nodeType === Node.TEXT_NODE) return root.textContent ?? "";
   if (isMention(root)) return "\uFFFC";
   if ((root as Element).tagName === "BR") return root.nextSibling ? "\n" : "";

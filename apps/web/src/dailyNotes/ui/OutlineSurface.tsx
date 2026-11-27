@@ -19,7 +19,7 @@ const isThreadDrag = (data: DataTransfer | null) =>
   !!data && [...data.types].includes(THREAD_PLACEMENT_DRAG_TYPE);
 
 /** Default max width of the notes' text column, in px. */
-export const TODAY_READABLE_WIDTH = 720;
+const TODAY_READABLE_WIDTH = 720;
 
 export type OutlinePlacement = "page" | "pinned" | "pinnedAtWindowEdge";
 

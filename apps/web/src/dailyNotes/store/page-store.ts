@@ -16,7 +16,7 @@ import {
 import type { DailyNoteDateEntry, DailyNotesRepoPort } from "./repo-port";
 
 /** How long typing must pause before the page is saved. */
-export const DAILY_NOTE_SAVE_DEBOUNCE_MS = 600;
+const DAILY_NOTE_SAVE_DEBOUNCE_MS = 600;
 /** A conflict is merged and retried at once; this many in a row means something else is wrong. */
 const MAX_CONFLICT_ROUNDS = 5;
 const PREVIEW_LENGTH = 120;
@@ -42,7 +42,7 @@ export type TodayPageStore = {
   dispose(): void;
 };
 
-export function previewOfSnapshot(snapshot: TodayPageSnapshot): string {
+function previewOfSnapshot(snapshot: TodayPageSnapshot): string {
   for (const node of snapshot.visible) {
     const text = node.text.replaceAll("￼", "").replaceAll(/\s+/g, " ").trim();
     if (text) return text.slice(0, PREVIEW_LENGTH);

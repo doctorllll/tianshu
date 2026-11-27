@@ -6,7 +6,7 @@ import type { TodaySearch } from "../model/dates";
 /** Where the pinned column stands and how wide the notes read; kept on this device only. */
 export const PINNED_COLUMN_MIN_WIDTH = 280;
 export const PINNED_COLUMN_MAX_WIDTH = 640;
-export const PINNED_COLUMN_DEFAULT_WIDTH = 360;
+const PINNED_COLUMN_DEFAULT_WIDTH = 360;
 
 export const clampPinnedWidth = (width: number) =>
   Math.min(PINNED_COLUMN_MAX_WIDTH, Math.max(PINNED_COLUMN_MIN_WIDTH, Math.round(width)));

@@ -6,7 +6,7 @@ import { useDailyNotesPrefs } from "../state/dailyNotesPrefs";
 const COMPACT_QUERY = "(max-width: 767px)";
 
 /** The pinned column cannot appear in a compact window; the notes then open as a page. */
-export const isDailyNotesColumnAvailable = () =>
+const isDailyNotesColumnAvailable = () =>
   typeof window === "undefined" || !window.matchMedia(COMPACT_QUERY).matches;
 
 /**

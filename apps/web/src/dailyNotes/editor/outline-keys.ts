@@ -136,7 +136,7 @@ export function resolveOutlineKey(
  * already there, the next press selects the whole node. Elsewhere the browser
  * extends by a line. Behavior: specs/today-outline.md (Outline editing).
  */
-export function resolveShiftVertical(
+function resolveShiftVertical(
   step: -1 | 1,
   caret: {
     anchor: number;

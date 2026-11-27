@@ -69,7 +69,7 @@ const isOffset = (value: unknown): value is number =>
  * Same rule as persisted ranges (`sanitizeMentionRanges`), except that a kind is
  * optional here: a range committed by a menu item may carry none.
  */
-export function sanitizeComposerMentions<M extends ComposerMentionRange>(
+function sanitizeComposerMentions<M extends ComposerMentionRange>(
   text: string,
   mentions: readonly M[],
 ): M[] {
@@ -181,7 +181,7 @@ function $nodeStartOffset(node: LexicalNode): number {
 }
 
 /** Map a Lexical selection point to a composer-string offset. */
-export function $pointToOffset(point: PointType): number {
+function $pointToOffset(point: PointType): number {
   const node = point.getNode();
   if (point.type === "text") return $nodeStartOffset(node) + point.offset;
   if ($isElementNode(node)) {
@@ -225,7 +225,7 @@ type PointTarget = { key: string; offset: number; type: "text" | "element" };
  * Map a composer-string offset to a Lexical point. An offset inside a chip moves
  * to the chip's nearer edge, as a collapsed caret never rests inside a mention.
  */
-export function $offsetToPoint(rawOffset: number): PointTarget {
+function $offsetToPoint(rawOffset: number): PointTarget {
   const paragraphs = $paragraphs();
   if (paragraphs.length === 0) {
     const paragraph = $createParagraphNode();

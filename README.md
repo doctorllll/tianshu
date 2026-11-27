@@ -39,15 +39,15 @@
 
 ## 目录
 
-| 路径 | 内容 |
-| --- | --- |
-| `apps/server` | 服务端：会话编排、各 agent 驱动、额度读取、子会话 |
-| `apps/web` | 界面 |
-| `apps/desktop` | Electron 外壳（产品名 Tianshu，数据在 `~/.tianshu`） |
-| `packages/provider-acp-registry` | ACP agent 的接入、模型与档位探测、额度 |
-| `bridges/antigravity-acp` | 把 Antigravity 包成 ACP agent（走 Antigravity app 自己的本地服务） |
-| `bridges/dsh-acp` | 把 DeepSeek Harness 包成 ACP agent（独立的无界面 profile） |
-| `assets/tianshu` | 字标、图标与天体素材的源文件 |
+| 路径                             | 内容                                                               |
+| -------------------------------- | ------------------------------------------------------------------ |
+| `apps/server`                    | 服务端：会话编排、各 agent 驱动、额度读取、子会话                  |
+| `apps/web`                       | 界面                                                               |
+| `apps/desktop`                   | Electron 外壳（产品名 Tianshu，数据在 `~/.tianshu`）               |
+| `packages/provider-acp-registry` | ACP agent 的接入、模型与档位探测、额度                             |
+| `bridges/antigravity-acp`        | 把 Antigravity 包成 ACP agent（走 Antigravity app 自己的本地服务） |
+| `bridges/dsh-acp`                | 把 DeepSeek Harness 包成 ACP agent（独立的无界面 profile）         |
+| `assets/tianshu`                 | 字标、图标与天体素材的源文件                                       |
 
 ## 开发与打包
 

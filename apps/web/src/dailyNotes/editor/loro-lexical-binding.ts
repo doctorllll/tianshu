@@ -26,7 +26,7 @@ const INBOUND_TAGS = [COLLABORATION_TAG, SKIP_SCROLL_INTO_VIEW_TAG];
 const PLACEHOLDER_VALUE = "?";
 
 /** Node rich text as the composer's ranges: one MentionDecoratorNode per mention. */
-export function todayRichToComposer(rich: TodayRichText): ComposerMentionRange[] {
+function todayRichToComposer(rich: TodayRichText): ComposerMentionRange[] {
   return rich.mentions.map((mention) => ({
     start: mention.start,
     end: mention.start + 1,

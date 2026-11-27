@@ -13,39 +13,11 @@ export type TextDeltaStep = { retain?: number; insert?: string | unknown; delete
 const isHighSurrogate = (code: number) => code >= 0xd800 && code <= 0xdbff;
 const isLowSurrogate = (code: number) => code >= 0xdc00 && code <= 0xdfff;
 
-/**
- * The smallest prefix/suffix splice turning `previous` into `next`, widened so
- * it never cuts a surrogate pair: editing 😀→😁 differs only in the low half,
- * and writing that half alone would store a lone surrogate.
- */
-export function safeTextDiff(previous: string, next: string): TextSplice | null {
-  if (previous === next) return null;
-  let start = 0;
-  const shortest = Math.min(previous.length, next.length);
-  while (start < shortest && previous[start] === next[start]) start += 1;
-  let previousEnd = previous.length;
-  let nextEnd = next.length;
-  while (
-    previousEnd > start &&
-    nextEnd > start &&
-    previous[previousEnd - 1] === next[nextEnd - 1]
-  ) {
-    previousEnd -= 1;
-    nextEnd -= 1;
-  }
-  if (start > 0 && isHighSurrogate(previous.charCodeAt(start - 1))) start -= 1;
-  if (previousEnd < previous.length && isLowSurrogate(previous.charCodeAt(previousEnd))) {
-    previousEnd += 1;
-    nextEnd += 1;
-  }
-  return { start, deleteCount: previousEnd - start, insert: next.slice(start, nextEnd) };
-}
-
 /** One contiguous replacement of rich text: the inserted part carries its mentions. */
 export type RichSplice = { start: number; deleteCount: number; insert: TodayRichText };
 
 /**
- * `safeTextDiff` over rich text: a position matches only when its character
+ * A prefix/suffix diff over rich text: a position matches only when its character
  * and, for U+FFFC, its mention are the same. A plain diff cannot tell two
  * adjacent mentions apart (deleting the first would delete the second) and
  * misses a mention replaced in place (the text does not change).

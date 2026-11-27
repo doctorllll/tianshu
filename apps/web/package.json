@@ -32,7 +32,6 @@
     "@fontsource-variable/inter": "^5.3.0",
     "@legendapp/list": "catalog:",
     "@lexical/plain-text": "0.53.0",
-    "@lexical/utils": "0.53.0",
     "@noble/hashes": "catalog:",
     "@pierre/diffs": "catalog:",
     "@pierre/trees": "1.0.0-beta.6",

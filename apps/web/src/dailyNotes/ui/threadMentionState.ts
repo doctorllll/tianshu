@@ -45,7 +45,7 @@ export function threadMentionRef(mentionId: string): ScopedThreadRef | null {
  * Priority: waiting > running > later > done > unread > idle. A thread the shell store does not
  * hold is deleted or unreachable only once the stores have settled.
  */
-export function threadMentionDisplay(input: {
+function threadMentionDisplay(input: {
   shell: EnvironmentThreadShell | null;
   shellsSettled: boolean;
   lastVisitedAt: string | undefined;

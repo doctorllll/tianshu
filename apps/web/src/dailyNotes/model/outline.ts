@@ -18,17 +18,17 @@ import {
  * `collapsed` and `todo`. A thread mention is one U+FFFC carrying the `mention` mark. Each
  * operation validates, then mutates and commits once; a Loro transaction cannot be rolled back.
  */
-export const TODAY_OUTLINE_TREE = "outline";
-export const TODAY_OUTLINE_EDIT_ORIGIN = "today:edit";
+const TODAY_OUTLINE_TREE = "outline";
+const TODAY_OUTLINE_EDIT_ORIGIN = "today:edit";
 /** Fold toggles: synced with the page but never undo steps. */
-export const TODAY_OUTLINE_FOLD_ORIGIN = "sys:today-fold";
+const TODAY_OUTLINE_FOLD_ORIGIN = "sys:today-fold";
 /** Fractional-index jitter: fewer rearranges when peers insert at the same spot. */
 const TODAY_FRACTIONAL_INDEX_JITTER = 4;
 
 /** The one character a mention occupies in node text. */
 export const TODAY_MENTION_CHAR = "\uFFFC";
 /** The LoroText mark key carrying a mention's `{kind, id}`. */
-export const TODAY_MENTION_MARK = "mention";
+const TODAY_MENTION_MARK = "mention";
 
 /**
  * A mention at `start` (always one character long). `kind: ''` is a bare
@@ -45,9 +45,7 @@ export type TodayTodoState = "todo" | "done";
 const TODO_STATES: readonly unknown[] = ["todo", "done"];
 export const isTodayTodoState = (value: unknown): value is TodayTodoState =>
   TODO_STATES.includes(value);
-export const nextTodayTodoState = (
-  state: TodayTodoState | undefined,
-): TodayTodoState | undefined =>
+const nextTodayTodoState = (state: TodayTodoState | undefined): TodayTodoState | undefined =>
   state === undefined ? "todo" : state === "todo" ? "done" : undefined;
 
 export type TodayNodeView = {
@@ -1211,7 +1209,7 @@ export type TodayPageUndo = {
 };
 
 /** Idle gap that closes a typing group. */
-export const TODAY_TYPING_GROUP_IDLE_MS = 1000;
+const TODAY_TYPING_GROUP_IDLE_MS = 1000;
 
 /**
  * Per-page undo. Loro's merge interval stays 0 (it would merge typing and Enter into one step);
