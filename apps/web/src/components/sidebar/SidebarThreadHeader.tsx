@@ -1,5 +1,5 @@
 import { useGT } from "gt-react";
-import { FolderPlusIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
+import { FolderPlusIcon, NotebookPenIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
 import {
   type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -30,6 +30,8 @@ export interface SidebarThreadHeaderProps {
   searchResultCount: number;
   activeSearchResultIndex: number;
   onClearSearch: () => void;
+  /** The daily notes entry; absent while that experiment is off. */
+  dailyNotes?: { onOpen: () => void; shortcutLabel: string | null | undefined };
 }
 
 export function SidebarThreadHeader({
@@ -49,6 +51,7 @@ export function SidebarThreadHeader({
   searchResultCount,
   activeSearchResultIndex,
   onClearSearch,
+  dailyNotes,
 }: SidebarThreadHeaderProps) {
   const gt = useGT();
   const resultsVisible = isSearching && searchResultCount > 0;
@@ -106,6 +109,19 @@ export function SidebarThreadHeader({
               <FolderPlusIcon />
             </SidebarHeaderIconButton>
           </>
+        ) : null}
+        {dailyNotes ? (
+          <SidebarHeaderIconButton
+            label={gt("Daily notes")}
+            tooltip={
+              dailyNotes.shortcutLabel
+                ? gt("Daily notes ({shortcut})", { shortcut: dailyNotes.shortcutLabel })
+                : gt("Daily notes")
+            }
+            onClick={dailyNotes.onOpen}
+          >
+            <NotebookPenIcon />
+          </SidebarHeaderIconButton>
         ) : null}
         <SidebarHeaderIconButton
           label={gt("New thread")}

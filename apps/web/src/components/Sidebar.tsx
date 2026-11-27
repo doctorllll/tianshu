@@ -258,6 +258,8 @@ import {
 import { SidebarContent, SidebarGroup, useSidebar } from "./ui/sidebar";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
+import { useDailyNotesPrefs } from "../dailyNotes/state/dailyNotesPrefs";
+import { openDailyNotes } from "../dailyNotes/ui/openDailyNotes";
 import { TooltipProvider } from "./ui/tooltip";
 import {
   composerDraftHasUserContent,
@@ -3061,6 +3063,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       ? shortcutLabelForCommand(keybindings, "chat.newLocal")
       : undefined);
   const newThreadInProjectShortcutLabel = shortcutLabelForCommand(keybindings, "chat.newLocal");
+  const dailyNotesEnabled = useDailyNotesPrefs((prefs) => prefs.enabled);
+  const dailyNotesShortcutLabel = shortcutLabelForCommand(keybindings, "dailyNotes.open");
   return (
     <SidebarFolderDrop>
       <SidebarChromeHeader isElectron={isElectron} />
@@ -3070,6 +3074,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         fixedHeader={
           <SidebarGroup className="z-[1]">
             <SidebarThreadHeader
+              {...(dailyNotesEnabled
+                ? {
+                    dailyNotes: {
+                      onOpen: () => {
+                        if (isMobile) setOpenMobile(false);
+                        openDailyNotes(router);
+                      },
+                      shortcutLabel: dailyNotesShortcutLabel,
+                    },
+                  }
+                : {})}
               hasProjects={projectGroups.length > 0}
               projectScope={
                 <Combobox

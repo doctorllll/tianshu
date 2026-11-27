@@ -327,6 +327,7 @@ import {
 } from "../threadCategories";
 import { ThreadCategoryPickerDialog } from "./sidebar/ThreadCategoryPicker";
 import { THREAD_PLACEMENT_DRAG_TYPE, useThreadPlacementStore } from "../sidebarThreadPlacement";
+import { DailyNotesNavRow } from "../dailyNotes/ui/DailyNotesNavRow";
 import {
   ThreadMoveProvider,
   ThreadProjectDropTarget,
@@ -3741,6 +3742,7 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
                 <SquarePenIcon />
               </SidebarMenuButton>
             </SidebarMenuItem>
+            <DailyNotesNavRow />
           </SidebarMenu>
         </SidebarGroup>
       }

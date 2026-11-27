@@ -1,4 +1,3 @@
-
 import { buildProjectActionItems } from "./CommandPalette.logic";
 import { useLegacySidebarEnabled } from "../hooks/useSettings";
 import { getThreadSortTimestamp } from "@t3tools/client-runtime/state/thread-sort";
@@ -75,11 +74,14 @@ import {
   PRIMARY_LOCAL_ENVIRONMENT_ID,
   resolveEnvironmentMachineKind,
 } from "@t3tools/contracts";
-import { useLocation, useNavigate } from "@tanstack/react-router";
+import { useLocation, useNavigate, useRouter } from "@tanstack/react-router";
+import { useDailyNotesPrefs } from "../dailyNotes/state/dailyNotesPrefs";
+import { openDailyNotes } from "../dailyNotes/ui/openDailyNotes";
 import {
   ArrowLeftIcon,
   BugIcon,
   ChartNoAxesColumnIcon,
+  NotebookPenIcon,
   CheckIcon,
   ChevronRightIcon,
   CornerLeftUpIcon,
@@ -448,6 +450,8 @@ function OpenCommandPaletteDialog(props: {
   const gt = useGT();
   const messages = useMessages();
   const navigate = useNavigate();
+  const router = useRouter();
+  const dailyNotesEnabled = useDailyNotesPrefs((prefs) => prefs.enabled);
   const pathname = useLocation({ select: (location) => location.pathname });
   const legacySidebarEnabled = useLegacySidebarEnabled();
   const { openChildSearch, setOpen } = props;
@@ -1865,6 +1869,20 @@ function OpenCommandPaletteDialog(props: {
       await navigate({ to: "/usage" });
     },
   });
+
+  if (dailyNotesEnabled) {
+    actionItems.push({
+      kind: "action",
+      value: "action:daily-notes",
+      searchTerms: ["daily", "notes", "journal", "today", "outline", "memo", "diary"],
+      title: gt("Open daily notes"),
+      icon: <NotebookPenIcon className={ITEM_ICON_CLASS} />,
+      shortcutCommand: "dailyNotes.open",
+      run: async () => {
+        openDailyNotes(router);
+      },
+    });
+  }
 
   for (const direction of [1, -1] as const) {
     const title =

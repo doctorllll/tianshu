@@ -40,7 +40,8 @@ export function startMainAppLocationTracking(router: AnyRouter): () => void {
     appModalReturnThreadTarget = resolveThreadRouteTarget(
       router.state.matches.at(-1)?.params ?? {},
     );
-    if (!isSidebarUtilityPage(pathname)) mainAppHref = href;
+    // The notes are a place of their own: pinning them must lead back to the view they replaced.
+    if (!isSidebarUtilityPage(pathname) && pathname !== "/daily-notes") mainAppHref = href;
   };
   record();
   return router.subscribe("onResolved", record);

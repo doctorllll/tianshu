@@ -11,6 +11,8 @@ import { APPEARANCE_OPTIONS, notifyThemeSaveFailure } from "../components/Comman
 import { toggleThemeEditorForTheme } from "../components/settings/themeEditorStore";
 import { toastManager } from "../components/ui/toast";
 import { getThemeSnapshot, setAppearanceMode } from "../hooks/useTheme";
+import { useDailyNotesPrefs } from "../dailyNotes/state/dailyNotesPrefs";
+import { openDailyNotes } from "../dailyNotes/ui/openDailyNotes";
 import { m } from "../i18n/messages";
 import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
 import { type CommandHandler, type CommandScopeOptions, registerCommands } from "./dispatcher";
@@ -98,6 +100,12 @@ export function installCommandPaletteCommands(
         consume(event);
         dispatchCommandPalette({ _tag: "SetOpen", open: false });
         void router.navigate({ to: "/usage" });
+      },
+      "dailyNotes.open": (event) => {
+        if (!useDailyNotesPrefs.getState().enabled) return false;
+        consume(event);
+        dispatchCommandPalette({ _tag: "SetOpen", open: false });
+        openDailyNotes(router);
       },
       "commandPalette.toggle": toggleOverlay("commandPalette.toggle"),
       "filePicker.toggle": toggleOverlay("filePicker.toggle"),

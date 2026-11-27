@@ -536,6 +536,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("hide fold running monitoring threads inbox sidebar shelf")],
   },
   {
+    id: "daily-notes",
+    title: msg("Daily notes"),
+    to: "/settings/labs",
+    searchTerms: [msg("beta journal today outline memo diary notes")],
+  },
+  {
     id: "boring-sidebar",
     title: msg("Boring sidebar (group by project)"),
     to: "/settings/labs",

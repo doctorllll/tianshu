@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import type { TodaySearch } from "../model/dates";
+
 /** Where the pinned column stands and how wide the notes read; kept on this device only. */
 export const PINNED_COLUMN_MIN_WIDTH = 280;
 export const PINNED_COLUMN_MAX_WIDTH = 640;
@@ -16,10 +18,13 @@ interface DailyNotesPrefs {
   pinnedWidth: number;
   /** Span the whole main area instead of the readable column. */
   fullWidth: boolean;
+  /** The day and focus the pinned column shows; not kept across restarts. */
+  pinnedTarget: TodaySearch;
   setEnabled: (enabled: boolean) => void;
   setPinned: (pinned: boolean) => void;
   setPinnedWidth: (width: number) => void;
   setFullWidth: (fullWidth: boolean) => void;
+  setPinnedTarget: (target: TodaySearch) => void;
 }
 
 export const useDailyNotesPrefs = create<DailyNotesPrefs>()(
@@ -29,6 +34,8 @@ export const useDailyNotesPrefs = create<DailyNotesPrefs>()(
       pinned: false,
       pinnedWidth: PINNED_COLUMN_DEFAULT_WIDTH,
       fullWidth: false,
+      pinnedTarget: {},
+      setPinnedTarget: (pinnedTarget) => set({ pinnedTarget }),
       setEnabled: (enabled) => set({ enabled }),
       setPinned: (pinned) => set({ pinned }),
       setPinnedWidth: (width) => set({ pinnedWidth: clampPinnedWidth(width) }),

@@ -5,6 +5,7 @@ import { T, useGT, useMessages } from "gt-react";
 
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
 import { useT3ConnectAuthPrompt } from "../clerk/useT3ConnectAuthPrompt";
+import { useDailyNotesPrefs } from "../../dailyNotes/state/dailyNotesPrefs";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
 import { ScopedSwitch } from "./ScopedSwitch";
@@ -20,6 +21,7 @@ export function LabsSettingsPanel() {
   return (
     <SettingsPageContainer>
       <SettingsSection id="beta" title={gt("Beta")}>
+        <DailyNotesRow />
         <BoringSidebarRow />
         {/* Clerk is only mounted when this build has T3 Connect. */}
         {hasCloudPublicConfig() ? <GuestLinksRowWithSignIn /> : <GuestLinksRow />}
@@ -29,6 +31,28 @@ export function LabsSettingsPanel() {
         <FastWorktreeCheckoutRow />
       </SettingsSection>
     </SettingsPageContainer>
+  );
+}
+
+function DailyNotesRow() {
+  const searchableSetting = useSearchableSetting();
+  const enabled = useDailyNotesPrefs((prefs) => prefs.enabled);
+  const setEnabled = useDailyNotesPrefs((prefs) => prefs.setEnabled);
+  const gt = useGT();
+  return (
+    <SettingsRow
+      {...searchableSetting("daily-notes")}
+      description={gt(
+        "Outline notes by day, with prompts you plan to send and the threads you are driving. Turning it off only hides it; your notes stay on disk. Stored on this device only.",
+      )}
+      control={
+        <Switch
+          checked={enabled}
+          onCheckedChange={(checked) => setEnabled(Boolean(checked))}
+          aria-label={gt("Daily notes")}
+        />
+      }
+    />
   );
 }
 
