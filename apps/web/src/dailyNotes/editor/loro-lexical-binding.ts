@@ -3,7 +3,7 @@
  * Modified for Tianshu (thread mentions, local storage, repo conventions).
  */
 import { COLLABORATION_TAG, SKIP_SCROLL_INTO_VIEW_TAG, type LexicalEditor } from "lexical";
-import type { LoroText } from "loro-crdt";
+import type { LoroText } from "../loro";
 import {
   insertTodayRich,
   readTodayText,

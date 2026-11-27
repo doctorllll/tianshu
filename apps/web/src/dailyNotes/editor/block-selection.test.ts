@@ -2,8 +2,8 @@
  * Adapted from LodyAI/Lody (Apache License 2.0): packages/components/tests/today-block-selection.test.ts.
  * Modified for Tianshu (thread mentions, local storage, repo conventions).
  */
-import { LoroDoc } from "loro-crdt";
-import { describe, expect, it } from "vitest";
+import { LoroDoc } from "../loro";
+import { describe, expect, it } from "vite-plus/test";
 import {
   TODAY_MENTION_CHAR,
   openTodayOutline,

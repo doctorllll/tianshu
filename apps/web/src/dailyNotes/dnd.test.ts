@@ -2,7 +2,7 @@
  * Adapted from LodyAI/Lody (Apache License 2.0): packages/components/tests/today-dnd.test.ts.
  * Modified for Tianshu (thread mentions, local storage, repo conventions).
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { projectTodayDrop, type TodayDropRow } from "./dnd";
 
 const INDENT = 20;

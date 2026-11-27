@@ -2,8 +2,8 @@
  * Adapted from LodyAI/Lody (Apache License 2.0): packages/shared/tests/today-outline.test.ts.
  * Modified for Tianshu (thread mentions, local storage, repo conventions).
  */
-import { LoroDoc } from "loro-crdt";
-import { describe, expect, it } from "vitest";
+import { LoroDoc } from "../loro";
+import { describe, expect, it } from "vite-plus/test";
 import {
   TODAY_MENTION_CHAR,
   createTodayPageUndo,
@@ -368,12 +368,12 @@ describe("Today to-dos", () => {
 
   it("Enter in a to-do starts another unchecked to-do, and Enter on an empty one ends the list", () => {
     const { outline, rows, id } = page("- [x] ab");
-    const created = outline.split(id("ab"), 1) as { nodeId: never };
+    const created = outline.split(id("ab"), 1) as unknown as { nodeId: never };
     expect(rows()).toEqual([
       ["a", "done"],
       ["b", "todo"],
     ]);
-    const empty = outline.split(created.nodeId, 1) as { nodeId: never };
+    const empty = outline.split(created.nodeId, 1) as unknown as { nodeId: never };
     expect(rows().at(-1)).toEqual(["", "todo"]);
     expect(outline.enterOnEmpty(empty.nodeId)).toEqual({ nodeId: empty.nodeId, offset: 0 });
     expect(rows()).toEqual([
@@ -505,7 +505,7 @@ describe("Today snapshot caches", () => {
       else if (action === 12) undo.redo();
       else {
         const theirs = peer.getAllNodes();
-        const target = theirs.length ? pick(theirs).id : undefined;
+        const target = theirs.length ? pick(theirs)?.id : undefined;
         if (target) {
           if (random() < 0.5) peer.split(target, 1);
           else peer.indent([target]);

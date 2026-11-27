@@ -2,7 +2,7 @@
  * Adapted from LodyAI/Lody (Apache License 2.0): packages/components/tests/today-stream.test.ts.
  * Modified for Tianshu (thread mentions, local storage, repo conventions).
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { buildDayStream, localTodayDate, msUntilNextLocalMidnight, type TodayDate } from "./dates";
 
 const d = (value: string) => value as TodayDate;

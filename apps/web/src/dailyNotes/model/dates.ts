@@ -107,7 +107,7 @@ export function todayRouteOutcome(input: {
 }
 
 /** `focus`: `"day"` for the day alone, or a node id to zoom into. */
-export type TodaySearch = { date?: string; focus?: string };
+export type TodaySearch = { date?: string | undefined; focus?: string | undefined };
 
 const FOCUS_PATTERN = /^(day|\d+@\d+)$/;
 

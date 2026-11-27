@@ -11,7 +11,7 @@ import {
   type LoroTree,
   type LoroTreeNode,
   type TreeID,
-} from "loro-crdt";
+} from "../loro";
 
 /**
  * Daily note outline over one LoroDoc: an `outline` LoroTree whose nodes hold a `text` LoroText,

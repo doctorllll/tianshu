@@ -3,7 +3,7 @@
  * Modified for Tianshu: the page persists as one snapshot per day through a revisioned save instead of
  * joining a sync room.
  */
-import type { LoroDoc } from "loro-crdt";
+import type { LoroDoc } from "../loro";
 
 import type { TodayDate } from "../model/dates";
 import {

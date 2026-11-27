@@ -2,7 +2,7 @@
  * Adapted from LodyAI/Lody (Apache License 2.0): packages/components/src/providers/today-page-store-cache.ts.
  * Modified for Tianshu: one local author and a revisioned snapshot repo instead of synced rooms.
  */
-import { LoroDoc } from "loro-crdt";
+import { ensureLoroReady, LoroDoc } from "../loro";
 
 import type { TodayDate } from "../model/dates";
 import { configureTodayTextStyles } from "../model/outline";
@@ -79,6 +79,7 @@ export function createTodayPageStoreCache(options: {
     create: async (docId) => {
       const date = docId as TodayDate;
       await closing.get(docId);
+      await ensureLoroReady();
       const loaded = await repo.load(date);
       const doc = new LoroDoc();
       configureTodayTextStyles(doc);

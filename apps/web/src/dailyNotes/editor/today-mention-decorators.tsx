@@ -6,7 +6,7 @@ import { useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { MentionDecoration } from "./mention-node";
 import { $readMentionOffsets, $readSelectionOffsets } from "./composer-document";
-import { TodayMention } from "../ui/today-mention";
+import { TodayMention } from "../ui/MentionChip";
 import type { TodayEditorController } from "./today-editor-controller";
 
 type Painted = {
