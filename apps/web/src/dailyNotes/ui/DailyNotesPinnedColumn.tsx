@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { useIsMobile } from "~/hooks/useMediaQuery";
+import { useStableCallback } from "~/hooks/useStableCallback";
 import { useUiText } from "~/i18n/useUiText";
 import { useResizeDrag } from "~/hooks/useResizeDrag";
 
@@ -45,6 +46,7 @@ export function DailyNotesPinnedColumn() {
       setDragging(false);
     },
   }));
+  const handleRef = useStableCallback((node: HTMLDivElement | null) => resize.ref(node));
   if (!enabled || !pinned || compact) return null;
   return (
     <aside
@@ -61,7 +63,7 @@ export function DailyNotesPinnedColumn() {
         onOpenThread={openThread}
       />
       <div
-        ref={(node) => resize.ref(node)}
+        ref={handleRef}
         role="separator"
         aria-orientation="vertical"
         className={`absolute inset-y-0 right-0 z-10 w-1.5 cursor-col-resize touch-none hover:bg-border/60 ${dragging ? "bg-border" : ""}`}

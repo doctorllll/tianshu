@@ -6,6 +6,7 @@ import { CheckIcon, ChevronRightIcon, MoreHorizontalIcon } from "lucide-react";
 import { createContext, Fragment, memo, useContext, type ReactNode } from "react";
 
 import { cn } from "~/lib/utils";
+import { useStableCallback } from "~/hooks/useStableCallback";
 import { useUiText } from "~/i18n/useUiText";
 
 import { TodayEditorContext } from "../editor/today-editor-context";
@@ -41,6 +42,9 @@ export const TodayRow = memo(function TodayRow(props: {
   const { node, store, active, selected, title = false } = props;
   const controller = useContext(TodayEditorContext);
   const moreAtEnd = useContext(TodayMoreAtEndContext);
+  const attachRoot = useStableCallback((element: HTMLElement | null) =>
+    controller?.attachRoot(element),
+  );
   const done = node?.todo === "done";
   const blank = !!node && !node.text.trim() && !node.hasChildren && !node.todo;
   const quiet = blank && !active && !selected;
@@ -153,7 +157,7 @@ export const TodayRow = memo(function TodayRow(props: {
         <>
           <div
             key="editor"
-            ref={(element) => controller.attachRoot(element)}
+            ref={attachRoot}
             contentEditable
             suppressContentEditableWarning
             spellCheck={false}
