@@ -19,6 +19,7 @@ import { Menu, MenuCheckboxItem, MenuPopup, MenuTrigger } from "~/components/ui/
 import { Toggle } from "~/components/ui/toggle";
 import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from "~/components/ui/tooltip";
 import { useUiText } from "~/i18n/useUiText";
+import { readThreadShell } from "~/state/entities";
 import { cn } from "~/lib/utils";
 
 import { TodayEditorContext, useTodayEditor } from "../editor/today-editor-context";
@@ -32,6 +33,7 @@ import {
   type TodaySearch,
 } from "../model/dates";
 import { TODAY_MENTION_CHAR, type TodayNodeId } from "../model/outline";
+import { THREAD_MENTION_KIND } from "../thread-mention";
 import { useDailyNotesCache } from "../state/useDailyNotesCache";
 import { useDailyNotesPrefs } from "../state/dailyNotesPrefs";
 import { useTodayClock } from "../state/useTodayClock";
@@ -40,8 +42,11 @@ import { TodayBreadcrumb, type TodayCrumb } from "./Breadcrumb";
 import { TodayCalendar } from "./DateCalendar";
 import { DailyNotesToolbar, type DailyNotesSurface } from "./DailyNotesToolbar";
 import { TodayDaySection } from "./DayOutline";
+import { TodayLiveThreadPicker } from "./MentionPicker";
+import { TodayMentionStatusMenuHost } from "./MentionStatusMenu";
 import { TodayNodeActions } from "./NodeActions";
 import { TodayOutlineSurface } from "./OutlineSurface";
+import { threadMentionRef } from "./threadMentionState";
 
 export type TodayViewTarget = TodaySearch;
 
@@ -359,7 +364,9 @@ export function TodayView(props: {
             />
           ))}
         </TodayOutlineSurface>
+        <TodayLiveThreadPicker />
         <TodayNodeActions openAfterConvert={pinnedColumn} />
+        <TodayMentionStatusMenuHost />
         {anchor && anchor !== today && !focusDate ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
             <span className="pointer-events-auto">
@@ -380,6 +387,6 @@ export function TodayView(props: {
 
 /** The title a mention's thread has now, for the plain-text form of a copy. */
 function threadMentionTitle(mention: { kind: string; id: string }): string | null {
-  void mention;
-  return null;
+  const ref = mention.kind === THREAD_MENTION_KIND ? threadMentionRef(mention.id) : null;
+  return ref ? (readThreadShell(ref)?.title ?? null) : null;
 }

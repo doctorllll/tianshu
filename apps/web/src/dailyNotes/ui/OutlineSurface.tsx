@@ -2,14 +2,21 @@
  * Adapted from LodyAI/Lody (Apache License 2.0): packages/components/src/components/today/today-view.tsx.
  * Modified for Tianshu (Tailwind).
  */
+import { parseScopedThreadKey } from "@t3tools/client-runtime/environment";
 import { useRef, type ReactNode } from "react";
 
 import { useUiText } from "~/i18n/useUiText";
 import { cn } from "~/lib/utils";
+import { THREAD_PLACEMENT_DRAG_TYPE } from "~/sidebarThreadPlacement";
 
 import { useTodayEditor } from "../editor/today-editor-context";
 import type { TodayEditorController } from "../editor/today-editor-controller";
+import { encodeThreadMentionId } from "../thread-mention";
 import { TodayMoreAtEndContext } from "./OutlineRow";
+
+/** A sidebar thread row is being dragged. */
+const isThreadDrag = (data: DataTransfer | null) =>
+  !!data && [...data.types].includes(THREAD_PLACEMENT_DRAG_TYPE);
 
 /** Default max width of the notes' text column, in px. */
 export const TODAY_READABLE_WIDTH = 720;
@@ -38,6 +45,31 @@ export function TodayOutlineSurface(props: {
       ref={(element) => {
         surfaceRef.current = element;
         controller?.attachSurface(element);
+      }}
+      onDragOverCapture={(event) => {
+        if (!controller || !isThreadDrag(event.dataTransfer)) return;
+        // Captured so the node editor never inserts the dragged title as text.
+        event.preventDefault();
+        event.stopPropagation();
+        event.dataTransfer.dropEffect = "move";
+        controller.hoverExternal(event.clientX, event.clientY);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          controller?.leaveExternal();
+        }
+      }}
+      onDropCapture={(event) => {
+        if (!controller || !isThreadDrag(event.dataTransfer)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const ref = parseScopedThreadKey(event.dataTransfer.getData(THREAD_PLACEMENT_DRAG_TYPE));
+        if (!ref) return controller.leaveExternal();
+        controller.dropExternal(
+          encodeThreadMentionId({ environmentId: ref.environmentId, threadId: ref.threadId }),
+          event.clientX,
+          event.clientY,
+        );
       }}
       tabIndex={-1}
       role="tree"
