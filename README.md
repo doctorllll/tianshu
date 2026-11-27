@@ -29,6 +29,7 @@
 - **套餐额度**：顶栏和用量页显示各 agent 的剩余额度与重置时间（ZCode Coding Plan、Antigravity、Grok 等）。
 - **原生程序守护**：某个 agent 依赖的原生 app 没开时，提示并可一键在后台启动。
 - **思考强度滑块**：档位随模型变化，从小行星、行星、恒星、黑洞到星系；恒星往上的天体会冲出滑槽，档位越高，粒子、冲击波和升档的震动越猛。
+- **每日笔记**：按天的大纲笔记（⌥⌘D），可以 `@` 会话、看状态、把一个节点转成新会话，也能固定在侧栏旁边。
 - **中文优先**：界面默认中文。
 - **不上报**：不向任何第三方发送使用数据，没有自动更新源。
 
@@ -71,10 +72,11 @@ vp run dist:desktop:dmg:arm64         # 打包 macOS（Apple Silicon），产物
 
 - **[T3 Code](https://github.com/pingdotgg/t3code)**（pingdotgg，MIT）：天枢的底座——服务端、会话编排与各 agent 的驱动框架都来自它。
 - **[T3 星尘版](https://github.com/zds-xiaoxin/xiaoxin-t3code)**（小新，MIT）：天枢最初就是在星尘版上动手的，它的界面、中文化和大量体验改进至今都在天枢里。谢谢小新。
+- **[Lody](https://github.com/LodyAI/Lody)**（LodyAI，Apache-2.0）：「每日笔记」的交互与大纲模型（Loro + Lexical）移植自它的 Today；相关源文件的头部保留了出处和修改说明。
 
 ## 许可
 
-[MIT](LICENSE)，保留 T3 Code 原有的版权与许可声明。
+[MIT](LICENSE)，保留 T3 Code 原有的版权与许可声明。「每日笔记」里来自 Lody 的部分遵循 Apache-2.0。
 
 ---
 
