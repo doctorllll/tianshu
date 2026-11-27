@@ -9,26 +9,36 @@ import { useUiText } from "~/i18n/useUiText";
 import { cn, normalizeSearchText } from "~/lib/utils";
 import { useVisibleThreadShells } from "~/state/entities";
 
-import { useTodayEditor } from "../editor/today-editor-context";
+import { useTodayEditorState } from "../editor/today-editor-context";
+import type { TodayEditorController } from "../editor/today-editor-controller";
 import { encodeThreadMentionId, THREAD_MENTION_KIND } from "../thread-mention";
 
 const PICKER_LIMIT = 8;
 
+/** The controller keeps the picker outside React: `version` marks when to read it again. */
+function readPicker(_version: number, controller: TodayEditorController | null) {
+  return controller?.getPicker() ?? null;
+}
+
+function readEditorRoot(_version: number, controller: TodayEditorController | null) {
+  return controller?.getEditorRoot() ?? null;
+}
+
 /** The `@` picker below the caret; the thread list is subscribed only while it is open. */
 export function TodayLiveThreadPicker() {
-  const controller = useTodayEditor();
-  if (!controller?.getPicker()) return null;
+  const { controller, version } = useTodayEditorState();
+  if (!readPicker(version, controller)) return null;
   return <ThreadPicker />;
 }
 
 function ThreadPicker() {
   const uiText = useUiText();
-  const controller = useTodayEditor();
+  const { controller, version } = useTodayEditorState();
   const threads = useVisibleThreadShells();
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [above, setAbove] = useState(false);
-  const picker = controller?.getPicker() ?? null;
-  const root = controller?.getEditorRoot() ?? null;
+  const picker = readPicker(version, controller);
+  const root = readEditorRoot(version, controller);
   const query = picker?.query ?? null;
   const rows = useMemo(() => {
     if (query === null) return [];

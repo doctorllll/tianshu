@@ -25,7 +25,8 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { useUiText } from "~/i18n/useUiText";
 
 import { topLevelSelection } from "../editor/block-selection";
-import { useTodayEditor } from "../editor/today-editor-context";
+import type { TodayEditorController } from "../editor/today-editor-controller";
+import { useTodayEditorState } from "../editor/today-editor-context";
 import { TODAY_MENTION_CHAR, type TodayNodeId } from "../model/outline";
 import type { TodayPageStore } from "../store/page-store";
 import { modShortcut } from "./shortcutLabels";
@@ -36,23 +37,30 @@ const BAR_GAP = 6;
 const noopSubscribe = () => () => {};
 const noSnapshot = () => null;
 
+/** The controller keeps its selection outside React: `version` marks when to read it again. */
+function readBlockSelection(_version: number, controller: TodayEditorController | null) {
+  return controller && !controller.isSelectingByPointer() ? controller.getBlockSelection() : null;
+}
+
+function readSurface(_version: number, controller: TodayEditorController | null) {
+  return controller?.getSurface() ?? null;
+}
+
 /** Block-selection actions: to-do step, Convert to task, Copy, Delete. */
 export function TodaySelectionBar(props: {
   onConvert: (store: TodayPageStore, nodeId: TodayNodeId) => void;
 }) {
   const uiText = useUiText();
-  const controller = useTodayEditor();
+  const { controller, version } = useTodayEditorState();
   const ref = useRef<HTMLDivElement | null>(null);
   const [place, setPlace] = useState<{ top: number; left: number } | null>(null);
   const [layout, setLayout] = useState(0);
-  const selection =
-    controller && !controller.isSelectingByPointer() ? controller.getBlockSelection() : null;
-  const version = controller?.getVersion() ?? 0;
+  const selection = readBlockSelection(version, controller);
   const snapshot = useSyncExternalStore(
     selection?.store.subscribe ?? noopSubscribe,
     selection?.store.getSnapshot ?? noSnapshot,
   );
-  const surface = controller?.getSurface() ?? null;
+  const surface = readSurface(version, controller);
 
   useEffect(() => {
     if (!selection || !surface) return undefined;

@@ -9,7 +9,7 @@ import { useUiText } from "~/i18n/useUiText";
 import { cn } from "~/lib/utils";
 import { THREAD_PLACEMENT_DRAG_TYPE } from "~/sidebarThreadPlacement";
 
-import { useTodayEditor } from "../editor/today-editor-context";
+import { useTodayEditorState } from "../editor/today-editor-context";
 import type { TodayEditorController } from "../editor/today-editor-controller";
 import { encodeThreadMentionId } from "../thread-mention";
 import { TodayMoreAtEndContext } from "./OutlineRow";
@@ -97,12 +97,19 @@ export function TodayOutlineSurface(props: {
   );
 }
 
+/** The controller keeps drag state outside React: `version` marks when to read it again. */
+function readDragState(_version: number, controller: TodayEditorController | null) {
+  return {
+    indicator: controller?.getDropIndicator() ?? null,
+    ghost: controller?.getDragGhost() ?? null,
+  };
+}
+
 /** The drop line, the "can't move here" note, and the dragged card. */
 function TodayDragLayer() {
   const uiText = useUiText();
-  const controller = useTodayEditor();
-  const indicator = controller?.getDropIndicator() ?? null;
-  const ghost = controller?.getDragGhost() ?? null;
+  const { controller, version } = useTodayEditorState();
+  const { indicator, ghost } = readDragState(version, controller);
   return (
     <>
       {indicator?.kind === "line" ? (
