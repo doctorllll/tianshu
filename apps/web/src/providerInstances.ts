@@ -173,6 +173,7 @@ const LOCAL_AGENT_ICONS: ReadonlyArray<readonly [RegExp, string]> = [
   [/dsh-acp|DSH_BIN=/, "/agents/deepseek.png"],
   [/fastctx-acp/, "/agents/fastctx.png"],
   [/antigravity-acp/, "/agents/antigravity.png"],
+  [/\bmcode\b/, "/agents/minimax.png"],
 ];
 
 function localAgentIconUrl(command: string): string | undefined {
