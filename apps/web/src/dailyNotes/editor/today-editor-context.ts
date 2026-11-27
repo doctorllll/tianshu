@@ -9,12 +9,17 @@ export const TodayEditorContext = createContext<TodayEditorController | null>(nu
 
 /** The surface's editor controller; re-renders when the active node changes. */
 export function useTodayEditor(): TodayEditorController | null {
+  return useTodayEditorState().controller;
+}
+
+/** The controller plus its change counter, for render output derived from controller state. */
+export function useTodayEditorState() {
   const controller = useContext(TodayEditorContext);
-  useSyncExternalStore(
+  const version = useSyncExternalStore(
     controller?.subscribe ?? noopSubscribe,
     controller?.getVersion ?? zeroVersion,
   );
-  return controller;
+  return { controller, version };
 }
 
 const noopSubscribe = () => () => {};

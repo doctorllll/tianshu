@@ -17,7 +17,7 @@ import {
 import { Button } from "~/components/ui/button";
 import { useUiText } from "~/i18n/useUiText";
 
-import { useTodayEditor } from "../editor/today-editor-context";
+import { useTodayEditor, useTodayEditorState } from "../editor/today-editor-context";
 import type { TodayEditorController } from "../editor/today-editor-controller";
 import { formatTodayHeading, type TodayDate } from "../model/dates";
 import type { TodayNodeId, TodayNodeView } from "../model/outline";
@@ -104,7 +104,7 @@ function TodayStaticOutline(props: {
 }) {
   const { store, isTop, onEmptyChange } = props;
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
-  const controller = useTodayEditor();
+  const { controller, version } = useTodayEditorState();
   useEffect(() => controller?.registerDay(store.date, store), [controller, store]);
   // A day found empty is skipped from the stream until it is written again.
   useEffect(() => {
@@ -128,7 +128,7 @@ function TodayStaticOutline(props: {
         <TodayRow
           key={node.id}
           store={store}
-          {...rowState(controller, store, snapshot.visible, index)}
+          {...rowState(version, controller, store, snapshot.visible, index)}
         />
       ))}
     </div>
@@ -139,7 +139,7 @@ function TodayStaticOutline(props: {
 function TodayZoomedOutline(props: { store: TodayPageStore; root: TodayNodeId }) {
   const uiText = useUiText();
   const { store, root } = props;
-  const controller = useTodayEditor();
+  const { controller, version } = useTodayEditorState();
   const readSubtree = useCallback(() => store.outline.getSubtree(root), [root, store]);
   const subtree = useSyncExternalStore(store.subscribe, readSubtree);
   const node = useMemo(() => {
@@ -156,15 +156,15 @@ function TodayZoomedOutline(props: { store: TodayPageStore; root: TodayNodeId })
       </div>
     );
   }
-  const rootSelected = !!controller?.isBlockSelected(store, root);
+  const rootState = rowState(version, controller, store, [node], 0);
   return (
     <div className="flex min-h-7 flex-col" role="tree">
       <TodayRow
         node={node}
         store={store}
         title
-        active={!!controller?.isActive(store, root)}
-        selected={rootSelected}
+        active={rootState.active}
+        selected={rootState.selected}
       />
       {subtree.visible.length === 0 ? (
         <TodayAddChild store={store} parentId={root} />
@@ -175,7 +175,7 @@ function TodayZoomedOutline(props: { store: TodayPageStore; root: TodayNodeId })
           <TodayRow
             key={row.id}
             store={store}
-            {...rowState(controller, store, subtree.visible, index)}
+            {...rowState(version, controller, store, subtree.visible, index)}
           />
         ))
       )}
@@ -210,6 +210,7 @@ function TodayAddChild(props: { store: TodayPageStore; parentId: TodayNodeId }) 
 
 /** What a memoized row compares: its node and its editing and selection state. */
 function rowState(
+  _version: number,
   controller: TodayEditorController | null,
   store: TodayPageStore,
   visible: readonly TodayNodeView[],
@@ -323,7 +324,7 @@ function TodayVirtualOutline(props: { store: TodayPageStore; zoomRoot?: TodayNod
           className="absolute inset-x-0 top-0"
           style={{ transform: `translateY(${item.start - scrollMargin}px)` }}
         >
-          <TodayRow store={store} {...rowState(controller, store, visible, item.index)} />
+          <TodayRow store={store} {...rowState(version ?? 0, controller, store, visible, item.index)} />
         </div>
       ))}
     </div>
