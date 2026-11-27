@@ -5,6 +5,7 @@
  */
 import { useAtomValue } from "@effect/atom-react";
 import { scopedProjectKey } from "@t3tools/client-runtime/environment";
+import { deriveThreadTitleSeed } from "@t3tools/client-runtime/operations";
 import { isReasoningSelect } from "@t3tools/client-runtime/model-traits";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
@@ -64,12 +65,14 @@ function defaultEffort(
   );
 }
 
-/** A title for the new thread from the first line of the prompt. */
-function titleOf(prompt: string): string {
+/**
+ * The placeholder title shown until the generated one lands: the first line of the prompt, as the
+ * composer seeds it. It is sent as `titleSeed`, so the server then writes a proper title.
+ */
+function titleSeedOf(prompt: string): string {
   const line = prompt.split("\n").find((candidate) => candidate.trim()) ?? "";
   const plain = line.replace(/^\s*(?:[-*]\s+(?:\[[ xX]\]\s+)?)/, "").trim();
-  // oxlint-disable-next-line t3code/no-untranslated-copy -- the default title of a stored thread, not shown copy
-  return plain.length > 80 ? `${plain.slice(0, 79)}…` : plain || "New thread";
+  return deriveThreadTitleSeed({ text: plain, attachments: [] });
 }
 
 /**
@@ -154,7 +157,7 @@ function ConvertForm(props: {
     setSending(true);
     setError(null);
     const threadId = newThreadId();
-    const title = titleOf(prompt);
+    const title = titleSeedOf(prompt);
     // oxlint-disable-next-line react/purity -- runs in an event handler (oxc#27309)
     const createdAt = new Date().toISOString();
     const options =
@@ -170,6 +173,7 @@ function ConvertForm(props: {
         threadId,
         message: { messageId: newMessageId(), role: "user", text: prompt, attachments: [] },
         modelSelection,
+        titleSeed: title,
         runtimeMode,
         interactionMode: "default",
         bootstrap: {
