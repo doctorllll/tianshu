@@ -30,7 +30,12 @@ import {
   planHandoffNote,
   shouldCarry,
 } from "./planHandoff.ts";
-import { planRequirement } from "./planRequirement.ts";
+import {
+  advancePlanState,
+  type PlanTurnState,
+  planRequirement,
+  planWritten,
+} from "./planRequirement.ts";
 
 /**
  * Where a thread's plan lives. Agents with a plan of their own keep it there: fastctx in its
@@ -504,15 +509,16 @@ const make = Effect.gen(function* () {
       ),
     );
 
-  /** The plan version each thread's agent was last shown or wrote itself. */
-  const lastSeen = new Map<ThreadId, number | null>();
+  /** What each thread's agent has been told about the plan, turn by turn. */
+  const turnStates = new Map<ThreadId, PlanTurnState>();
 
   const write: ThreadPlansShape["write"] = Effect.fn("ThreadPlans.write")(
     function* (input: Parameters<ThreadPlansShape["write"]>[0]) {
       const location = yield* locate(input.threadId);
       const outcome = yield* writeAt(input.threadId, location, input);
       if (input.updatedBy === "agent" && outcome.result === "saved") {
-        lastSeen.set(input.threadId, outcome.plan.version);
+        const known = planWritten(turnStates.get(input.threadId), outcome.plan.version);
+        if (known !== undefined) turnStates.set(input.threadId, known);
       }
       const key = planLocationKey(location);
       if (key !== null && outcome.result === "saved") {
@@ -616,10 +622,14 @@ const make = Effect.gen(function* () {
       });
       if (location.source !== "tianshu") return "";
       const plan = yield* readAt(input.threadId, location);
-      const showPlan =
-        !lastSeen.has(input.threadId) || lastSeen.get(input.threadId) !== plan.version;
-      lastSeen.set(input.threadId, plan.version);
-      return planRequirement({ markdown: plan.markdown, version: plan.version, showPlan });
+      const { state, showPlan } = advancePlanState(turnStates.get(input.threadId), plan.version);
+      turnStates.set(input.threadId, state);
+      return planRequirement({
+        markdown: plan.markdown,
+        version: plan.version,
+        showPlan,
+        quietTurns: state.quiet,
+      });
     },
     Effect.catch((error) =>
       Effect.logWarning("Could not read the plan for a turn", { error }).pipe(Effect.as("")),
