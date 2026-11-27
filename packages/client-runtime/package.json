@@ -662,6 +662,10 @@
     "./state/thread-plans": {
       "types": "./src/state/threadPlans.ts",
       "import": "./src/state/threadPlans.ts"
+    },
+    "./state/daily-notes": {
+      "types": "./src/state/dailyNotes.ts",
+      "import": "./src/state/dailyNotes.ts"
     }
   },
   "scripts": {

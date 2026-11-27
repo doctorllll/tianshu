@@ -109,6 +109,7 @@ import * as PeerThreadRelay from "./peer/PeerThreadRelay.ts";
 import * as McpSessionRegistry from "./mcp/McpSessionRegistry.ts";
 import * as PreviewAutomationBroker from "./mcp/PreviewAutomationBroker.ts";
 import * as DeviceService from "./device/DeviceService.ts";
+import * as DailyNotes from "./dailyNotes/DailyNotes.ts";
 import * as SubSessionProposals from "./mcp/SubSessionProposals.ts";
 import * as ThreadPlans from "./plans/ThreadPlans.ts";
 import * as DeviceHubProxy from "./device/DeviceHubProxy.ts";
@@ -947,6 +948,8 @@ const layerMakeRoutes = Layer.mergeAll(
   Layer.provide(SubSessionProposals.layer),
   // Each thread's plan: shown in the side panel, read and written by agents over /mcp.
   Layer.provide(layerThreadPlans),
+  // One page of notes per day, saved as snapshots under the state directory.
+  Layer.provide(DailyNotes.layer),
   // Share the service so HTTP/WS clients single-flight reads and invalidate each other's cached patches.
   Layer.provide(layerPullRequestService),
   Layer.provide(layerThreadIssueService),

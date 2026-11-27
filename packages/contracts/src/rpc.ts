@@ -24,6 +24,15 @@ import {
   WriteThreadPlanInput,
   WriteThreadPlanResult,
 } from "./threadPlan.ts";
+import {
+  DailyNoteError,
+  GetDailyNoteInput,
+  GetDailyNoteResult,
+  ListDailyNotesInput,
+  ListDailyNotesResult,
+  SaveDailyNoteInput,
+  SaveDailyNoteResult,
+} from "./dailyNotes.ts";
 import { UserMemoryMutation } from "./memory.ts";
 import {
   OrchestrationV2SearchThreadError,
@@ -750,6 +759,9 @@ export const WS_METHODS = {
   respondSubSessionProposal: "subSessionProposal.respond",
   subscribeThreadPlan: "subscribeThreadPlan",
   writeThreadPlan: "threadPlan.write",
+  dailyNotesList: "dailyNotes.list",
+  dailyNotesGet: "dailyNotes.get",
+  dailyNotesSave: "dailyNotes.save",
 } as const;
 
 const WsServerUpsertKeybindingRpc = Rpc.make(WS_METHODS.serverUpsertKeybinding, {
@@ -2110,6 +2122,24 @@ const WsWriteThreadPlanRpc = Rpc.make(WS_METHODS.writeThreadPlan, {
   error: Schema.Union([ThreadPlanError, EnvironmentAuthorizationError]),
 });
 
+const WsDailyNotesListRpc = Rpc.make(WS_METHODS.dailyNotesList, {
+  payload: ListDailyNotesInput,
+  success: ListDailyNotesResult,
+  error: Schema.Union([DailyNoteError, EnvironmentAuthorizationError]),
+});
+
+const WsDailyNotesGetRpc = Rpc.make(WS_METHODS.dailyNotesGet, {
+  payload: GetDailyNoteInput,
+  success: GetDailyNoteResult,
+  error: Schema.Union([DailyNoteError, EnvironmentAuthorizationError]),
+});
+
+const WsDailyNotesSaveRpc = Rpc.make(WS_METHODS.dailyNotesSave, {
+  payload: SaveDailyNoteInput,
+  success: SaveDailyNoteResult,
+  error: Schema.Union([DailyNoteError, EnvironmentAuthorizationError]),
+});
+
 const WsDeviceTestHostRpc = Rpc.make(WS_METHODS.deviceTestHost, {
   payload: SshDeviceHostConfig,
   success: DeviceHostSummary,
@@ -2697,6 +2727,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsRespondSubSessionProposalRpc,
   WsSubscribeThreadPlanRpc,
   WsWriteThreadPlanRpc,
+  WsDailyNotesListRpc,
+  WsDailyNotesGetRpc,
+  WsDailyNotesSaveRpc,
   WsDeviceConfigureRpc,
   WsDeviceListRpc,
   WsDeviceTestHostRpc,

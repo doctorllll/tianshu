@@ -17,6 +17,7 @@ import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as PeerClientPairing from "./peer/PeerClientPairing.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
 import * as SubSessionProposals from "./mcp/SubSessionProposals.ts";
+import * as DailyNotes from "./dailyNotes/DailyNotes.ts";
 import * as ThreadPlans from "./plans/ThreadPlans.ts";
 import * as PeerLinks from "./peer/PeerLinks.ts";
 import * as PeerThreadRelay from "./peer/PeerThreadRelay.ts";
@@ -1588,6 +1589,9 @@ export const layerWsRpc = (
       const threadPlans =
         Option.getOrUndefined(yield* Effect.serviceOption(ThreadPlans.ThreadPlans)) ??
         ThreadPlans.unavailable;
+      const dailyNotes =
+        Option.getOrUndefined(yield* Effect.serviceOption(DailyNotes.DailyNotes)) ??
+        DailyNotes.unavailable;
       const peerThreadRelay = yield* PeerThreadRelay.PeerThreadRelay;
       const peerClientPairing = yield* PeerClientPairing.PeerClientPairing;
       const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
@@ -2787,6 +2791,9 @@ export const layerWsRpc = (
         [WS_METHODS.respondSubSessionProposal]: (input) => subSessionProposals.respond(input),
         [WS_METHODS.subscribeThreadPlan]: (input) => threadPlans.changes(input.threadId),
         [WS_METHODS.writeThreadPlan]: (input) => threadPlans.write({ ...input, updatedBy: "user" }),
+        [WS_METHODS.dailyNotesList]: () => dailyNotes.list,
+        [WS_METHODS.dailyNotesGet]: (input) => dailyNotes.get(input.date),
+        [WS_METHODS.dailyNotesSave]: (input) => dailyNotes.save(input),
         [WS_METHODS.peerLinksAnswerRequest]: (input) =>
           Effect.annotateCurrentSpan({ "orchestration_v2.thread_id": input.threadId }).pipe(
             Effect.andThen(peerLinkRequests.answer(input)),
@@ -3766,6 +3773,9 @@ export const layer = Layer.unwrap(
     const threadPlans =
       Option.getOrUndefined(yield* Effect.serviceOption(ThreadPlans.ThreadPlans)) ??
       ThreadPlans.unavailable;
+    const dailyNotes =
+      Option.getOrUndefined(yield* Effect.serviceOption(DailyNotes.DailyNotes)) ??
+      DailyNotes.unavailable;
     const peerThreadRelay = yield* PeerThreadRelay.PeerThreadRelay;
     const peerClientPairing = yield* PeerClientPairing.PeerClientPairing;
     const sql = yield* SqlClient.SqlClient;
@@ -3871,7 +3881,12 @@ export const layer = Layer.unwrap(
               Layer.provide(
                 Layer.succeed(SubSessionProposals.SubSessionProposals, subSessionProposals),
               ),
-              Layer.provide(Layer.succeed(ThreadPlans.ThreadPlans, threadPlans)),
+              Layer.provide(
+                Layer.mergeAll(
+                  Layer.succeed(ThreadPlans.ThreadPlans, threadPlans),
+                  Layer.succeed(DailyNotes.DailyNotes, dailyNotes),
+                ),
+              ),
               Layer.provide(Layer.succeed(PeerThreadRelay.PeerThreadRelay, peerThreadRelay)),
               Layer.provide(Layer.succeed(PeerClientPairing.PeerClientPairing, peerClientPairing)),
               Layer.provide(
