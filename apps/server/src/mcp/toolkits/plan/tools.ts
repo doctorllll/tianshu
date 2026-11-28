@@ -34,7 +34,7 @@ const PlanRead = Tool.make("plan_read", {
 const PlanWrite = Tool.make("plan_write", {
   ...common,
   description:
-    "Replace this thread's plan, the Markdown the user and other agents follow and hand off from. On multi-step work keep it current: goal, steps as [ ]/[x], decisions, open questions. Pass the version you read (null if none); a conflict returns the current plan.",
+    "Replace this thread's plan, the Markdown the user and other agents follow and hand off from. How to write and arrange it is up to you. Pass the version you read (null if none); a conflict returns the current plan.",
   parameters: Schema.Struct({
     markdown: Schema.String,
     expectedVersion: Schema.NullOr(Schema.Number),

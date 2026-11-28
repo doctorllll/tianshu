@@ -14,7 +14,7 @@ export const PLAN_REFRESH_TURNS = 8;
 const RULES = [
   "<plan_rules>",
   "This thread keeps a plan: Markdown the user and other agents follow and hand off from. Using it is required.",
-  "- Before any work beyond a quick answer, write it with plan_write: goal, steps as [ ]/[x], decisions, open questions.",
+  "- Before any work beyond a quick answer, write it with plan_write. How to write and arrange it is up to you; the one test is that someone who reads only the plan can carry on.",
   "- Keep it current as you work (plan_edit for a small change, plan_write to rewrite; pass the version you read), and bring it up to date before you end a turn.",
   '- The tools are plan_read, plan_write and plan_edit from t3-code; if they are not listed, search your tools for "plan_write".',
   "</plan_rules>",
