@@ -175,6 +175,16 @@ function stripClaudeContextWindowSuffix(value: string): string {
   return value.replace(/\[[^\]]*\]$/, "").trim();
 }
 
+/** Whether the CLI itself named a model the catalog does not hold, which only a gateway it can
+ * reach adds: its own aliases (`opus`, `sonnet`, `haiku`) are reported even with none reachable. */
+export function claudeReportedGatewayModels(
+  catalog: ClaudeModelCatalog,
+  customModels: ReadonlyArray<CustomModelSetting>,
+  reported: ReadonlyArray<ClaudeModelInfo> | undefined,
+): boolean {
+  return claudeReportedModels(catalog, customModels, reported).length > 0;
+}
+
 export function claudeReportedModels(
   catalog: ClaudeModelCatalog,
   customModels: ReadonlyArray<CustomModelSetting>,

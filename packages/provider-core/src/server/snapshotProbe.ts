@@ -296,6 +296,8 @@ export function buildServerProvider(input: {
   updateRequiredModels?: ReadonlyArray<ServerProviderUpdateRequiredModel>;
   slashCommands?: ReadonlyArray<ServerProviderSlashCommand>;
   skills?: ReadonlyArray<ServerProviderSkill>;
+  /** The agent itself stated its model list, so a model missing from `models` is gone. */
+  modelsProbed?: boolean;
   probe: ProviderProbeResult;
 }): ServerProviderDraft {
   const versionAdvisory = input.driver
@@ -330,6 +332,7 @@ export function buildServerProvider(input: {
     checkedAt: input.checkedAt,
     ...(input.probe.message ? { message: input.probe.message } : {}),
     models: input.models,
+    ...(input.modelsProbed ? { modelsProbed: true } : {}),
     ...(input.updateRequiredModels?.length
       ? { updateRequiredModels: input.updateRequiredModels }
       : {}),

@@ -1505,37 +1505,75 @@ it.layer(
       );
     });
 
-    it.each(["kiro", "claudeAgent"] as const)(
-      "keeps %s models a ready probe can omit",
-      (driver) => {
-        const previousProvider = {
-          instanceId: ProviderInstanceId.make(driver),
-          driver: ProviderDriverKind.make(driver),
-          status: "ready",
-          enabled: true,
-          installed: true,
-          auth: { status: "authenticated" },
-          checkedAt: "2026-10-30T00:00:00.000Z",
-          version: "1.0.0",
-          models: [
-            { slug: "built-in-model", name: "Built-in", isCustom: false, capabilities: null },
-            { slug: "listed-model", name: "Listed", isCustom: false, capabilities: null },
-          ],
-          slashCommands: [],
-          skills: [],
-        } as const satisfies ServerProvider;
-        const partialProvider = {
-          ...previousProvider,
-          checkedAt: "2026-10-30T00:01:00.000Z",
-          models: [previousProvider.models[0]],
-        } satisfies ServerProvider;
+    it("keeps kiro models a ready probe can omit", () => {
+      const previousProvider = {
+        instanceId: ProviderInstanceId.make("kiro"),
+        driver: ProviderDriverKind.make("kiro"),
+        status: "ready",
+        enabled: true,
+        installed: true,
+        auth: { status: "authenticated" },
+        checkedAt: "2026-10-30T00:00:00.000Z",
+        version: "1.0.0",
+        models: [
+          { slug: "built-in-model", name: "Built-in", isCustom: false, capabilities: null },
+          { slug: "listed-model", name: "Listed", isCustom: false, capabilities: null },
+        ],
+        slashCommands: [],
+        skills: [],
+      } as const satisfies ServerProvider;
+      const partialProvider = {
+        ...previousProvider,
+        checkedAt: "2026-10-30T00:01:00.000Z",
+        models: [previousProvider.models[0]],
+      } satisfies ServerProvider;
 
-        assert.deepStrictEqual(
-          ProviderRegistry.mergeProviderSnapshot(previousProvider, partialProvider).models,
-          [...previousProvider.models],
-        );
-      },
-    );
+      assert.deepStrictEqual(
+        ProviderRegistry.mergeProviderSnapshot(previousProvider, partialProvider).models,
+        [...previousProvider.models],
+      );
+    });
+
+    it("keeps Claude's models when the probe named none, and drops the ones it left out", () => {
+      const previousProvider = {
+        instanceId: ProviderInstanceId.make("claudeAgent"),
+        driver: ProviderDriverKind.make("claudeAgent"),
+        status: "ready",
+        enabled: true,
+        installed: true,
+        auth: { status: "authenticated" },
+        checkedAt: "2026-10-30T00:00:00.000Z",
+        version: "1.0.0",
+        models: [
+          { slug: "built-in-model", name: "Built-in", isCustom: false, capabilities: null },
+          { slug: "listed-model", name: "Listed", isCustom: false, capabilities: null },
+        ],
+        slashCommands: [],
+        skills: [],
+      } as const satisfies ServerProvider;
+      const merge = ProviderRegistry.mergeProviderSnapshot;
+
+      // Another instance or a terminal `claude` on a different gateway rewrote the shared cache,
+      // so this probe read no gateway models at all: the ones held stay.
+      const silentProbe = {
+        ...previousProvider,
+        checkedAt: "2026-10-30T00:01:00.000Z",
+        models: [previousProvider.models[0]],
+      } satisfies ServerProvider;
+      assert.deepStrictEqual(merge(previousProvider, silentProbe).models, [
+        ...previousProvider.models,
+      ]);
+
+      // A probe that did read the list is authoritative: the model magpie no longer offers goes.
+      assert.deepStrictEqual(
+        merge(previousProvider, { ...silentProbe, modelsProbed: true }).models,
+        [previousProvider.models[0]],
+      );
+      assert.deepStrictEqual(
+        merge({ ...previousProvider, modelsProbed: true }, silentProbe).models,
+        [...previousProvider.models],
+      );
+    });
 
     it("retains stale OpenCode models when a refresh fails or lists none", () => {
       const previousProvider = {

@@ -72,6 +72,7 @@ import {
   type ClaudeEffortCapSource,
   type ClaudeEffortLevel,
   type ClaudeModelCatalog,
+  claudeReportedGatewayModels,
   claudeReportedModels,
   formatClaudeVersionUpgradeMessage,
   resolveClaudeModelsForVersion,
@@ -800,6 +801,14 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
   );
   const skills = yield* discoverClaudeSkills(claudeSettings, cwd, resolvedEnvironment);
   const slashCommands = [COMPACT_SLASH_COMMAND, ...(capabilities?.slashCommands ?? [])];
+  // The CLI always reports its own aliases, so only a model beyond the catalog proves this probe
+  // read this gateway: without one, another instance or a terminal `claude` on a different
+  // gateway may have rewritten the shared cache and the models the app holds are kept.
+  const modelsProbed = claudeReportedGatewayModels(
+    modelCatalog,
+    claudeSettings.customModels,
+    capabilities?.models,
+  );
   const dedupedSlashCommands = dedupeSlashCommands(slashCommands);
 
   if (!capabilities) {
@@ -891,6 +900,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
     enabled: claudeSettings.enabled,
     checkedAt,
     models,
+    ...(modelsProbed ? { modelsProbed: true } : {}),
     updateRequiredModels,
     slashCommands: dedupedSlashCommands,
     skills,

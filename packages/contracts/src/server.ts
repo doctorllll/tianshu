@@ -281,6 +281,11 @@ export const ServerProvider = Schema.Struct({
   subProviders: Schema.optional(Schema.Array(ServerProviderSubProvider)),
   // Set for the one failed check that follows a ready one: pickers keep offering `models`.
   modelsRetained: Schema.optionalKey(Schema.Boolean),
+  /**
+   * This check read the model list from the agent itself, so `models` is the whole list it offers
+   * now and a model missing from it is gone rather than merely unreported.
+   */
+  modelsProbed: Schema.optionalKey(Schema.Boolean),
   // Kept apart from `models` so clients that predate it never offer them.
   updateRequiredModels: Schema.optionalKey(Schema.Array(ServerProviderUpdateRequiredModel)),
   slashCommands: Schema.Array(ServerProviderSlashCommand).pipe(

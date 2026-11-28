@@ -6,6 +6,8 @@ import {
   BUNDLED_CLAUDE_MODEL_CATALOG,
   capClaudeCatalogEffort,
   type ClaudeModelCatalog,
+  claudeReportedGatewayModels,
+  claudeReportedModels,
   formatClaudeVersionUpgradeMessage,
   getClaudeCatalogModelCapabilities,
   normalizeClaudeCatalogEffort,
@@ -561,6 +563,33 @@ describe("Claude model catalog", () => {
     assert.strictEqual(
       maxLabel([{ maxEffortLevel: "medium" }, perModel({ opus: "high" })]),
       "Max (capped to Medium)",
+    );
+  });
+
+  it("takes a probe as the gateway's list only when it named a model beyond the catalog", () => {
+    const catalog = BUNDLED_CLAUDE_MODEL_CATALOG;
+    const aliasesOnly = [
+      { value: "opus", displayName: "Opus" },
+      { value: "sonnet[1m]", displayName: "Sonnet", resolvedModel: "auto/kimi-k3.1-pro[1m]" },
+      { value: "haiku", displayName: "Haiku" },
+      { value: "default", displayName: "Default" },
+    ] as unknown as ReadonlyArray<Parameters<typeof claudeReportedGatewayModels>[2]>[number];
+
+    // Claude Code lists its own aliases whether or not a gateway answered, so they prove nothing.
+    assert.strictEqual(claudeReportedModels(catalog, [], aliasesOnly).length, 0);
+    assert.strictEqual(claudeReportedGatewayModels(catalog, [], aliasesOnly), false);
+    assert.strictEqual(claudeReportedGatewayModels(catalog, [], undefined), false);
+
+    // A model the catalog does not hold came from the gateway this instance talks to.
+    const withGateway = [
+      ...(aliasesOnly as unknown as ReadonlyArray<{ value: string; displayName: string }>),
+      { value: "ds/deepseek-v4.1-flash[1m]", displayName: "DeepSeek V4.1 Flash" },
+    ] as unknown as ReadonlyArray<Parameters<typeof claudeReportedGatewayModels>[2]>[number];
+    assert.strictEqual(claudeReportedGatewayModels(catalog, [], withGateway), true);
+    // A model the app was told to treat as custom is no proof of the gateway either.
+    assert.strictEqual(
+      claudeReportedGatewayModels(catalog, ["ds/deepseek-v4.1-flash"], withGateway),
+      false,
     );
   });
 });
